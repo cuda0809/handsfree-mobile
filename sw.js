@@ -1,4 +1,4 @@
-const CACHE='handsfree-shell-v4';
+const CACHE='handsfree-shell-v5';
 self.addEventListener('install',event=>{self.skipWaiting();});
 self.addEventListener('activate',event=>{event.waitUntil((async()=>{
   const keys=await caches.keys();
@@ -6,7 +6,7 @@ self.addEventListener('activate',event=>{event.waitUntil((async()=>{
   await self.clients.claim();
   const clients=await self.clients.matchAll({type:'window',includeUncontrolled:true});
   await Promise.all(clients.map(async client=>{
-    try{if('navigate' in client) await client.navigate('/');}catch(e){}
+    try{if('navigate' in client) await client.navigate('/?sw=5');}catch(e){}
   }));
 })());});
 self.addEventListener('fetch',event=>{
@@ -19,8 +19,8 @@ self.addEventListener('fetch',event=>{
         const fresh=await fetch(req,{cache:'no-store'});
         const html=await fresh.text();
         let injected=html;
-        if(!injected.includes('/equipment-tab.js')) injected=injected.replace('</body>','<script src="/equipment-tab.js?v=4"></script></body>');
-        if(!injected.includes('/update-client.js')) injected=injected.replace('</body>','<script src="/update-client.js?v=4"></script></body>');
+        if(!injected.includes('/equipment-tab.js')) injected=injected.replace('</body>','<script src="/equipment-tab.js?v=5"></script></body>');
+        if(!injected.includes('/update-client.js')) injected=injected.replace('</body>','<script src="/update-client.js?v=5"></script></body>');
         const headers=new Headers(fresh.headers);
         headers.set('content-type','text/html; charset=utf-8');
         headers.set('cache-control','no-store');
