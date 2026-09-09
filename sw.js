@@ -1,4 +1,4 @@
-const CACHE='handsfree-shell-v3';
+const CACHE='handsfree-shell-v4';
 self.addEventListener('install',event=>{self.skipWaiting();});
 self.addEventListener('activate',event=>{event.waitUntil((async()=>{
   const keys=await caches.keys();
@@ -18,7 +18,9 @@ self.addEventListener('fetch',event=>{
       try{
         const fresh=await fetch(req,{cache:'no-store'});
         const html=await fresh.text();
-        const injected=html.includes('/equipment-tab.js')?html:html.replace('</body>','<script src="/equipment-tab.js?v=3"></script></body>');
+        let injected=html;
+        if(!injected.includes('/equipment-tab.js')) injected=injected.replace('</body>','<script src="/equipment-tab.js?v=4"></script></body>');
+        if(!injected.includes('/update-client.js')) injected=injected.replace('</body>','<script src="/update-client.js?v=4"></script></body>');
         const headers=new Headers(fresh.headers);
         headers.set('content-type','text/html; charset=utf-8');
         headers.set('cache-control','no-store');
