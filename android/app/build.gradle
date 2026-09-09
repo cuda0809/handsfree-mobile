@@ -2,6 +2,12 @@ plugins {
     id 'com.android.application'
 }
 
+def releaseStoreFile = project.findProperty('HF_RELEASE_STORE_FILE')
+def releaseStorePassword = project.findProperty('HF_RELEASE_STORE_PASSWORD')
+def releaseKeyAlias = project.findProperty('HF_RELEASE_KEY_ALIAS')
+def releaseKeyPassword = project.findProperty('HF_RELEASE_KEY_PASSWORD')
+def hasReleaseSigning = releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword
+
 android {
     namespace 'com.handsfree.mobile'
     compileSdk 35
@@ -12,5 +18,28 @@ android {
         targetSdk 35
         versionCode 1
         versionName '0.3.0'
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            // Existing test/debug APK path remains unchanged.
+        }
+        release {
+            minifyEnabled false
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
+        }
     }
 }
