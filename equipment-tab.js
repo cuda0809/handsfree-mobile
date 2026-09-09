@@ -50,7 +50,7 @@
     if(values[2]) values[2].textContent=issue+'대';
     if(values[3]) values[3].textContent=inspected+'대';
     setChipCopy(['전체 장비','작업 중','긴급','주의']);
-    const focusLabel=$('.focus small'); if(focusLabel) focusLabel.textContent='장비 빠른 확인 · 자동반영 테스트';
+    const focusLabel=$('.focus small'); if(focusLabel) focusLabel.textContent='✅ 자동 업데이트 성공';
     const focusText=$('#focusText'); if(focusText) focusText.textContent='검색하거나 장비 카드를 선택해 상세 상태를 확인';
     const focusBtn=$('#focusBtn');
     if(focusBtn){
