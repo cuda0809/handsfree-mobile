@@ -1,0 +1,15 @@
+# Android signing material - never commit
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+android/local.properties
+
+# Android/Gradle build outputs
+.gradle/
+**/build/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
