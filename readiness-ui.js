@@ -49,6 +49,13 @@
     else html=panel+html;
     return html;
   };
+  if(typeof renderCoreSource==='function'){
+    const baseSource=renderCoreSource;
+    renderCoreSource=function(){
+      baseSource();
+      const brand=$('.brand small'); if(brand) brand.textContent='리얼 0.4 · 생산 준비도 판단 엔진';
+    };
+  }
   const style=document.createElement('style');
   style.textContent=`
     .pr-panel{margin:10px 0 13px;border:1px solid #d6e1ec;background:#fff;border-radius:16px;padding:11px}.pr-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;margin-bottom:9px}.pr-head small{font-size:8px;font-weight:900;color:#54718d}.pr-head h3{font-size:13px;margin:2px 0 0}.pr-head>span{font-size:9px;font-weight:900;background:#f0f4f8;padding:6px 8px;border-radius:999px;white-space:nowrap}
