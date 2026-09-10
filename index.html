@@ -3,40 +3,87 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#102a4a">
+<meta name="theme-color" content="#0b2f55">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="핸즈프리 리얼">
+<meta name="apple-mobile-web-app-title" content="KMT HandsFree">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/real.css">
-<title>핸즈프리 모바일 — 리얼</title>
+<link rel="stylesheet" href="/kmt-brand.css">
+<style>.kmt-logo{background-image:url(data:image/png;base64,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)}</style>
+<title>KMT HandsFree Mobile</title>
 </head>
 <body>
+<section id="loginScreen" class="login-screen" aria-label="KMT HandsFree 로그인">
+  <div class="login-backdrop"></div>
+  <div class="login-wrap">
+    <div class="login-brand">
+      <div class="kmt-logo kmt-logo-login" role="img" aria-label="KMT 케이엠텍(주)"></div>
+      <div class="login-product">HandsFree Mobile</div>
+      <div class="login-tagline">현장의 손을 자유롭게, 생산을 더 스마트하게</div>
+      <div class="login-version">KMT INTERNAL · REAL 0.4</div>
+    </div>
+    <form id="loginForm" class="login-card">
+      <div class="login-card-head">
+        <span>사내 운영 시스템</span>
+        <h1>로그인</h1>
+        <p>생산 현황과 이슈, Grow 판단을 한 화면에서 확인합니다.</p>
+      </div>
+      <label class="login-field"><span>아이디</span><input id="loginId" autocomplete="username" placeholder="사번 또는 이름"></label>
+      <label class="login-field"><span>비밀번호</span><input id="loginPw" type="password" autocomplete="current-password" placeholder="비밀번호"></label>
+      <button class="login-primary" type="submit">로그인</button>
+      <button id="testLoginBtn" class="login-test" type="button">UI 테스트로 입장</button>
+      <p id="loginNote" class="login-note">현재는 UI 테스트 로그인입니다. 실제 사내 계정 인증은 LIVE 연결 단계에서 적용합니다.</p>
+    </form>
+  </div>
+</section>
+
+<div id="appShell" class="app-shell locked" aria-hidden="true">
 <header class="appbar">
-  <div class="brand">
-    <div class="mark"></div>
-    <div><b>핸즈프리 모바일</b><small>리얼 0.4 · 생산 준비도 판단 엔진</small></div>
+  <div class="brand kmt-app-brand">
+    <div class="kmt-logo kmt-logo-app" role="img" aria-label="KMT 케이엠텍(주)"></div>
+    <div class="kmt-app-title"><b>HandsFree Mobile</b><small>REAL 0.4 · KMT 생산운영</small></div>
     <button id="syncBadge" class="sync">동기화</button>
+    <button id="logoutBtn" class="logout-btn" type="button">나가기</button>
   </div>
 </header>
 
 <section id="page-today" class="page active">
-  <div class="eyebrow">오늘</div>
-  <h1>오늘 판단할 것부터</h1>
-  <p id="syncText" class="lead">운영 데이터를 읽는 중…</p>
-
-  <section class="decision">
-    <div class="decision-head"><b>판단함</b><span id="decisionCount" class="decision-count">–</span></div>
-    <div id="decisionList" class="decision-list"></div>
+  <section class="kmt-home-hero">
+    <div>
+      <div class="eyebrow light">TODAY · PRODUCTION CONTROL</div>
+      <h1>오늘 뭐부터 할까?</h1>
+      <p id="syncText" class="lead light">운영 데이터를 읽는 중…</p>
+    </div>
+    <span id="kmtRuntimeMode" class="runtime-pill">READ ONLY</span>
   </section>
 
-  <section class="stats">
+  <section class="stats kmt-stats">
     <article class="stat"><small>오늘 작업</small><b id="sWork">–</b></article>
     <article class="stat"><small>긴급</small><b id="sUrgent">–</b></article>
     <article class="stat"><small>활성 이슈</small><b id="sIssue">–</b></article>
     <article class="stat"><small>공정 보류</small><b id="sBlocked">–</b></article>
+  </section>
+
+  <section class="capa-card">
+    <div class="capa-head">
+      <div><small>CAPA · 오늘 인력 가용성</small><b id="capaText">LIVE 연결 후 자동 계산</b></div>
+      <span id="capaBadge" class="capa-badge">대기</span>
+    </div>
+    <div class="capa-track"><i id="capaBar"></i></div>
+    <p id="capaSub">운영 인력 데이터와 연결되면 계획 대비 GAP을 표시합니다.</p>
+  </section>
+
+  <div class="kmt-quick-actions">
+    <button id="homeGrowBtn" class="kmt-grow-call" type="button"><span>●</span><b>Grow에게 말하기</b><small>조회 · 판단 · 기록</small></button>
+    <button id="homeSearchBtn" class="kmt-search-call" type="button"><span>⌕</span><b>통합검색</b><small>과거 이력까지</small></button>
+  </div>
+
+  <section class="decision">
+    <div class="decision-head"><b>지금 먼저 볼 것</b><span id="decisionCount" class="decision-count">–</span></div>
+    <div id="decisionList" class="decision-list"></div>
   </section>
 
   <div class="section-title"><h2>멈춘 장비 / 핵심 방해요인</h2><span>자재 · 품질 · 일정</span></div>
@@ -49,7 +96,7 @@
 <section id="page-projects" class="page">
   <div class="eyebrow">프로젝트</div>
   <h1>장비 한 대의 전체 생애</h1>
-  <p class="lead">월간계획이 아니라 프로젝트/발주번호를 중심으로 계획·자재·실행·변경·품질·출고를 연결한다.</p>
+  <p class="lead">발주번호를 중심으로 계획·자재·실행·변경·품질·출고를 연결합니다.</p>
   <div class="searchbox">
     <input id="projectSearch" placeholder="발주번호 · 고객사 · 모델 검색">
     <div class="chips">
@@ -65,14 +112,14 @@
 <section id="page-issues" class="page">
   <div class="eyebrow">이슈</div>
   <h1>끝나지 않은 문제만</h1>
-  <p class="lead">지연·외주입고·불량·수정·납기 위험을 프로젝트와 다음 공정에 연결해서 본다.</p>
+  <p class="lead">지연·외주입고·불량·수정·납기 위험을 프로젝트와 다음 공정에 연결합니다.</p>
   <div id="issueList" class="stack"></div>
 </section>
 
 <section id="page-search" class="page">
   <div class="eyebrow">검색</div>
   <h1>회사 기억을 찾는다</h1>
-  <p class="lead">리얼 운영엔진에서는 현재 프로젝트뿐 아니라 과거 이력, 변경, 이슈, 부품, 협력업체, A/S까지 같은 검색창에서 이어진다.</p>
+  <p class="lead">현재 프로젝트와 과거 이력, 변경, 이슈를 한 번에 검색합니다.</p>
   <div class="searchbox"><input id="globalSearch" placeholder="예) 미코 82D / 한신정밀 / KRM-100D2 전장"></div>
   <div id="searchResults" class="stack"></div>
 </section>
@@ -80,23 +127,23 @@
 <nav class="bottom">
   <button class="active" data-page="today"><b>⌂</b><span>오늘</span></button>
   <button data-page="projects"><b>▣</b><span>프로젝트</span></button>
-  <button id="growNav" class="grow-btn"><b>🌱</b><span>그로우</span></button>
+  <button id="growNav" class="grow-btn"><b>G</b><span>Grow</span></button>
   <button data-page="issues"><b>!</b><span>이슈</span></button>
   <button data-page="search"><b>⌕</b><span>검색</span></button>
 </nav>
 
 <div class="sheet" id="growSheet">
   <div class="sheetbox">
-    <div class="sheethead"><div><small>그로우</small><h2>말하면 읽고, 판단하고, 기록한다</h2></div><button class="close" data-close="growSheet">×</button></div>
+    <div class="sheethead"><div><small>Grow · KMT 생산 AI</small><h2>말하면 읽고, 판단하고, 기록한다</h2></div><button class="close" data-close="growSheet">×</button></div>
     <div id="growMode" class="mode demo">연결 확인 중</div>
-    <textarea id="growInput" placeholder="예) 트루메카 자전컵 커버 이틀 더 늦어진대&#10;예) 미코 KDM-150 지금 막힌 이유 알려줘&#10;예) 오늘 내가 결정해야 할 것만 알려줘"></textarea>
+    <textarea id="growInput" placeholder="예) 오늘 내가 결정해야 할 것만 알려줘&#10;예) 미코 KDM-150 지금 막힌 이유 알려줘&#10;예) 자재 입고 지연 장비만 보여줘"></textarea>
     <div class="actions"><button id="growVoice">🎙 음성</button><button id="growRun" class="primary">실행</button></div>
     <div class="chips">
       <button class="grow-quick" data-q="오늘 내가 결정해야 할 것만 알려줘">오늘 결정</button>
       <button class="grow-quick" data-q="현재 공정이 막힌 장비 알려줘">공정 보류</button>
       <button class="grow-quick" data-q="납기 위험 장비와 이유 알려줘">납기 위험</button>
     </div>
-    <div id="growResult" class="result">그로우 결과가 여기에 표시돼.</div>
+    <div id="growResult" class="result">Grow 결과가 여기에 표시됩니다.</div>
   </div>
 </div>
 
@@ -109,10 +156,13 @@
 
 <button id="installBtn" class="hidden" aria-label="앱 설치">설치</button>
 <div id="toast"></div>
+</div>
+
 <script src="/real.js"></script>
 <script src="/core-adapter.js"></script>
 <script src="/project-detail.js"></script>
 <script src="/readiness-ui.js"></script>
 <script src="/ko-ui.js"></script>
+<script src="/kmt-shell.js"></script>
 </body>
 </html>
