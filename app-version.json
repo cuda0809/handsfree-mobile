@@ -1,4 +1,5 @@
 {
-  "version": "REAL-0.1.0",
-  "lineage": "handsfree-mobile-real"
+  "version": "REAL-0.1.1",
+  "lineage": "handsfree-mobile-real",
+  "milestone": "PROJECT_EVENT_ISSUE_CORE_READ"
 }
