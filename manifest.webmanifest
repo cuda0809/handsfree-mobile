@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "HandsFree Mobile REAL",
-  "short_name": "HF REAL",
-  "description": "수주형 장비 생산 운영 모바일 OS",
+  "name": "핸즈프리 모바일 리얼",
+  "short_name": "핸즈프리 리얼",
+  "description": "수주형 장비 생산 운영 모바일 시스템",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
