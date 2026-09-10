@@ -26,6 +26,7 @@ Bottom navigation is fixed to five user concepts:
 - Risk is based on remaining required work, dependencies, material readiness, skill capacity and protected test/FAT time.
 - Grow reads current data first, explains risk and raises only high-impact choices for approval.
 - High-risk decisions such as customer due-date changes remain human decisions.
+- Internal API/data codes may remain English, but every user-visible app label, status, help text and operating term must be presented in Korean. Product/model/order identifiers are not translated.
 
 ## Data model target
 PROJECT → WORK_PACKAGE / PLAN → EVENT → CHANGE → ISSUE → PART/SUPPLY/VENDOR → RESOURCE/SKILL → QUALITY/A-S → IMPACT/RISK → ROLE VIEWS.
@@ -63,6 +64,25 @@ Verification:
 - No runtime errors were found in the post-deployment check window.
 - Preview remains Vercel-auth protected. The available connector cannot complete cookie-based body verification of `/api/core/source`, so `runtimeDirectGoogleRead:true` has not yet been proven from a live response in this session.
 - Write Gate remains locked.
+
+## REAL 0.3.3 checkpoint — 2026-09-10
+Korean presentation policy is implemented for the mobile app without changing internal Core contracts.
+
+Implemented:
+- Static UI labels were converted to Korean: Today/Projects/Issues/Search, Decision Inbox, blocked-equipment terminology, Grow navigation and project descriptions.
+- Added `ko-ui.js`, a user-visible presentation layer that translates internal status/type codes only at render time while preserving API/data values.
+- Visible status examples: READY → 준비완료, BLOCKED → 막힘, UNKNOWN → 확인필요, QUALITY_ISSUE → 품질 문제, DELAY_CAUSE → 지연 원인, MONITOR → 관찰중, LIVE → 실시간, REFERENCE → 검증용.
+- Manufacturing display terms such as Assembly Ready, Flow, Next Gate, Core Source, CAPA/FTE and FAT/SAT are rendered with Korean operating terms.
+- Product names, model names and order IDs are preserved exactly and are never translated.
+- PWA installed-app name changed to `핸즈프리 모바일 리얼` / `핸즈프리 리얼`.
+- PWA shell cache advanced to `handsfree-real-v033` and now includes `ko-ui.js`.
+- Version marker advanced to `REAL-0.3.3 / KOREAN_UI_PRESENTATION`.
+
+Verification:
+- REAL 0.3.3 Preview deployment reached READY.
+- Vercel build completed with no build errors.
+- No error/fatal runtime logs were found in the post-deployment check window.
+- Core read-parity and Write Gate state remain unchanged; this checkpoint is presentation-only.
 
 ## Next production gate
 1. Prove authenticated OS v3 LIVE read by verifying `/api/core/source?refresh=1` reports `runtimeDirectGoogleRead:true`, `label: OS v3 LIVE`, and `auth: service-account`.
