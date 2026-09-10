@@ -1,24 +1,17 @@
-const {AS_OF,projects,decisions,metrics,toLegacy,openIssues} = require('../../core/data');
+const core = require('../../core/runtime');
 
 module.exports = (req,res) => {
-  const decisionItems = decisions().slice(0,5).map(d => ({
-    id:d.id,
-    projectId:d.projectId,
-    severity:d.severity,
-    title:d.title,
-    decision:d.decision,
-    nextAction:d.nextAction
+  const decisionItems = core.decisions().slice(0,7).map(d => ({
+    id:d.id, projectId:d.projectId||null, severity:d.severity, title:d.title,
+    decision:d.decision, nextAction:d.nextAction, source:d.source
   }));
   res.setHeader('Cache-Control','no-store');
   res.status(200).json({
-    ok:true,
-    mode:'core-reference',
-    readOnly:true,
-    asOf:AS_OF,
-    metrics:metrics(),
-    decisions:decisionItems,
-    projects:projects.map(toLegacy),
-    openIssues:openIssues().length,
-    source:'REAL_CORE_V0_1_NORMALIZED_V3_SNAPSHOT'
+    ok:true, mode:core.sourceHealth().mode, readOnly:true, asOf:core.AS_OF,
+    metrics:core.metrics(), decisions:decisionItems,
+    projects:core.activeProjects().map(core.toLegacy),
+    openIssues:core.openIssues().length,
+    capacity:core.currentCapacity(), recentEvents:(core.events||[]).slice(-12).reverse(),
+    source:core.sourceHealth()
   });
 };

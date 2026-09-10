@@ -1,15 +1,16 @@
-const {AS_OF,projects,events,issues} = require('../../core/data');
+const core = require('../../core/runtime');
+const hay=v=>JSON.stringify(v).toLowerCase();
 
-const text = v => JSON.stringify(v).toLowerCase();
 module.exports = (req,res) => {
   const q=String(req.query?.q||'').trim().toLowerCase();
-  const projectMatches=q?projects.filter(x=>text(x).includes(q)):[];
-  const eventMatches=q?events.filter(x=>text(x).includes(q)):[];
-  const issueMatches=q?issues.filter(x=>text(x).includes(q)):[];
+  const pick=list=>q?(list||[]).filter(x=>hay(x).includes(q)):[];
+  const projects=pick(core.projects),events=pick(core.events),issues=pick(core.issues),
+    changes=pick(core.changes),capacity=pick(core.capacity);
   res.setHeader('Cache-Control','no-store');
   res.status(200).json({
-    ok:true, mode:'core-reference', readOnly:true, asOf:AS_OF, query:q,
-    projects:projectMatches, events:eventMatches, issues:issueMatches,
-    count:projectMatches.length+eventMatches.length+issueMatches.length
+    ok:true,mode:core.sourceHealth().mode,readOnly:true,asOf:core.AS_OF,query:q,
+    projects,events,issues,changes,capacity,
+    count:projects.length+events.length+issues.length+changes.length+capacity.length,
+    source:core.sourceHealth()
   });
 };
