@@ -27,6 +27,8 @@ Bottom navigation is fixed to five user concepts:
 - Grow reads current data first, explains risk and raises only high-impact choices for approval.
 - High-risk decisions such as customer due-date changes remain human decisions.
 - Internal API/data codes may remain English, but every user-visible app label, status, help text and operating term must be presented in Korean. Product/model/order identifiers are not translated.
+- Plan consumption and physical completion are different measures. Plan progress must never be displayed as physical completion without direct evidence.
+- Shipment readiness is evidence-based. Missing approval/test evidence remains `확인 필요`; REAL does not infer final shipment approval.
 
 ## Data model target
 PROJECT → WORK_PACKAGE / PLAN → EVENT → CHANGE → ISSUE → PART/SUPPLY/VENDOR → RESOURCE/SKILL → QUALITY/A-S → IMPACT/RISK → ROLE VIEWS.
@@ -44,48 +46,36 @@ Source-aware security boundaries were introduced. Runtime operational data is se
 Evidence-first project detail was added. Project detail connects current state, open issues, schedule changes, recent events and capacity impact rather than showing only a card-level summary.
 
 ## REAL 0.3.2 checkpoint — 2026-09-10
-V3 read-parity guard is implemented on branch `real-v0.1`.
-
-Implemented:
-- Authenticated Google Sheets read bridge supports the authoritative private OS v3 source without putting credentials or new operational exports in GitHub.
-- Live source ranges include `제품마스터`, `업무이력`, `HF_DATA_이슈원장`, `HF_DATA_일정변경누적`, `HF_VIEW_인력CAPA`, and `HF_VIEW_브리핑소스`.
-- Decision Inbox now respects the V3 briefing source `결정필요` evidence when available instead of escalating every quality issue automatically.
-- Assembly Ready is separated from Flow BLOCKED. Quality rework can block the next production gate without falsely implying that material readiness is blocked.
-- Quality processes such as `가공/외주` are no longer misclassified as supply blockage solely because the process name contains `외주`.
-- Today work count prefers distinct planned Project IDs from current-date CAPA, with actual work events as fallback.
-- Capacity decision items are day-level deduplicated and use V3 briefing evidence for human-decision escalation.
-- Project detail explicitly displays both `Assembly Ready` and `Flow` status.
-- PWA shell cache advanced to `handsfree-real-v032`.
-- Version marker advanced to `REAL-0.3.2 / V3_READ_PARITY_GUARD`.
-
-Verification:
-- Latest REAL 0.3.2 Preview deployment reached READY.
-- Vercel build completed with no build errors.
-- No runtime errors were found in the post-deployment check window.
-- Preview remains Vercel-auth protected. The available connector cannot complete cookie-based body verification of `/api/core/source`, so `runtimeDirectGoogleRead:true` has not yet been proven from a live response in this session.
-- Write Gate remains locked.
+V3 read-parity guard was implemented. Assembly Ready was separated from general flow blockage, V3 decision evidence was respected, and a parity diagnostic endpoint was introduced while Write Gate remained locked.
 
 ## REAL 0.3.3 checkpoint — 2026-09-10
-Korean presentation policy is implemented for the mobile app without changing internal Core contracts.
+Korean presentation policy was implemented for the mobile app without changing internal Core contracts. User-visible labels/status/help text are Korean while model/order identifiers and internal API codes remain unchanged.
+
+## REAL 0.4.0 checkpoint — 2026-09-10
+Production-readiness decision model is implemented from a veteran equipment-production perspective.
 
 Implemented:
-- Static UI labels were converted to Korean: Today/Projects/Issues/Search, Decision Inbox, blocked-equipment terminology, Grow navigation and project descriptions.
-- Added `ko-ui.js`, a user-visible presentation layer that translates internal status/type codes only at render time while preserving API/data values.
-- Visible status examples: READY → 준비완료, BLOCKED → 막힘, UNKNOWN → 확인필요, QUALITY_ISSUE → 품질 문제, DELAY_CAUSE → 지연 원인, MONITOR → 관찰중, LIVE → 실시간, REFERENCE → 검증용.
-- Manufacturing display terms such as Assembly Ready, Flow, Next Gate, Core Source, CAPA/FTE and FAT/SAT are rendered with Korean operating terms.
-- Product names, model names and order IDs are preserved exactly and are never translated.
-- PWA installed-app name changed to `핸즈프리 모바일 리얼` / `핸즈프리 리얼`.
-- PWA shell cache advanced to `handsfree-real-v033` and now includes `ko-ui.js`.
-- Version marker advanced to `REAL-0.3.3 / KOREAN_UI_PRESENTATION`.
+- Added `core/production-readiness.js` with four decision axes: physical completion vs plan consumption, critical-material readiness, quality reverification, and shipment-readiness gates.
+- Physical completion is intentionally `확인 필요` when direct actual-progress evidence is absent. Plan-based `% · 계획기준` is retained only as plan consumption.
+- Added `core/google-sheets-v04.js` read-only bridge range for `HF_DATA_90일분석이력`, mapping production slack, production state, final inspection, bottleneck, purchase status, assembly-available date and actual-basis evidence.
+- Project Core now exposes `physicalCompletion`, `planConsumption`, `productionSlackDays`, `bottleneck`, `assemblyAvailableDate`, `analysis90`, and structured `readiness`.
+- Critical-material readiness uses current supply/inbound issues and 90-day purchase/assembly evidence but explicitly marks part-level critical-material data as not yet connected.
+- Active quality issues force the quality gate to `재검증 필요`; modification records alone do not close the gate.
+- Shipment readiness separately evaluates material, quality, test evidence, final inspection and shipment approval. Hard material/quality blockers produce `출고 조건 보류`; otherwise incomplete evidence remains `출고 조건 확인`. Even a fully clear operating state is only `출고 가능 후보` until explicit shipment approval exists.
+- Project detail now starts with a Korean `생산판단 4대 기준` panel and shows actual completion, plan consumption, critical materials, quality reverification, shipment condition, assembly-available date, production slack and bottleneck.
+- `/api/core/parity` now checks readiness model presence, forbids fake physical progress, verifies quality reverification gating, verifies hard shipment holds, and requires 90-day analysis rows when authenticated LIVE read is active.
+- PWA shell cache advanced to `handsfree-real-v040` and version marker to `REAL-0.4.0 / PRODUCTION_READINESS_4_AXIS`.
 
 Verification:
-- REAL 0.3.3 Preview deployment reached READY.
+- REAL 0.4.0 Preview deployment reached READY.
 - Vercel build completed with no build errors.
-- No error/fatal runtime logs were found in the post-deployment check window.
-- Core read-parity and Write Gate state remain unchanged; this checkpoint is presentation-only.
+- No error/fatal runtime logs were found in the checked Preview window.
+- Preview remains Vercel-auth protected, so body-level authenticated Google LIVE parity is still pending.
+- Google Sheet operational ledgers were not modified by this checkpoint; REAL remains read-only.
 
 ## Next production gate
-1. Prove authenticated OS v3 LIVE read by verifying `/api/core/source?refresh=1` reports `runtimeDirectGoogleRead:true`, `label: OS v3 LIVE`, and `auth: service-account`.
-2. Run read-parity checks against authoritative V3 values for project count, current work, open issues, schedule changes, Decision Inbox and CAPA.
-3. Only after read parity passes, implement append-only EVENT Write Gate through queue → validation → dedupe → audit evidence → post-write re-read verification.
-4. Human approval remains mandatory only for high-risk decisions such as due-date/external commitment changes.
+1. Connect authenticated OS v3 LIVE read and run `/api/core/parity?refresh=1` until every read/parity/readiness check passes.
+2. Add a structured `PART / CRITICAL_MATERIAL` ledger: Project ID, Part No, item, required quantity, received quantity, vendor, planned inbound, actual inbound, incoming-inspection status and Blocking flag.
+3. Add a structured `PHYSICAL_PROGRESS` ledger so actual completion and remaining effort become direct evidence rather than `확인 필요`.
+4. Add `QUALITY_VERIFICATION` and `SHIPMENT_GATE` evidence ledgers for correction → reverification → pass and assembly/electrical/program/test/inspection/FAT/correction-closed/shipment-approval states.
+5. Only after reliable read parity and evidence schemas pass, implement append-only EVENT Write Gate through queue → validation → dedupe → audit evidence → post-write re-read verification.
