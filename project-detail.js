@@ -1,4 +1,4 @@
-// HandsFree Mobile REAL 0.3 — evidence-first project detail.
+// HandsFree Mobile REAL 0.3.2 — evidence-first project detail.
 // Loaded after core-adapter.js. Keeps the legacy detail as an offline fallback.
 const legacyShowProjectDetail = showProject;
 
@@ -6,7 +6,7 @@ const legacyShowProjectDetail = showProject;
   const style=document.createElement('style');
   style.textContent=`
     .pd-hero{border:1px solid #d8e4ef;background:linear-gradient(145deg,#f8fbff,#eef5ff);border-radius:16px;padding:12px;margin-bottom:10px}
-    .pd-hero-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.pd-kicker{font-size:8px;font-weight:900;color:#52769b;letter-spacing:.06em}.pd-state{font-size:15px;font-weight:900;margin-top:2px;line-height:1.35}.pd-ready{font-size:9px;font-weight:900;border-radius:999px;padding:6px 9px;white-space:nowrap}.pd-ready.READY{background:#e5f6ed;color:#166f4c}.pd-ready.BLOCKED{background:#ffe8e8;color:#b73737}.pd-ready.UNKNOWN{background:#eef2f6;color:#607080}
+    .pd-hero-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.pd-kicker{font-size:8px;font-weight:900;color:#52769b;letter-spacing:.06em}.pd-state{font-size:15px;font-weight:900;margin-top:2px;line-height:1.35}.pd-badges{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}.pd-ready,.pd-flow{font-size:9px;font-weight:900;border-radius:999px;padding:6px 9px;white-space:nowrap}.pd-ready.READY{background:#e5f6ed;color:#166f4c}.pd-ready.BLOCKED{background:#ffe8e8;color:#b73737}.pd-ready.UNKNOWN{background:#eef2f6;color:#607080}.pd-flow.OPEN{background:#e7f3ff;color:#245d9a}.pd-flow.BLOCKED{background:#fff0dc;color:#97610e}
     .pd-progress{height:7px;background:#dce6f0;border-radius:99px;margin-top:10px;overflow:hidden}.pd-progress>span{display:block;height:100%;background:linear-gradient(90deg,#2f76f6,#7566e8);border-radius:99px}.pd-progress-label{display:flex;justify-content:space-between;margin-top:4px;font-size:8px;color:#6f7f91}
     .pd-decision{border:1px solid #f0dec0;background:#fff7e9;border-radius:13px;padding:10px;margin:10px 0}.pd-decision small{display:block;font-size:8px;color:#94600d;font-weight:900}.pd-decision b{display:block;font-size:11px;margin:3px 0;line-height:1.4}.pd-decision p{font-size:9px;line-height:1.5;margin:0;color:#745b36}
     .pd-section{margin-top:14px}.pd-section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}.pd-section-head h3{font-size:13px;margin:0}.pd-count{font-size:8px;color:#6f7f91;background:#eef3f7;border-radius:999px;padding:4px 7px}
@@ -26,7 +26,8 @@ function pdChangeReason(c){ return c.reason||c.summary||c.raw||'변경 사유 �
 function pdEventSummary(e){ return e.summary||e.raw||[e.type,e.process].filter(Boolean).join(' · ')||'업무이력'; }
 function pdDelta(c){ const n=Number(c.deltaDays??c.cumulativeDays??0); return Number.isFinite(n)?n:0; }
 function pdEmpty(text){ return `<div class="pd-empty">${esc(text)}</div>`; }
-function pdStatusBadge(p){ const ready=['READY','BLOCKED','UNKNOWN'].includes(p.assemblyReady)?p.assemblyReady:'UNKNOWN'; return `<span class="pd-ready ${ready}">${ready}</span>`; }
+function pdAssemblyBadge(p){ const ready=['READY','BLOCKED','UNKNOWN'].includes(p.assemblyReady)?p.assemblyReady:'UNKNOWN'; return `<span class="pd-ready ${ready}">Assembly ${ready}</span>`; }
+function pdFlowBadge(p){ const flow=p.flowBlocked?'BLOCKED':'OPEN'; return `<span class="pd-flow ${flow}">Flow ${flow}</span>`; }
 
 function pdRenderProject(p,source){
   const issues=(p.issues||[]).filter(i=>String(i.status||'OPEN').toUpperCase()!=='CLOSED');
@@ -39,14 +40,18 @@ function pdRenderProject(p,source){
   const due=p.shipmentPlan||p.customerDueDate||'-';
   const team=Array.isArray(p.production)?p.production.join(', '):(p.production||'-');
   const sourceLabel=source?.runtimeDirectGoogleRead?'OS v3 LIVE':source?.label||source?.mode||'REAL Core';
+  const flowText=p.flowBlocked?'현재 이슈로 다음 Gate 진행 전 확인 필요':'현재 연결 근거상 흐름 진행 가능';
+  const assemblyText=p.assemblyReady==='BLOCKED'?'자재·외주입고 조건 미충족':p.assemblyReady==='READY'?'조립 착수/진행 조건 충족':'자재 준비도 직접 확인 필요';
   return `
     <div class="pd-hero">
-      <div class="pd-hero-top"><div><div class="pd-kicker">CURRENT OPERATION</div><div class="pd-state">${esc(p.state||p.stage||'현재상태 확인')}</div></div>${pdStatusBadge(p)}</div>
+      <div class="pd-hero-top"><div><div class="pd-kicker">CURRENT OPERATION</div><div class="pd-state">${esc(p.state||p.stage||'현재상태 확인')}</div></div><div class="pd-badges">${pdAssemblyBadge(p)}${pdFlowBadge(p)}</div></div>
       ${progress!==null?`<div class="pd-progress"><span style="width:${progress}%"></span></div><div class="pd-progress-label"><span>진행률</span><b>${progress}%</b></div>`:''}
     </div>
     <div class="detail-grid">
       <div class="detail-box"><small>위험도</small><b>${esc(p.risk||'안정')}</b></div>
       <div class="detail-box"><small>다음 Gate</small><b>${esc(next)}</b></div>
+      <div class="detail-box"><small>Assembly Ready</small><b>${esc(p.assemblyReady||'UNKNOWN')}</b></div>
+      <div class="detail-box"><small>Flow</small><b>${p.flowBlocked?'BLOCKED':'OPEN'}</b></div>
       <div class="detail-box"><small>납기/출고</small><b>${esc(due)}</b></div>
       <div class="detail-box"><small>검수</small><b>${esc(p.inspection||'검수 전 단계')}</b></div>
       <div class="detail-box"><small>구매/입고</small><b>${esc(p.supplyStatus||'-')}</b></div>
@@ -54,7 +59,7 @@ function pdRenderProject(p,source){
       <div class="detail-box"><small>생산담당</small><b>${esc(team)}</b></div>
       <div class="detail-box"><small>열린 이슈</small><b>${issues.length}건</b></div>
     </div>
-    <div class="pd-decision"><small>지금 판단 근거</small><b>${esc(blocker)}</b><p>다음 기준점: ${esc(next)}${p.dueDays!==null&&p.dueDays!==undefined?` · 납기 D${Number(p.dueDays)>=0?'-':'+'}${Math.abs(Number(p.dueDays))}`:''}</p></div>
+    <div class="pd-decision"><small>지금 판단 근거</small><b>${esc(blocker)}</b><p>${esc(assemblyText)} · ${esc(flowText)}<br>다음 기준점: ${esc(next)}${p.dueDays!==null&&p.dueDays!==undefined?` · 납기 D${Number(p.dueDays)>=0?'-':'+'}${Math.abs(Number(p.dueDays))}`:''}</p></div>
 
     <section class="pd-section"><div class="pd-section-head"><h3>열린 이슈</h3><span class="pd-count">${issues.length}건</span></div><div class="pd-list">
       ${issues.length?issues.map(i=>`<div class="pd-item"><div class="pd-item-top"><b>${esc([i.type,i.process].filter(Boolean).join(' · ')||'ISSUE')}</b><span class="pd-tag">${esc(i.status||'OPEN')}</span></div><p>${esc(pdIssueCause(i))}</p>${i.nextAction?`<div class="pd-next">다음 조치 · ${esc(i.nextAction)}</div>`:''}</div>`).join(''):pdEmpty('현재 연결된 열린 이슈가 없어.')}
@@ -99,6 +104,6 @@ if(typeof renderCoreSource==='function'){
   const baseRenderCoreSource03=renderCoreSource;
   renderCoreSource=function(){
     baseRenderCoreSource03();
-    const brand=$('.brand small'); if(brand) brand.textContent='REAL 0.3 · Evidence-first Project Core';
+    const brand=$('.brand small'); if(brand) brand.textContent='REAL 0.3.2 · V3 parity guarded Project Core';
   };
 }
