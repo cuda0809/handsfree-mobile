@@ -1,6 +1,6 @@
-// HandsFree Mobile REAL 0.3 — async source provider.
+// HandsFree Mobile REAL 0.4 — async source provider.
 const {buildCore,buildReference}=require('./runtime');
-const google=require('./google-sheets');
+const google=require('./google-sheets-v04');
 let cache={core:null,expiresAt:0,mode:null};
 const CACHE_MS=20000;
 function privateSnapshot(){const raw=process.env.HF_OS_V3_SNAPSHOT_JSON;if(!raw)return null;try{const parsed=JSON.parse(raw);return parsed&&Array.isArray(parsed.projects)?parsed:null;}catch(e){return{__error:e.message};}}
