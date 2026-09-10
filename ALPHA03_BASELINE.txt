@@ -1,1 +1,15 @@
 This file marks the Alpha 03 UI as the fixed mobile baseline. Future releases update the same app URL in place.
+
+Checkpoint: 2026-09-10 09:15 KST
+Verified functional baseline commit: 3d6722cf583ee0f9f693f965a995a6b694a55afa
+Status: PASS
+- Vercel production deployment READY
+- Automatic in-app deployment update confirmed
+- Full app restart from home-screen icon confirmed
+- Search confirmed
+- Bottom navigation confirmed: Today / Equipment / Issues
+- Grow sheet popup confirmed
+- Equipment detail interaction confirmed
+- No Vercel runtime errors found during verification window
+
+Resume rule: continue future Alpha 03 mobile UI work from this verified checkpoint unless explicitly rolling back.
