@@ -41,3 +41,25 @@ PROJECT → WORK_PACKAGE / PLAN → EVENT → CHANGE → ISSUE → PART/SUPPLY/V
 
 ## Migration policy
 No legacy data is deleted. Alpha/V3 is reference history. REAL imports and normalizes useful data into the new model incrementally, with Project/Order ID as the join key.
+
+## REAL 0.1.1 checkpoint — 2026-09-10
+The first structured Core read layer is implemented on branch `real-v0.1`.
+
+Implemented:
+- `core/data.js`: normalized PROJECT / EVENT / ISSUE objects using Project/Order ID as the join key.
+- `/api/core/today`: Decision Inbox, metrics and project read model.
+- `/api/core/projects`: project lifecycle with linked events and open issues.
+- `/api/core/issues`: active issue read model.
+- `/api/core/search`: unified Project/Event/Issue search.
+- `/api/dashboard`: compatibility bridge for the existing mobile shell.
+- `core-adapter.js`: mobile UI consumes explicit Core fields such as Assembly Ready, Next Gate and Quality Active instead of relying only on browser-side text inference.
+- Grow Core Read: read-only decision, blocker and history queries are allowed; write/change commands remain locked until the write gate is designed.
+
+Verification:
+- Vercel Preview deployment for commit `40bb32b3d93a99bffefd274e4d722466bb417710` reached READY.
+- Vercel build completed with no build errors.
+- No runtime errors were found during the post-deployment check.
+- Preview is Vercel-auth protected, so unauthenticated external body-level API verification remains intentionally unavailable.
+
+Next production gate:
+Replace the normalized V3 snapshot adapter with a source adapter that reads the authoritative operational data, while keeping the REAL Core contracts stable. After read synchronization is trustworthy, add an append-only EVENT write gate with validation, dedupe, audit evidence and human approval only for high-risk decisions.
