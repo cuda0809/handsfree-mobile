@@ -91,7 +91,10 @@ function buildCore(snapshot, sourceMeta={}) {
     const actuals = events.filter(e => ['일일작업','출고완료','A/S','PT'].includes(text(e.type)) || ['ACTUAL','DELIVERY'].includes(text(e.lawTag)));
     const latestEvent = [...actuals].sort((a,b)=>text(a.date).localeCompare(text(b.date))).at(-1) || null;
     const qualityActive = issues.some(i => /QUALITY/.test(text(i.type)));
-    const supplyBlocked = issues.some(i => /DELAY|SUPPLY|INBOUND/.test(text(i.type)) || /자재|입고|외주/.test(text(i.process)));
+    const supplyBlocked = issues.some(i => {
+      const issueType=text(i.type), process=text(i.process);
+      return /DELAY|SUPPLY|INBOUND/.test(issueType) || (!/QUALITY/.test(issueType) && /자재|입고|외주/.test(process));
+    });
     const progress = progressOf(p.progressText);
     const state = latestEvent?.summary || text(p.status) || (progress === 0 ? '생산전' : '진행상태 확인');
     const productionStarted = Boolean(latestEvent) || (progress !== null && progress > 0) || /조립|전장|프로그램|테스트|검수|완료/.test(state);
