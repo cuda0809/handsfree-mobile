@@ -31,6 +31,7 @@
     ['PROJECT / EVENT / ISSUE / CHANGE','프로젝트 / 이력 / 이슈 / 변경'],
     ['Event/Issue/Part/A-S','이력/이슈/부품/A/S'],
     ['Event, Change, Issue, Part, Vendor, A/S','이력, 변경, 이슈, 부품, 협력업체, A/S'],
+    ['Project/Event API','프로젝트/이력 데이터 연결'],
     ['Next Gate','다음 공정'],
     ['다음 Gate','다음 공정'],
     ['핵심 Blocker','핵심 방해요인'],
@@ -39,11 +40,15 @@
     ['Write Gate','쓰기 검증 단계'],
     ['Project Core','프로젝트 운영엔진'],
     ['REAL Core','리얼 운영엔진'],
+    ['REAL UI','리얼 화면'],
     ['Core 검색','운영엔진 검색'],
     ['Core 상세','운영엔진 상세'],
     ['Core 확인','운영엔진 확인'],
     ['Core 연결','운영엔진 연결'],
     ['Core 운영','운영엔진 운영'],
+    ['Core에서','운영엔진에서'],
+    ['PM 협의','프로젝트 담당 협의'],
+    ['생산DB','생산 데이터베이스'],
     ['LIVE · HandsFree 데이터 쓰기 경로 연결','실시간 · 핸즈프리 데이터 쓰기 경로 연결'],
     ['HandsFree Mobile','핸즈프리 모바일'],
     ['HF REAL','핸즈프리 리얼'],
@@ -92,17 +97,36 @@
     ['CHANGE','변경'],
     ['EVENT','이력'],
     ['PROJECT','프로젝트'],
+    ['Project','프로젝트'],
+    ['Event','이력'],
+    ['Issue','이슈'],
+    ['Change','변경'],
+    ['Part','부품'],
+    ['Vendor','협력업체'],
+    ['Flow','공정 흐름'],
+    ['Blocker','방해요인'],
+    ['Core','운영엔진'],
     ['CAPA','인력 여력'],
     ['FTE','인력환산'],
     ['FAT','공장인수검사'],
     ['SAT','현장인수검사'],
     ['Next:','다음:'],
-    ['READ','읽기']
+    ['HTTP','통신'],
+    ['READ','읽기'],
+    ['REAL','리얼']
   ];
+
+  const exactMap = new Map([
+    ['PM','프로젝트 담당'],
+    ['ON','사용'],
+    ['OFF','미사용']
+  ]);
 
   function escapeRx(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
   function translateText(value){
     let out=String(value ?? '');
+    const exact=exactMap.get(out.trim());
+    if(exact && out.trim()===out) return exact;
     for(const [from,to] of phraseMap){
       out=out.replace(new RegExp(escapeRx(from),'g'),to);
     }
