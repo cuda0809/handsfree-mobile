@@ -1,40 +1,12 @@
-const CACHE='handsfree-shell-v5';
-self.addEventListener('install',event=>{self.skipWaiting();});
-self.addEventListener('activate',event=>{event.waitUntil((async()=>{
-  const keys=await caches.keys();
-  await Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)));
-  await self.clients.claim();
-  const clients=await self.clients.matchAll({type:'window',includeUncontrolled:true});
-  await Promise.all(clients.map(async client=>{
-    try{if('navigate' in client) await client.navigate('/?sw=5');}catch(e){}
-  }));
-})());});
+const CACHE='handsfree-real-v01';
+const SHELL=['/','/real.css','/real.js','/manifest.webmanifest','/icon.svg'];
+self.addEventListener('install',event=>{event.waitUntil((async()=>{self.skipWaiting();const c=await caches.open(CACHE);await c.addAll(SHELL).catch(()=>{});})())});
+self.addEventListener('activate',event=>{event.waitUntil((async()=>{const keys=await caches.keys();await Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)));await self.clients.claim();})())});
 self.addEventListener('fetch',event=>{
   const req=event.request;
   if(req.method!=='GET') return;
+  if(req.url.includes('/api/')){event.respondWith(fetch(req,{cache:'no-store'}));return;}
   const isNav=req.mode==='navigate'||(req.headers.get('accept')||'').includes('text/html');
-  if(isNav){
-    event.respondWith((async()=>{
-      try{
-        const fresh=await fetch(req,{cache:'no-store'});
-        const html=await fresh.text();
-        let injected=html;
-        if(!injected.includes('/equipment-tab.js')) injected=injected.replace('</body>','<script src="/equipment-tab.js?v=5"></script></body>');
-        if(!injected.includes('/update-client.js')) injected=injected.replace('</body>','<script src="/update-client.js?v=5"></script></body>');
-        const headers=new Headers(fresh.headers);
-        headers.set('content-type','text/html; charset=utf-8');
-        headers.set('cache-control','no-store');
-        const response=new Response(injected,{status:fresh.status,statusText:fresh.statusText,headers});
-        const cache=await caches.open(CACHE);
-        cache.put('/',response.clone());
-        return response;
-      }catch(e){
-        return (await caches.match('/'))||Response.error();
-      }
-    })());
-    return;
-  }
-  event.respondWith((async()=>{
-    try{return await fetch(req,{cache:'no-store'});}catch(e){return (await caches.match(req))||Response.error();}
-  })());
+  if(isNav){event.respondWith((async()=>{try{const fresh=await fetch(req,{cache:'no-store'});const c=await caches.open(CACHE);c.put('/',fresh.clone());return fresh}catch(e){return (await caches.match('/'))||Response.error()}})());return;}
+  event.respondWith((async()=>{try{const fresh=await fetch(req);const c=await caches.open(CACHE);c.put(req,fresh.clone());return fresh}catch(e){return (await caches.match(req))||Response.error()}})());
 });
