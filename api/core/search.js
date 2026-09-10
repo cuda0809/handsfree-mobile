@@ -1,16 +1,3 @@
-const core = require('../../core/runtime');
+const {getCore}=require('../../core/provider');
 const hay=v=>JSON.stringify(v).toLowerCase();
-
-module.exports = (req,res) => {
-  const q=String(req.query?.q||'').trim().toLowerCase();
-  const pick=list=>q?(list||[]).filter(x=>hay(x).includes(q)):[];
-  const projects=pick(core.projects),events=pick(core.events),issues=pick(core.issues),
-    changes=pick(core.changes),capacity=pick(core.capacity);
-  res.setHeader('Cache-Control','no-store');
-  res.status(200).json({
-    ok:true,mode:core.sourceHealth().mode,readOnly:true,asOf:core.AS_OF,query:q,
-    projects,events,issues,changes,capacity,
-    count:projects.length+events.length+issues.length+changes.length+capacity.length,
-    source:core.sourceHealth()
-  });
-};
+module.exports=async(req,res)=>{const core=await getCore(),q=String(req.query?.q||'').trim().toLowerCase(),pick=list=>q?(list||[]).filter(x=>hay(x).includes(q)):[];const projects=pick(core.projects),events=pick(core.events),issues=pick(core.issues),changes=pick(core.changes),capacity=pick(core.capacity);res.setHeader('Cache-Control','no-store');res.status(200).json({ok:true,mode:core.sourceHealth().mode,readOnly:true,asOf:core.AS_OF,query:q,projects,events,issues,changes,capacity,count:projects.length+events.length+issues.length+changes.length+capacity.length,source:core.sourceHealth()});};

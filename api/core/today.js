@@ -1,17 +1,2 @@
-const core = require('../../core/runtime');
-
-module.exports = (req,res) => {
-  const decisionItems = core.decisions().slice(0,7).map(d => ({
-    id:d.id, projectId:d.projectId||null, severity:d.severity, title:d.title,
-    decision:d.decision, nextAction:d.nextAction, source:d.source
-  }));
-  res.setHeader('Cache-Control','no-store');
-  res.status(200).json({
-    ok:true, mode:core.sourceHealth().mode, readOnly:true, asOf:core.AS_OF,
-    metrics:core.metrics(), decisions:decisionItems,
-    projects:core.activeProjects().map(core.toLegacy),
-    openIssues:core.openIssues().length,
-    capacity:core.currentCapacity(), recentEvents:(core.events||[]).slice(-12).reverse(),
-    source:core.sourceHealth()
-  });
-};
+const {getCore}=require('../../core/provider');
+module.exports=async(req,res)=>{const core=await getCore({force:String(req.query?.refresh||'')==='1'});const decisionItems=core.decisions().slice(0,7).map(d=>({id:d.id,projectId:d.projectId||null,severity:d.severity,title:d.title,decision:d.decision,nextAction:d.nextAction,source:d.source}));res.setHeader('Cache-Control','no-store');res.status(200).json({ok:true,mode:core.sourceHealth().mode,readOnly:true,asOf:core.AS_OF,metrics:core.metrics(),decisions:decisionItems,projects:core.activeProjects().map(core.toLegacy),openIssues:core.openIssues().length,capacity:core.currentCapacity(),recentEvents:(core.events||[]).slice(-12).reverse(),source:core.sourceHealth()});};
