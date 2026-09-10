@@ -11,6 +11,11 @@ function isSupply(issue){
   return /DELAY|SUPPLY|INBOUND/.test(type) || /자재|입고|외주입고|구매/.test(`${process} ${body}`);
 }
 function issueEvidence(issue){ return text(issue?.note) || text(issue?.cause) || text(issue?.resolution) || [issue?.process,issue?.type].map(text).filter(Boolean).join(' · ') || '상세 근거 확인 필요'; }
+function hasCompletedTestEvidence(value){
+  const s=text(value);
+  return /(테스트|기능\s*시험|구동\s*시험|시운전|공회전|FAT)\s*(완료|합격|통과|OK|PASS)/i.test(s)
+    || /(완료|합격|통과|OK|PASS)\s*(된|됨|처리)?\s*(테스트|기능\s*시험|구동\s*시험|시운전|공회전|FAT)/i.test(s);
+}
 
 function buildProductionReadiness(input={}){
   const issues=Array.isArray(input.issues)?input.issues:[];
@@ -22,15 +27,23 @@ function buildProductionReadiness(input={}){
   const assemblyReady=['READY','BLOCKED','UNKNOWN'].includes(input.assemblyReady)?input.assemblyReady:'UNKNOWN';
   const inspection=text(input.inspection || analysis?.finalInspection || '');
   const currentState=text(input.state || analysis?.productionStatus || '');
+  const materialBlocked=assemblyReady==='BLOCKED';
+  const blockingSupplyIssues=materialBlocked?supplyIssues:[];
 
   const criticalMaterials={
     status: assemblyReady,
     partLevelDataAvailable:false,
-    blockingCount:supplyIssues.length,
-    blockingEvidence:supplyIssues.map(issueEvidence).slice(0,5),
+    blockingCount:blockingSupplyIssues.length,
+    relatedIssueCount:supplyIssues.length,
+    blockingEvidence:blockingSupplyIssues.map(issueEvidence).slice(0,5),
+    relatedEvidence:supplyIssues.map(issueEvidence).slice(0,5),
     assemblyAvailableDate:dateText(analysis?.assemblyAvailableDate),
     purchaseStatus:text(analysis?.purchaseStatus) || null,
-    note:supplyIssues.length?'조립을 막는 자재/외주입고 근거가 있어.':'부품 단위 핵심자재 원장은 아직 연결되지 않았어.'
+    note:materialBlocked
+      ? (blockingSupplyIssues.length?'현재 조립을 막는 자재/외주입고 근거가 있어.':'조립 보류 상태지만 직접 자재 근거를 추가 확인해야 해.')
+      : supplyIssues.length
+        ? '자재/입고 관련 이력은 있지만 현재 조립 보류 근거로 확정하지 않아.'
+        : '부품 단위 핵심자재 원장은 아직 연결되지 않았어.'
   };
 
   const qualityGate={
@@ -41,11 +54,11 @@ function buildProductionReadiness(input={}){
   };
 
   const inspectionDone=/완성품\s*검수완료|최종\s*검수완료|검수완료/.test(inspection) || /완성품\s*검수완료|최종\s*검수완료/.test(currentState);
-  const testsEvidence=/테스트|시운전|공회전|FAT|검수/.test(`${currentState} ${inspection}`);
+  const testsEvidence=hasCompletedTestEvidence(`${currentState} ${inspection} ${text(analysis?.actualBasis)}`);
   const gateChecks=[
-    {key:'material',label:'핵심 자재/외주입고',status:assemblyReady==='BLOCKED'?'HOLD':assemblyReady==='READY'?'CLEAR':'VERIFY',evidence:criticalMaterials.blockingEvidence[0]||criticalMaterials.purchaseStatus||criticalMaterials.note},
+    {key:'material',label:'핵심 자재/외주입고',status:materialBlocked?'HOLD':assemblyReady==='READY'?'CLEAR':'VERIFY',evidence:criticalMaterials.blockingEvidence[0]||criticalMaterials.relatedEvidence[0]||criticalMaterials.purchaseStatus||criticalMaterials.note},
     {key:'quality',label:'품질 수정·재검증',status:qualityIssues.length?'HOLD':'CLEAR',evidence:qualityGate.evidence[0]||qualityGate.note},
-    {key:'test',label:'구동·기능시험',status:testsEvidence?'EVIDENCE':'VERIFY',evidence:testsEvidence?`현재 상태/검수 근거: ${currentState||inspection}`:'직접 시험 완료 근거 확인 필요'},
+    {key:'test',label:'구동·기능시험',status:testsEvidence?'EVIDENCE':'VERIFY',evidence:testsEvidence?`완료 근거: ${[currentState,inspection,text(analysis?.actualBasis)].filter(Boolean).join(' · ')}`:'구동·기능시험 완료를 직접 나타내는 근거 확인 필요'},
     {key:'inspection',label:'최종 검수',status:inspectionDone?'CLEAR':'VERIFY',evidence:inspection||'최종 검수 완료 근거 확인 필요'},
     {key:'approval',label:'출고 승인',status:'VERIFY',evidence:'별도 출고 승인 기록 연결 필요'}
   ];
@@ -55,7 +68,7 @@ function buildProductionReadiness(input={}){
     status:hardHold?'HOLD':allOperationalClear?'CANDIDATE':'VERIFY',
     label:hardHold?'출고 조건 보류':allOperationalClear?'출고 가능 후보':'출고 조건 확인',
     checks:gateChecks,
-    reason:hardHold?'자재 또는 품질의 미해결 조건이 있어 출고 준비를 진행하기 전 해소가 필요해.':allOperationalClear?'현재 연결된 근거상 주요 생산조건은 충족했지만 최종 출고 승인은 별도 확인해야 해.':'시험·검수·승인 등 직접 완료 근거가 더 필요해.'
+    reason:hardHold?'자재 또는 품질의 미해결 조건이 있어 출고 준비를 진행하기 전 해소가 필요해.':allOperationalClear?'현재 연결된 근거상 자재·품질·검수 조건은 충족했지만 시험 및 최종 출고 승인은 각각 직접 확인해야 해.':'시험·검수·승인 등 직접 완료 근거가 더 필요해.'
   };
 
   const completion={
@@ -87,4 +100,4 @@ function buildProductionReadiness(input={}){
   };
 }
 
-module.exports={buildProductionReadiness};
+module.exports={buildProductionReadiness,hasCompletedTestEvidence};
