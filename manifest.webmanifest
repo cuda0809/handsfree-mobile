@@ -1,13 +1,13 @@
 {
   "id": "/",
-  "name": "핸즈프리 모바일 리얼",
-  "short_name": "핸즈프리 리얼",
-  "description": "수주형 장비 생산 운영 모바일 시스템",
+  "name": "KMT HandsFree Mobile",
+  "short_name": "KMT HandsFree",
+  "description": "케이엠텍 사내 생산 운영 모바일 시스템",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f4f7fb",
-  "theme_color": "#102a4a",
+  "background_color": "#082b4d",
+  "theme_color": "#082b4d",
   "orientation": "portrait-primary",
   "icons": [
     {
