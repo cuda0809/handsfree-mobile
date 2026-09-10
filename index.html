@@ -7,28 +7,28 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="HandsFree REAL">
+<meta name="apple-mobile-web-app-title" content="핸즈프리 리얼">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/real.css">
-<title>HandsFree Mobile — REAL</title>
+<title>핸즈프리 모바일 — 리얼</title>
 </head>
 <body>
 <header class="appbar">
   <div class="brand">
     <div class="mark"></div>
-    <div><b>HandsFree Mobile</b><small>REAL 0.3 · Evidence-first Project Core</small></div>
+    <div><b>핸즈프리 모바일</b><small>리얼 0.3.3 · V3 정합성 보호 운영엔진</small></div>
     <button id="syncBadge" class="sync">동기화</button>
   </div>
 </header>
 
 <section id="page-today" class="page active">
-  <div class="eyebrow">TODAY</div>
+  <div class="eyebrow">오늘</div>
   <h1>오늘 판단할 것부터</h1>
   <p id="syncText" class="lead">운영 데이터를 읽는 중…</p>
 
   <section class="decision">
-    <div class="decision-head"><b>Decision Inbox</b><span id="decisionCount" class="decision-count">–</span></div>
+    <div class="decision-head"><b>판단함</b><span id="decisionCount" class="decision-count">–</span></div>
     <div id="decisionList" class="decision-list"></div>
   </section>
 
@@ -36,10 +36,10 @@
     <article class="stat"><small>오늘 작업</small><b id="sWork">–</b></article>
     <article class="stat"><small>긴급</small><b id="sUrgent">–</b></article>
     <article class="stat"><small>활성 이슈</small><b id="sIssue">–</b></article>
-    <article class="stat"><small>BLOCKED</small><b id="sBlocked">–</b></article>
+    <article class="stat"><small>공정 보류</small><b id="sBlocked">–</b></article>
   </section>
 
-  <div class="section-title"><h2>막힌 장비 / 핵심 Blocker</h2><span>자재 · 품질 · 일정</span></div>
+  <div class="section-title"><h2>멈춘 장비 / 핵심 방해요인</h2><span>자재 · 품질 · 일정</span></div>
   <div id="blockerList" class="stack"></div>
 
   <div class="section-title"><h2>현재 실행 중</h2><span>오늘 작업 흐름</span></div>
@@ -47,15 +47,15 @@
 </section>
 
 <section id="page-projects" class="page">
-  <div class="eyebrow">PROJECTS</div>
+  <div class="eyebrow">프로젝트</div>
   <h1>장비 한 대의 전체 생애</h1>
-  <p class="lead">월간계획이 아니라 Project/Order ID를 중심으로 계획·자재·실행·변경·품질·출고를 연결한다.</p>
+  <p class="lead">월간계획이 아니라 프로젝트/발주번호를 중심으로 계획·자재·실행·변경·품질·출고를 연결한다.</p>
   <div class="searchbox">
     <input id="projectSearch" placeholder="발주번호 · 고객사 · 모델 검색">
     <div class="chips">
       <button class="active" data-filter="all">전체</button>
       <button data-filter="urgent">긴급</button>
-      <button data-filter="blocked">BLOCKED</button>
+      <button data-filter="blocked">공정 보류</button>
       <button data-filter="quality">품질</button>
     </div>
   </div>
@@ -63,16 +63,16 @@
 </section>
 
 <section id="page-issues" class="page">
-  <div class="eyebrow">ISSUES</div>
+  <div class="eyebrow">이슈</div>
   <h1>끝나지 않은 문제만</h1>
-  <p class="lead">지연·외주입고·불량·수정·납기 위험을 프로젝트와 다음 Gate에 연결해서 본다.</p>
+  <p class="lead">지연·외주입고·불량·수정·납기 위험을 프로젝트와 다음 공정에 연결해서 본다.</p>
   <div id="issueList" class="stack"></div>
 </section>
 
 <section id="page-search" class="page">
-  <div class="eyebrow">SEARCH</div>
+  <div class="eyebrow">검색</div>
   <h1>회사 기억을 찾는다</h1>
-  <p class="lead">REAL Core에서는 현재 프로젝트뿐 아니라 과거 Event, Change, Issue, Part, Vendor, A/S까지 같은 검색창에서 이어진다.</p>
+  <p class="lead">리얼 운영엔진에서는 현재 프로젝트뿐 아니라 과거 이력, 변경, 이슈, 부품, 협력업체, A/S까지 같은 검색창에서 이어진다.</p>
   <div class="searchbox"><input id="globalSearch" placeholder="예) 미코 82D / 한신정밀 / KRM-100D2 전장"></div>
   <div id="searchResults" class="stack"></div>
 </section>
@@ -80,29 +80,29 @@
 <nav class="bottom">
   <button class="active" data-page="today"><b>⌂</b><span>오늘</span></button>
   <button data-page="projects"><b>▣</b><span>프로젝트</span></button>
-  <button id="growNav" class="grow-btn"><b>🌱</b><span>Grow</span></button>
+  <button id="growNav" class="grow-btn"><b>🌱</b><span>그로우</span></button>
   <button data-page="issues"><b>!</b><span>이슈</span></button>
   <button data-page="search"><b>⌕</b><span>검색</span></button>
 </nav>
 
 <div class="sheet" id="growSheet">
   <div class="sheetbox">
-    <div class="sheethead"><div><small>GROW</small><h2>말하면 읽고, 판단하고, 기록한다</h2></div><button class="close" data-close="growSheet">×</button></div>
+    <div class="sheethead"><div><small>그로우</small><h2>말하면 읽고, 판단하고, 기록한다</h2></div><button class="close" data-close="growSheet">×</button></div>
     <div id="growMode" class="mode demo">연결 확인 중</div>
     <textarea id="growInput" placeholder="예) 트루메카 자전컵 커버 이틀 더 늦어진대&#10;예) 미코 KDM-150 지금 막힌 이유 알려줘&#10;예) 오늘 내가 결정해야 할 것만 알려줘"></textarea>
     <div class="actions"><button id="growVoice">🎙 음성</button><button id="growRun" class="primary">실행</button></div>
     <div class="chips">
       <button class="grow-quick" data-q="오늘 내가 결정해야 할 것만 알려줘">오늘 결정</button>
-      <button class="grow-quick" data-q="현재 BLOCKED 장비 알려줘">BLOCKED</button>
+      <button class="grow-quick" data-q="현재 공정이 막힌 장비 알려줘">공정 보류</button>
       <button class="grow-quick" data-q="납기 위험 장비와 이유 알려줘">납기 위험</button>
     </div>
-    <div id="growResult" class="result">Grow 결과가 여기에 표시돼.</div>
+    <div id="growResult" class="result">그로우 결과가 여기에 표시돼.</div>
   </div>
 </div>
 
 <div class="sheet" id="detailSheet">
   <div class="sheetbox">
-    <div class="sheethead"><div><small id="detailJob">PROJECT</small><h2 id="detailTitle">프로젝트</h2></div><button class="close" data-close="detailSheet">×</button></div>
+    <div class="sheethead"><div><small id="detailJob">프로젝트</small><h2 id="detailTitle">프로젝트</h2></div><button class="close" data-close="detailSheet">×</button></div>
     <div id="detailBody"></div>
   </div>
 </div>
@@ -112,5 +112,6 @@
 <script src="/real.js"></script>
 <script src="/core-adapter.js"></script>
 <script src="/project-detail.js"></script>
+<script src="/ko-ui.js"></script>
 </body>
 </html>
