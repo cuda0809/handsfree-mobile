@@ -1,5 +1,5 @@
 {
-  "version": "REAL-0.4.2",
+  "version": "REAL-0.4.3",
   "lineage": "handsfree-mobile-real",
-  "milestone": "SAFE_QUEUE_CLIENT_BRIDGE"
+  "milestone": "STRUCTURED_FIELD_INPUT"
 }
