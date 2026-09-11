@@ -44,6 +44,15 @@
     if(q('#fieldResult'))q('#fieldResult').textContent='아직 운영 데이터에는 아무것도 기록하지 않았어.';
   }
 
+  function openForProject(project={},nextKind='WORK'){
+    openSheet();
+    setKind(nextKind);
+    const target=[project.job||project.id,project.customer,project.device||project.model].filter(Boolean).join(' · ');
+    if(q('#fieldTarget'))q('#fieldTarget').value=target;
+    if(q('#fieldProcess')&&project.state)q('#fieldProcess').value=project.state;
+    if(q('#fieldResult'))q('#fieldResult').textContent=`${KIND_META[kind].label} 입력을 프로젝트 정보로 시작했어. 내용을 확인하고 필요한 부분만 추가해.`;
+  }
+
   function required(value,label){
     if(!text(value)) throw new Error(`${label}을 입력해줘`);
     return text(value);
@@ -179,7 +188,7 @@
     if(q('#fieldDate'))q('#fieldDate').value=todayKst();
     setKind('WORK');
     renderDrafts();
-    window.HFFieldInput={open:openSheet,setKind,renderDrafts};
+    window.HFFieldInput={open:openSheet,openForProject,setKind,renderDrafts};
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
