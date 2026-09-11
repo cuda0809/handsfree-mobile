@@ -44,3 +44,5 @@ On any header mismatch the LIVE read must fail closed rather than silently map w
 
 ## Promotion gate
 Production promotion is blocked until LIVE READ and Shadow Mode checks pass. No SAFE WRITE work starts from a fallback/reference source.
+
+Preview redeploy trigger after token rotation: 2026-09-11.
