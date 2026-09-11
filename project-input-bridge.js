@@ -58,7 +58,7 @@
 
 // Load the REAL 0.7 LIVE FOCUS presentation layer before later UI enhancers.
 if(document.readyState==='loading'){
-  document.write('<script src="/ui-focus-v07.js?v=0704"><\/script>');
+  document.write('<script src="/ui-focus-v07.js?v=0705"><\/script><script src="/ui-focus-v07-fix.js?v=0705"><\/script>');
 }else{
-  const s=document.createElement('script');s.src='/ui-focus-v07.js?v=0704';document.head.appendChild(s);
+  const a=document.createElement('script');a.src='/ui-focus-v07.js?v=0705';a.onload=()=>{const b=document.createElement('script');b.src='/ui-focus-v07-fix.js?v=0705';document.head.appendChild(b);};document.head.appendChild(a);
 }
