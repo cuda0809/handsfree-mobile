@@ -11,8 +11,14 @@ module.exports=async(req,res)=>{
   try{
     const core=await getCore({force:true});const source=core.sourceHealth();
     const auth=String(source?.auth||'');
-    const liveReady=Boolean(source?.runtimeLiveRead===true&&['apps-script-token','service-account'].includes(auth)&&/OS v3 LIVE/i.test(String(source?.label||'')));
-    const payload={ok:liveReady,liveReady,mode:source?.mode||null,label:source?.label||null,auth:source?.auth||null,runtimeLiveRead:Boolean(source?.runtimeLiveRead),runtimeDirectGoogleRead:Boolean(source?.runtimeDirectGoogleRead),fetchedAt:source?.fetchedAt||null,warning:source?.warning||null,env:envPresence(),writeLocked:true};
+    const mode=String(source?.mode||'');
+    // runtime.js v0.4 sourceHealth does not yet expose runtimeLiveRead even when
+    // provider successfully builds an authenticated Apps Script/Google LIVE core.
+    // Treat only authenticated LIVE modes with a real fetch timestamp and no warning as LIVE.
+    const inferredLive=Boolean(['apps-script-live','google-live'].includes(mode)&&source?.fetchedAt&&!source?.warning);
+    const runtimeLiveRead=Boolean(source?.runtimeLiveRead===true||inferredLive);
+    const liveReady=Boolean(runtimeLiveRead&&['apps-script-token','service-account'].includes(auth)&&/OS v3 LIVE/i.test(String(source?.label||'')));
+    const payload={ok:liveReady,liveReady,mode:source?.mode||null,label:source?.label||null,auth:source?.auth||null,runtimeLiveRead,runtimeDirectGoogleRead:Boolean(source?.runtimeDirectGoogleRead),fetchedAt:source?.fetchedAt||null,warning:source?.warning||null,env:envPresence(),writeLocked:true};
     if(!liveReady)return res.status(503).json({...payload,code:'REAL_LIVE_READ_NOT_READY',message:'OS v3 LIVE READ is not active. Snapshot/reference fallbacks are not accepted as LIVE.'});
     return res.status(200).json({...payload,code:'REAL_LIVE_READ_READY',message:'Authenticated OS v3 LIVE READ is active.'});
   }catch(error){return res.status(500).json({ok:false,liveReady:false,code:'REAL_LIVE_READ_ERROR',message:error?.message||'LIVE READ check failed',env:envPresence(),writeLocked:true});}
