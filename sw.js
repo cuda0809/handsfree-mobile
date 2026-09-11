@@ -1,5 +1,5 @@
-const CACHE='handsfree-real-v043';
-const SHELL=['/','/real.css','/real.js','/core-adapter.js','/project-detail.js','/readiness-ui.js','/ko-ui.js','/queue-client.js','/input-ui.js','/manifest.webmanifest','/icon.svg','/app-version.json'];
+const CACHE='handsfree-real-v043b';
+const SHELL=['/','/real.css','/real.js','/core-adapter.js','/project-detail.js','/readiness-ui.js','/ko-ui.js','/queue-client.js','/input-ui.js','/project-input-bridge.js','/manifest.webmanifest','/icon.svg','/app-version.json'];
 self.addEventListener('install',event=>{event.waitUntil((async()=>{self.skipWaiting();const c=await caches.open(CACHE);await c.addAll(SHELL).catch(()=>{});})())});
 self.addEventListener('activate',event=>{event.waitUntil((async()=>{const keys=await caches.keys();await Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)));await self.clients.claim();})())});
 self.addEventListener('fetch',event=>{
