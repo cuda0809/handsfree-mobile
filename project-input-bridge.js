@@ -14,6 +14,7 @@
   }
   function openInput(kind){
     const p=currentProject();
+    q('#fieldReset')?.click();
     q('#detailSheet')?.classList.remove('show');
     if(window.HFFieldInput?.openForProject) window.HFFieldInput.openForProject(p,kind);
   }
