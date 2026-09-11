@@ -25,7 +25,12 @@ function buildCanonical(snapshot){
       owners:{sales:p.sales??null,design:p.design??null,production:Array.isArray(p.production)?p.production:[],pm:p.pm??null},
       status:p.status??null,active:activeStatus(p.status),note:p.note??null,
       progress:{plan:planProgress,actual:actualProgress,planLabel:p.progressText??null,actualBasis:a?.actualBasis??null},
-      analysis:{snapshotDate:dateOnly(a?.snapshotDate),grade:a?.grade??null,productionStatus:a?.productionStatus??null,bottleneck:a?.bottleneck??null,purchaseStatus:a?.purchaseStatus??null},
+      analysis:{
+        snapshotDate:dateOnly(a?.snapshotDate),grade:a?.grade??null,productionSlackDays:a?.productionSlackDays??null,
+        productionStatus:a?.productionStatus??null,bottleneck:a?.bottleneck??null,purchaseStatus:a?.purchaseStatus??null,
+        customerDue:dateOnly(a?.customerDue)||(a?.customerDue??null),operatingDue:dateOnly(a?.operatingDue)||(a?.operatingDue??null),
+        assemblyAvailableDate:dateOnly(a?.assemblyAvailableDate),scheduleNetDays:a?.scheduleNetDays??null,actualBasis:a?.actualBasis??null
+      },
       source:'제품마스터'
     };
   });
