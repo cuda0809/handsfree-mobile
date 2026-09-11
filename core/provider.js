@@ -1,5 +1,7 @@
 // HandsFree Mobile REAL 0.7 — async source provider.
 const {buildCore}=require('./runtime');
+const {buildCanonical}=require('./canonical-v07');
+const {buildDecisions}=require('./decision-v07');
 const reference=require('./data');
 const appsScript=require('./apps-script-v07');
 const google=require('./google-sheets-v04');
@@ -13,6 +15,43 @@ function privateSnapshot(){
     const parsed=JSON.parse(raw);
     return parsed&&Array.isArray(parsed.projects)?parsed:null;
   }catch(e){return{__error:e.message};}
+}
+
+function applyDecisionEngine(core,snapshot){
+  const canonical=buildCanonical(snapshot);
+  const decision=buildDecisions(canonical);
+  const byId=new Map(decision.projects.map(d=>[String(d.projectId),d]));
+  for(const p of core.projects||[]){
+    const d=byId.get(String(p.id));if(!d)continue;
+    p.risk=d.risk;
+    p.riskReason=(d.riskReasons||[]).join(' · ')||p.riskReason;
+    p.nextGate=d.nextGate||p.nextGate;
+    p.plannedToday=Boolean(d.todayWork);
+    p.flowBlocked=Boolean(d.blocked);
+    p.assemblyReady=d.blocked?'BLOCKED':p.assemblyReady;
+    p.dueDays=d.dueDays;
+    p.dDay=d.dDay;
+    p.currentProcess=d.currentProcess;
+    p.decisionState=d.currentState;
+    p.decisionRequired=Boolean(d.decisionRequired);
+    p.blockType=d.blockType;
+    p.autoDecision=d;
+  }
+  const baseMetrics=core.metrics.bind(core);
+  core.metrics=()=>({...baseMetrics(),todayWork:decision.metrics.todayWork,urgent:decision.metrics.urgent,blocked:decision.metrics.blocked,caution:decision.metrics.caution,consult:decision.metrics.consult,decisionRequired:decision.metrics.decisions});
+  core.decisions=()=>decision.projects.filter(d=>d.decisionRequired).map(d=>{
+    const p=(core.projects||[]).find(x=>String(x.id)===String(d.projectId));
+    const severity=d.risk==='긴급'?'CRITICAL':d.risk==='주의'?'HIGH':'MEDIUM';
+    const cause=(d.riskReasons||[]).join(' · ')||d.currentState;
+    return {id:`AUTO-${d.projectId}`,projectId:d.projectId,type:'AUTO_DECISION',severity,status:'OPEN',process:d.currentProcess,cause,nextAction:d.nextGate,decisionRequired:true,project:p||null,title:p?`${p.customer} · ${p.model}`:d.projectId,decision:`${cause} — ${d.nextGate}`,source:'REAL_DECISION_V1'};
+  });
+  const baseLegacy=core.toLegacy.bind(core);
+  core.toLegacy=p=>{const row=baseLegacy(p),d=byId.get(String(p.id));return d?{...row,dDay:d.dDay,dueDays:d.dueDays,todayWork:d.todayWork,blocked:d.blocked,blockType:d.blockType,currentProcess:d.currentProcess,decisionState:d.currentState,decisionRequired:d.decisionRequired,riskReasons:d.riskReasons,progressPlan:d.progress.plan,progressActual:d.progress.actual,autoDecision:true}:row;};
+  const baseHealth=core.sourceHealth.bind(core);
+  core.sourceHealth=()=>({...baseHealth(),canonicalSchema:canonical.schema,decisionSchema:decision.schema,decisionMetrics:decision.metrics});
+  core.canonical=canonical;
+  core.autoDecision=decision;
+  return core;
 }
 
 function buildReferenceCore(warning){
@@ -40,7 +79,8 @@ async function getCore({force=false}={}){
   if(appsScript.configured()){
     try{
       const snapshot=await appsScript.loadSnapshot();
-      const core=buildCore(snapshot,{mode:'apps-script-live',label:'OS v3 LIVE',privateRuntimeSource:false,runtimeDirectGoogleRead:false,runtimeLiveRead:true,auth:'apps-script-token',fetchedAt:snapshot?.meta?.fetchedAt||new Date().toISOString(),projectSource:'OS_V3_APPS_SCRIPT',issueSource:'OS_V3_APPS_SCRIPT',capacitySource:'OS_V3_APPS_SCRIPT'});
+      let core=buildCore(snapshot,{mode:'apps-script-live',label:'OS v3 LIVE',privateRuntimeSource:false,runtimeDirectGoogleRead:false,runtimeLiveRead:true,auth:'apps-script-token',fetchedAt:snapshot?.meta?.fetchedAt||new Date().toISOString(),projectSource:'OS_V3_APPS_SCRIPT',issueSource:'OS_V3_APPS_SCRIPT',capacitySource:'OS_V3_APPS_SCRIPT'});
+      core=applyDecisionEngine(core,snapshot);
       cache={core,expiresAt:now+CACHE_MS,mode:'apps-script-live'};return core;
     }catch(e){
       const core=decorateFailure(buildReferenceCore(`Apps Script bridge configured but read failed: ${e.message}`),{mode:'apps-script-error',label:'APPS SCRIPT ERROR',auth:'apps-script-token',runtimeLiveRead:false});
@@ -52,7 +92,8 @@ async function getCore({force=false}={}){
   if(google.configured()){
     try{
       const snapshot=await google.loadSnapshot();
-      const core=buildCore(snapshot,{mode:'google-live',label:'OS v3 LIVE',privateRuntimeSource:false,runtimeDirectGoogleRead:true,runtimeLiveRead:true,auth:'service-account',fetchedAt:new Date().toISOString()});
+      let core=buildCore(snapshot,{mode:'google-live',label:'OS v3 LIVE',privateRuntimeSource:false,runtimeDirectGoogleRead:true,runtimeLiveRead:true,auth:'service-account',fetchedAt:new Date().toISOString()});
+      core=applyDecisionEngine(core,snapshot);
       cache={core,expiresAt:now+CACHE_MS,mode:'google-live'};return core;
     }catch(e){
       const core=decorateFailure(buildReferenceCore(`Google bridge configured but read failed: ${e.message}`),{mode:'google-error',label:'GOOGLE ERROR',auth:'service-account',runtimeLiveRead:false});
