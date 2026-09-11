@@ -1,5 +1,5 @@
 {
-  "version": "REAL-0.4.3",
+  "version": "REAL-0.4.4",
   "lineage": "handsfree-mobile-real",
-  "milestone": "STRUCTURED_FIELD_INPUT"
+  "milestone": "SAFE_LOCAL_DRAFT_RECOVERY"
 }
