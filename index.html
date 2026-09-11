@@ -17,7 +17,7 @@
 <header class="appbar">
   <div class="brand">
     <div class="mark"></div>
-    <div><b>핸즈프리 모바일</b><small>리얼 0.4.4 · 초안 복구/관리</small></div>
+    <div><b>핸즈프리 모바일</b><small>리얼 0.5.0 · 조회 고도화</small></div>
     <button id="syncBadge" class="sync">동기화</button>
   </div>
 </header>
@@ -26,148 +26,31 @@
   <div class="eyebrow">오늘</div>
   <h1>오늘 판단할 것부터</h1>
   <p id="syncText" class="lead">운영 데이터를 읽는 중…</p>
-
-  <section class="decision">
-    <div class="decision-head"><b>판단함</b><span id="decisionCount" class="decision-count">–</span></div>
-    <div id="decisionList" class="decision-list"></div>
-  </section>
-
-  <section class="stats">
-    <article class="stat"><small>오늘 작업</small><b id="sWork">–</b></article>
-    <article class="stat"><small>긴급</small><b id="sUrgent">–</b></article>
-    <article class="stat"><small>활성 이슈</small><b id="sIssue">–</b></article>
-    <article class="stat"><small>공정 보류</small><b id="sBlocked">–</b></article>
-  </section>
-
-  <section class="quick-entry">
-    <div><small>현장 입력</small><b>말로 하거나, 버튼으로 빠르게</b><span>업무 · 일정변경 · 이슈 · 지원을 같은 안전 Queue로 보낸다.</span></div>
-    <button id="openFieldInput">입력 열기</button>
-  </section>
-
-  <div class="section-title"><h2>멈춘 장비 / 핵심 방해요인</h2><span>자재 · 품질 · 일정</span></div>
-  <div id="blockerList" class="stack"></div>
-
-  <div class="section-title"><h2>현재 실행 중</h2><span>오늘 작업 흐름</span></div>
-  <div id="workList" class="stack"></div>
+  <section class="decision"><div class="decision-head"><b>판단함</b><span id="decisionCount" class="decision-count">–</span></div><div id="decisionList" class="decision-list"></div></section>
+  <section class="stats"><article class="stat"><small>오늘 작업</small><b id="sWork">–</b></article><article class="stat"><small>긴급</small><b id="sUrgent">–</b></article><article class="stat"><small>활성 이슈</small><b id="sIssue">–</b></article><article class="stat"><small>공정 보류</small><b id="sBlocked">–</b></article></section>
+  <section class="quick-entry"><div><small>현장 입력</small><b>말로 하거나, 버튼으로 빠르게</b><span>업무 · 일정변경 · 이슈 · 지원을 같은 안전 Queue로 보낸다.</span></div><button id="openFieldInput">입력 열기</button></section>
+  <div class="section-title"><h2>멈춘 장비 / 핵심 방해요인</h2><span>자재 · 품질 · 일정</span></div><div id="blockerList" class="stack"></div>
+  <div class="section-title"><h2>현재 실행 중</h2><span>오늘 작업 흐름</span></div><div id="workList" class="stack"></div>
 </section>
 
 <section id="page-projects" class="page">
-  <div class="eyebrow">프로젝트</div>
-  <h1>장비 한 대의 전체 생애</h1>
-  <p class="lead">월간계획이 아니라 프로젝트/발주번호를 중심으로 계획·자재·실행·변경·품질·출고를 연결한다.</p>
-  <div class="searchbox">
-    <input id="projectSearch" placeholder="발주번호 · 고객사 · 모델 검색">
-    <div class="chips">
-      <button class="active" data-filter="all">전체</button>
-      <button data-filter="urgent">긴급</button>
-      <button data-filter="blocked">공정 보류</button>
-      <button data-filter="quality">품질</button>
-    </div>
-  </div>
-  <div id="projectList" class="stack projects"></div>
+  <div class="eyebrow">프로젝트</div><h1>장비 한 대의 전체 생애</h1><p class="lead">월간계획이 아니라 프로젝트/발주번호를 중심으로 계획·자재·실행·변경·품질·출고를 연결한다.</p>
+  <div class="searchbox"><input id="projectSearch" placeholder="발주번호 · 고객사 · 모델 검색"><div class="chips"><button class="active" data-filter="all">전체</button><button data-filter="urgent">긴급</button><button data-filter="blocked">공정 보류</button><button data-filter="quality">품질</button></div></div><div id="projectList" class="stack projects"></div>
 </section>
 
-<section id="page-issues" class="page">
-  <div class="eyebrow">이슈</div>
-  <h1>끝나지 않은 문제만</h1>
-  <p class="lead">지연·외주입고·불량·수정·납기 위험을 프로젝트와 다음 공정에 연결해서 본다.</p>
-  <div id="issueList" class="stack"></div>
-</section>
+<section id="page-issues" class="page"><div class="eyebrow">이슈</div><h1>끝나지 않은 문제만</h1><p class="lead">지연·외주입고·불량·수정·납기 위험을 프로젝트와 다음 공정에 연결해서 본다.</p><div id="issueList" class="stack"></div></section>
+<section id="page-search" class="page"><div class="eyebrow">검색</div><h1>회사 기억을 찾는다</h1><p class="lead">현재제품·과거계획·업무이력·변경·이슈를 같은 검색창에서 이어서 본다.</p><div class="searchbox"><input id="globalSearch" placeholder="예) 미코 82D / 한신정밀 / KRM-100D2 전장"></div><div id="searchResults" class="stack"></div></section>
 
-<section id="page-search" class="page">
-  <div class="eyebrow">검색</div>
-  <h1>회사 기억을 찾는다</h1>
-  <p class="lead">리얼 운영엔진에서는 현재 프로젝트뿐 아니라 과거 이력, 변경, 이슈, 부품, 협력업체, A/S까지 같은 검색창에서 이어진다.</p>
-  <div class="searchbox"><input id="globalSearch" placeholder="예) 미코 82D / 한신정밀 / KRM-100D2 전장"></div>
-  <div id="searchResults" class="stack"></div>
-</section>
-
-<nav class="bottom">
-  <button class="active" data-page="today"><b>⌂</b><span>오늘</span></button>
-  <button data-page="projects"><b>▣</b><span>프로젝트</span></button>
-  <button id="growNav" class="grow-btn"><b>🌱</b><span>그로우</span></button>
-  <button data-page="issues"><b>!</b><span>이슈</span></button>
-  <button data-page="search"><b>⌕</b><span>검색</span></button>
-</nav>
-
+<nav class="bottom"><button class="active" data-page="today"><b>⌂</b><span>오늘</span></button><button data-page="projects"><b>▣</b><span>프로젝트</span></button><button id="growNav" class="grow-btn"><b>🌱</b><span>그로우</span></button><button data-page="issues"><b>!</b><span>이슈</span></button><button data-page="search"><b>⌕</b><span>검색</span></button></nav>
 <button id="fieldInputFab" class="field-fab" aria-label="현장 입력 열기"><b>＋</b><span>입력</span></button>
 
-<div class="sheet" id="growSheet">
-  <div class="sheetbox">
-    <div class="sheethead"><div><small>그로우</small><h2>말하면 읽고, 판단하고, 기록한다</h2></div><button class="close" data-close="growSheet">×</button></div>
-    <div id="growMode" class="mode demo">연결 확인 중</div>
-    <div id="queueGate" class="mode demo">쓰기 안전게이트 확인 중</div>
-    <textarea id="growInput" placeholder="예) 트루메카 자전컵 커버 이틀 더 늦어진대&#10;예) 미코 KDM-150 지금 막힌 이유 알려줘&#10;예) 오늘 내가 결정해야 할 것만 알려줘"></textarea>
-    <div class="actions"><button id="growVoice">🎙 음성</button><button id="growRun" class="primary">실행</button></div>
-    <div class="chips">
-      <button class="grow-quick" data-q="오늘 내가 결정해야 할 것만 알려줘">오늘 결정</button>
-      <button class="grow-quick" data-q="현재 공정이 막힌 장비 알려줘">공정 보류</button>
-      <button class="grow-quick" data-q="납기 위험 장비와 이유 알려줘">납기 위험</button>
-    </div>
-    <div id="growResult" class="result">읽기 질문은 바로 답하고, 쓰기 명령은 안전게이트 검증 후 한 번 더 확인받아.</div>
-    <div id="draftInfo" class="queue-note">미등록 초안 없음</div>
-  </div>
-</div>
+<div class="sheet" id="growSheet"><div class="sheetbox"><div class="sheethead"><div><small>그로우</small><h2>말하면 읽고, 판단하고, 기록한다</h2></div><button class="close" data-close="growSheet">×</button></div><div id="growMode" class="mode demo">연결 확인 중</div><div id="queueGate" class="mode demo">쓰기 안전게이트 확인 중</div><textarea id="growInput" placeholder="예) 트루메카 자전컵 커버 이틀 더 늦어진대&#10;예) 미코 KDM-150 지금 막힌 이유 알려줘&#10;예) 오늘 내가 결정해야 할 것만 알려줘"></textarea><div class="actions"><button id="growVoice">🎙 음성</button><button id="growRun" class="primary">실행</button></div><div class="chips"><button class="grow-quick" data-q="오늘 내가 결정해야 할 것만 알려줘">오늘 결정</button><button class="grow-quick" data-q="현재 공정이 막힌 장비 알려줘">공정 보류</button><button class="grow-quick" data-q="납기 위험 장비와 이유 알려줘">납기 위험</button></div><div id="growResult" class="result">읽기 질문은 바로 답하고, 쓰기 명령은 안전게이트 검증 후 한 번 더 확인받아.</div><div id="draftInfo" class="queue-note">미등록 초안 없음</div></div></div>
 
-<div class="sheet" id="inputSheet">
-  <div class="sheetbox field-sheet">
-    <div class="sheethead"><div><small>현장 입력</small><h2>핵심만 빠르게 기록</h2></div><button class="close" data-close="inputSheet">×</button></div>
-    <div id="fieldQueueGate" class="mode demo">쓰기 안전게이트 확인 중</div>
-    <div class="entry-tabs" role="tablist">
-      <button type="button" class="active" data-entry-kind="WORK">업무</button>
-      <button type="button" data-entry-kind="CHANGE">일정변경</button>
-      <button type="button" data-entry-kind="ISSUE">이슈</button>
-      <button type="button" data-entry-kind="SUPPORT">지원</button>
-    </div>
-    <div id="fieldHelp" class="entry-help">오늘 진행한 작업이나 진행상태를 빠르게 남겨.</div>
+<div class="sheet" id="inputSheet"><div class="sheetbox field-sheet"><div class="sheethead"><div><small>현장 입력</small><h2>핵심만 빠르게 기록</h2></div><button class="close" data-close="inputSheet">×</button></div><div id="fieldQueueGate" class="mode demo">쓰기 안전게이트 확인 중</div><div class="entry-tabs" role="tablist"><button type="button" class="active" data-entry-kind="WORK">업무</button><button type="button" data-entry-kind="CHANGE">일정변경</button><button type="button" data-entry-kind="ISSUE">이슈</button><button type="button" data-entry-kind="SUPPORT">지원</button></div><div id="fieldHelp" class="entry-help">오늘 진행한 작업이나 진행상태를 빠르게 남겨.</div>
+<form id="fieldForm" class="field-form"><div class="form-grid"><label class="span2"><span>대상 장비 / 발주번호</span><input id="fieldTarget" placeholder="예) 미코 KDM-150 / 260710A-052"></label><label><span>기준일</span><input id="fieldDate" type="date"></label><label><span>담당 / 입력자</span><input id="fieldOwner" placeholder="예) 이성호"></label><label><span>공정</span><input id="fieldProcess" placeholder="예) 조립 / 전장 / 검수"></label><label><span>우선순위</span><select id="fieldPriority"><option value="NORMAL">일반</option><option value="HIGH">긴급</option></select></label><label class="span2 hidden" data-show-kinds="CHANGE"><span>변경 후 일정</span><input id="fieldNewDate" type="date"></label><label class="span2 hidden" data-show-kinds="CHANGE"><span>변경 사유</span><input id="fieldReason" placeholder="예) 전장품 입고 지연으로 2일 연기"></label><label class="hidden" data-show-kinds="ISSUE"><span>이슈 유형</span><select id="fieldIssueType"><option>품질</option><option>자재/입고</option><option>일정지연</option><option>설계</option><option>기타</option></select></label><label class="hidden" data-show-kinds="ISSUE"><span>다음 조치</span><input id="fieldNextAction" placeholder="예) 수정품 입고 후 재검증"></label><label class="hidden" data-show-kinds="SUPPORT"><span>지원 유형</span><select id="fieldSupportType"><option>타부서지원</option><option>A/S</option><option>PT</option><option>출장</option><option>기타</option></select></label><label class="hidden" data-show-kinds="SUPPORT"><span>참여자</span><input id="fieldParticipants" placeholder="예) 이상준, 장현준"></label><label class="span2"><span>내용</span><textarea id="fieldDetail" placeholder="현장에서 필요한 내용만 간단히 입력"></textarea></label></div><div class="field-actions"><button id="fieldReset" type="button">비우기</button><button id="fieldSubmit" type="submit" class="primary">업무 안전검증</button></div></form>
+<div id="fieldResult" class="result">아직 운영 데이터에는 아무것도 기록하지 않았어.</div><button id="fieldConfirm" type="button" class="queue-confirm hidden">확인 후 입력대기열에 등록</button><div class="draft-head"><b>이 기기 미등록 초안</b><span id="entryDraftCount">0건</span></div><div id="entryDraftList" class="draft-list"><div class="empty compact">미등록 초안이 없어.</div></div></div></div>
 
-    <form id="fieldForm" class="field-form">
-      <div class="form-grid">
-        <label class="span2"><span>대상 장비 / 발주번호</span><input id="fieldTarget" placeholder="예) 미코 KDM-150 / 260710A-052"></label>
-        <label><span>기준일</span><input id="fieldDate" type="date"></label>
-        <label><span>담당 / 입력자</span><input id="fieldOwner" placeholder="예) 이성호"></label>
-        <label><span>공정</span><input id="fieldProcess" placeholder="예) 조립 / 전장 / 검수"></label>
-        <label><span>우선순위</span><select id="fieldPriority"><option value="NORMAL">일반</option><option value="HIGH">긴급</option></select></label>
-
-        <label class="span2 hidden" data-show-kinds="CHANGE"><span>변경 후 일정</span><input id="fieldNewDate" type="date"></label>
-        <label class="span2 hidden" data-show-kinds="CHANGE"><span>변경 사유</span><input id="fieldReason" placeholder="예) 전장품 입고 지연으로 2일 연기"></label>
-
-        <label class="hidden" data-show-kinds="ISSUE"><span>이슈 유형</span><select id="fieldIssueType"><option>품질</option><option>자재/입고</option><option>일정지연</option><option>설계</option><option>기타</option></select></label>
-        <label class="hidden" data-show-kinds="ISSUE"><span>다음 조치</span><input id="fieldNextAction" placeholder="예) 수정품 입고 후 재검증"></label>
-
-        <label class="hidden" data-show-kinds="SUPPORT"><span>지원 유형</span><select id="fieldSupportType"><option>타부서지원</option><option>A/S</option><option>PT</option><option>출장</option><option>기타</option></select></label>
-        <label class="hidden" data-show-kinds="SUPPORT"><span>참여자</span><input id="fieldParticipants" placeholder="예) 이상준, 장현준"></label>
-
-        <label class="span2"><span>내용</span><textarea id="fieldDetail" placeholder="현장에서 필요한 내용만 간단히 입력"></textarea></label>
-      </div>
-      <div class="field-actions"><button id="fieldReset" type="button">비우기</button><button id="fieldSubmit" type="submit" class="primary">업무 안전검증</button></div>
-    </form>
-
-    <div id="fieldResult" class="result">아직 운영 데이터에는 아무것도 기록하지 않았어.</div>
-    <button id="fieldConfirm" type="button" class="queue-confirm hidden">확인 후 입력대기열에 등록</button>
-
-    <div class="draft-head"><b>이 기기 미등록 초안</b><span id="entryDraftCount">0건</span></div>
-    <div id="entryDraftList" class="draft-list"><div class="empty compact">미등록 초안이 없어.</div></div>
-  </div>
-</div>
-
-<div class="sheet" id="detailSheet">
-  <div class="sheetbox">
-    <div class="sheethead"><div><small id="detailJob">프로젝트</small><h2 id="detailTitle">프로젝트</h2></div><button class="close" data-close="detailSheet">×</button></div>
-    <div id="detailBody"></div>
-  </div>
-</div>
-
-<button id="installBtn" class="hidden" aria-label="앱 설치">설치</button>
-<div id="toast"></div>
-<script src="/real.js"></script>
-<script src="/core-adapter.js"></script>
-<script src="/project-detail.js"></script>
-<script src="/readiness-ui.js"></script>
-<script src="/ko-ui.js"></script>
-<script src="/queue-client.js"></script>
-<script src="/input-ui.js"></script>
-<script src="/project-input-bridge.js"></script>
-<script src="/draft-manager.js"></script>
-</body>
-</html>
+<div class="sheet" id="detailSheet"><div class="sheetbox"><div class="sheethead"><div><small id="detailJob">프로젝트</small><h2 id="detailTitle">프로젝트</h2></div><button class="close" data-close="detailSheet">×</button></div><div id="detailBody"></div></div></div>
+<button id="installBtn" class="hidden" aria-label="앱 설치">설치</button><div id="toast"></div>
+<script src="/real.js"></script><script src="/core-adapter.js"></script><script src="/project-detail.js"></script><script src="/readiness-ui.js"></script><script src="/ko-ui.js"></script><script src="/queue-client.js"></script><script src="/input-ui.js"></script><script src="/project-input-bridge.js"></script><script src="/draft-manager.js"></script><script src="/read-experience.js"></script>
+</body></html>
