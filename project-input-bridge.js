@@ -55,3 +55,10 @@
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
+
+// Load the REAL 0.7 LIVE FOCUS presentation layer before later UI enhancers.
+if(document.readyState==='loading'){
+  document.write('<script src="/ui-focus-v07.js?v=0704"><\/script>');
+}else{
+  const s=document.createElement('script');s.src='/ui-focus-v07.js?v=0704';document.head.appendChild(s);
+}
