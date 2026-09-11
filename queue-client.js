@@ -24,14 +24,21 @@
     if(/(알려줘|보여줘|찾아줘|뭐야|무엇|왜|이유|현황|상태|어때|몇|확인해|확인해줘|조회)/.test(s)) return true;
     return /[?？]$/.test(s);
   }
+  function explicitWrite(s){
+    return /(반영해|기록해|등록해|추가해|변경해|바꿔|미뤄|연기해|당겨|삭제해|처리해|완료로|진행으로)/.test(s);
+  }
+  function operationalUpdate(s){
+    return /(입고대기|입고 대기|불량발생|불량 발생|휴가|연차|출장|지원 예정|지원해|늦어진|늦어졌|늦어진대|미뤄졌|연기됐|당겨졌|진행중|진행 중|완료 예정|입고 예정|재입고완료|재입고 완료)/.test(s);
+  }
   function isWriteIntent(input){
     const s=text(input);
-    if(isReadIntent(s) && !/(반영해|기록해|등록해|추가해|변경해|바꿔|미뤄|연기해|당겨|삭제해|처리해)/.test(s)) return false;
-    return /(반영해|기록해|등록해|추가해|변경해|바꿔|미뤄|연기해|당겨|삭제해|처리해|완료로|진행으로|입고대기|불량발생|불량 발생|휴가|연차|출장|지원 예정|지원해)/.test(s);
+    if(explicitWrite(s)) return true;
+    if(isReadIntent(s)) return false;
+    return operationalUpdate(s);
   }
   function kindFor(input){
     const s=text(input);
-    if(/(일정|납기|연기|미뤄|당겨|변경)/.test(s)) return 'CHANGE';
+    if(/(일정|납기|연기|미뤄|당겨|변경|늦어진|늦어졌|미뤄졌|연기됐|당겨졌)/.test(s)) return 'CHANGE';
     if(/(불량|고장|문제|지연|입고대기|입고 대기|끼임|동심|소음|재검증)/.test(s)) return 'ISSUE';
     if(/(A\/S|\bAS\b|PT|타부서.?지원|지원)/i.test(s)) return 'SUPPORT';
     return 'WORK';
@@ -85,18 +92,21 @@
     const reasons=[...(body?.sheetGate?.reasons||[])];
     if(body?.parity && !body.parity.live) reasons.unshift('LIVE_READ_PENDING');
     const labels={
-      GOOGLE_CREDENTIALS_NOT_CONFIGURED:'서비스계정 인증 대기',
+      GOOGLECREDENTIALSNOTCONFIGURED:'서비스계정 인증 대기',
       CREDENTIALS:'서비스계정 인증 대기',
       WRITESWITCH:'쓰기 스위치 잠금',
-      WRITE_SWITCH:'쓰기 스위치 잠금',
-      LIVE_READ_PENDING:'OS v3 LIVE 읽기 대기',
+      LIVEREADPENDING:'OS v3 LIVE 읽기 대기',
       INTEGRITYPASS:'무결성 검사 확인 필요',
       CORECHECKPASS:'핵심점검 확인 필요',
       QUEUEHEADERS:'Queue 헤더 확인 필요',
       SPREADSHEETID:'V3 파일 ID 불일치',
-      CURRENTVERSION:'V3 버전 기준 불일치'
+      CURRENTVERSION:'V3 버전 기준 불일치',
+      SHEETGATEREADFAILED:'시트 안전게이트 확인 실패'
     };
-    const pretty=[...new Set(reasons.map(r=>labels[String(r).replace(/_/g,'').toUpperCase()]||labels[r]||r))];
+    const pretty=[...new Set(reasons.map(r=>{
+      const key=String(r).replace(/_/g,'').toUpperCase();
+      return labels[key]||String(r);
+    }))];
     return pretty.join(' · ')||'안전 게이트 잠금';
   }
   function renderGate(body){
