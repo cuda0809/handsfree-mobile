@@ -17,7 +17,7 @@
 <header class="appbar">
   <div class="brand">
     <div class="mark"></div>
-    <div><b>핸즈프리 모바일</b><small>리얼 0.4 · 생산 준비도 판단 엔진</small></div>
+    <div><b>핸즈프리 모바일</b><small>리얼 0.4.2 · 안전 입력 브리지</small></div>
     <button id="syncBadge" class="sync">동기화</button>
   </div>
 </header>
@@ -89,6 +89,7 @@
   <div class="sheetbox">
     <div class="sheethead"><div><small>그로우</small><h2>말하면 읽고, 판단하고, 기록한다</h2></div><button class="close" data-close="growSheet">×</button></div>
     <div id="growMode" class="mode demo">연결 확인 중</div>
+    <div id="queueGate" class="mode demo">쓰기 안전게이트 확인 중</div>
     <textarea id="growInput" placeholder="예) 트루메카 자전컵 커버 이틀 더 늦어진대&#10;예) 미코 KDM-150 지금 막힌 이유 알려줘&#10;예) 오늘 내가 결정해야 할 것만 알려줘"></textarea>
     <div class="actions"><button id="growVoice">🎙 음성</button><button id="growRun" class="primary">실행</button></div>
     <div class="chips">
@@ -96,7 +97,8 @@
       <button class="grow-quick" data-q="현재 공정이 막힌 장비 알려줘">공정 보류</button>
       <button class="grow-quick" data-q="납기 위험 장비와 이유 알려줘">납기 위험</button>
     </div>
-    <div id="growResult" class="result">그로우 결과가 여기에 표시돼.</div>
+    <div id="growResult" class="result">읽기 질문은 바로 답하고, 쓰기 명령은 안전게이트 검증 후 한 번 더 확인받아.</div>
+    <div id="draftInfo" class="queue-note">미등록 초안 없음</div>
   </div>
 </div>
 
@@ -114,5 +116,6 @@
 <script src="/project-detail.js"></script>
 <script src="/readiness-ui.js"></script>
 <script src="/ko-ui.js"></script>
+<script src="/queue-client.js"></script>
 </body>
 </html>
