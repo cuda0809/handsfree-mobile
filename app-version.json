@@ -1,5 +1,5 @@
 {
-  "version": "REAL-0.4.0",
+  "version": "REAL-0.4.2",
   "lineage": "handsfree-mobile-real",
-  "milestone": "PRODUCTION_READINESS_4_AXIS"
+  "milestone": "SAFE_QUEUE_CLIENT_BRIDGE"
 }
