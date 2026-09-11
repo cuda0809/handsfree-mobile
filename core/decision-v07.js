@@ -2,6 +2,7 @@
 // Derives Risk / Today Work / BLOCKED / Next Gate / D-Day from the canonical read model.
 function text(v){return String(v??'').trim();}
 function dateOnly(v){const s=text(v);return /^\d{4}-\d{2}-\d{2}$/.test(s)?s:null;}
+function numberOrNull(v){if(v===null||v===undefined||v==='')return null;const n=Number(v);return Number.isFinite(n)?n:null;}
 function dayDiff(future,base){if(!future||!base)return null;return Math.ceil((new Date(future+'T00:00:00+09:00')-new Date(base+'T00:00:00+09:00'))/86400000);}
 function matchProject(pattern,id){if(!pattern||!id)return false;if(pattern===id)return true;if(String(pattern).endsWith('*'))return String(id).startsWith(String(pattern).slice(0,-1));return false;}
 function rankRisk(v){return ({'안정':0,'주의':1,'긴급':2,'협의':3}[v]??0);}
@@ -40,8 +41,8 @@ function buildDecisions(canonical){
     const dueDays=dayDiff(due,asOf);
     const customerHold=/고객사\s*연기|PM\s*협의|납기\s*미정/.test(`${text(p.due)} ${text(p.status)} ${text(p.note)}`);
     const analysisGrade=normalizeGrade(p.analysis?.grade);
-    const slack=Number.isFinite(Number(p.analysis?.productionSlackDays))?Number(p.analysis.productionSlackDays):null;
-    const analysisAge=canonical?.meta?.analysisAgeDays;
+    const slack=numberOrNull(p.analysis?.productionSlackDays);
+    const analysisAge=numberOrNull(canonical?.meta?.analysisAgeDays);
 
     let risk='안정';
     const reasons=[];
@@ -74,7 +75,7 @@ function buildDecisions(canonical){
       todayWork,todayEvidence:{event:todayEvent,capacityRows:todayCap.length},blocked,blockType,openIssueCount:openIssues.length,
       currentProcess,currentState:state,nextGate,decisionRequired,
       progress:{plan:p.progress?.plan??null,actual:p.progress?.actual??null},
-      analysis:{grade:analysisGrade,productionSlackDays:slack,snapshotDate:p.analysis?.snapshotDate??null,ageDays:analysisAge??null},
+      analysis:{grade:analysisGrade,productionSlackDays:slack,snapshotDate:p.analysis?.snapshotDate??null,ageDays:analysisAge},
       evidence:{latestWork:latestWork?{date:latestWork.occurredAt,type:latestWork.eventType,process:latestWork.process,summary:latestWork.summary}:null,todayCapacity:todayCap.slice(0,3).map(c=>({date:c.date,process:c.process,risk:c.risk,shortageFTE:c.shortageFTE,summary:c.summary}))}
     });
   }
