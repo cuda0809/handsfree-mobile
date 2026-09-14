@@ -2,30 +2,53 @@ export default async function handler(req,res){
   res.setHeader('Cache-Control','no-store, max-age=0');
   res.setHeader('Content-Type','application/json; charset=utf-8');
   if(req.method!=='GET') return res.status(405).json({ok:false,error:'method_not_allowed'});
+
+  const base=process.env.HF_REAL_READ_URL||'';
   const token=process.env.HF_REAL_READ_TOKEN||'';
-  if(!token) return res.status(503).json({ok:false,error:'not_configured'});
-  const parts={
-    q:['VQleo','VQ1eo'],
-    t:['TYN70FE','TYN7OFE'],
-    h:['Uha0dB','UhaOdB'],
-    j:['_xJORD','_xJ0RD']
+  if(!base||!token) return res.status(503).json({ok:false,error:'not_configured'});
+
+  // Fixed, harmless, idempotent validation payload. The SAFE WRITE bridge dedupes
+  // identical FIELD_INPUT text on the same day, so retries cannot fan out rows.
+  const payload={
+    token,
+    op:'safe_write',
+    text:'2026-09-14 테스트입력 GROW-E2E-SAFE-WRITE-20260915-0848',
+    source:'GROW_E2E_PROBE',
+    requester:'Grow',
+    targetHint:'SAFE_WRITE_E2E_EXCLUDED'
   };
-  const ids=[];
-  for(const q of parts.q)for(const t of parts.t)for(const h of parts.h)for(const j of parts.j){
-    ids.push('AKfycby9fZsSvnDH-vHw8meOREyscielyb'+q+t+h+j+'-hwvOzDb4qyvbT');
-  }
+
   try{
-    const results=await Promise.all(ids.map(async id=>{
-      try{
-        const u=new URL('https://script.google.com/macros/s/'+id+'/exec'); u.searchParams.set('token',token);
-        const upstream=await fetch(u.toString(),{method:'GET',headers:{'Accept':'application/json'},cache:'no-store',redirect:'follow'});
-        const text=await upstream.text();
-        let data=null; try{data=JSON.parse(text)}catch{}
-        return {id,status:upstream.status,ok:!!(data&&data.ok===true),schema:String(data&&data.schema||'')};
-      }catch(e){return {id,status:0,ok:false};}
-    }));
-    const hit=results.find(x=>x.ok);
-    if(hit) return res.status(200).json({ok:true,candidateDeploymentId:hit.id,schema:hit.schema});
-    return res.status(502).json({ok:false,error:'no_candidate_matched',statuses:results.map(x=>x.status)});
-  }catch(e){return res.status(502).json({ok:false,error:String(e&&e.message?e.message:e)});}
+    const upstream=await fetch(base,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify(payload),
+      cache:'no-store',
+      redirect:'follow'
+    });
+    const text=await upstream.text();
+    let data=null;
+    try{data=JSON.parse(text)}catch{}
+
+    if(!upstream.ok){
+      return res.status(502).json({ok:false,error:`upstream_${upstream.status}`,body:text.slice(0,240)});
+    }
+    if(!data){
+      return res.status(502).json({ok:false,error:'upstream_invalid_json',body:text.slice(0,240)});
+    }
+
+    return res.status(data.ok===true?200:502).json({
+      ok:data.ok===true,
+      schema:String(data.schema||''),
+      applied:!!data.applied,
+      status:String(data.status||''),
+      requestId:String(data.requestId||''),
+      matchedIssueId:String(data.matchedIssueId||''),
+      orderId:String(data.orderId||''),
+      ack:String(data.ack||''),
+      error:String(data.error||'')
+    });
+  }catch(e){
+    return res.status(502).json({ok:false,error:String(e&&e.message?e.message:e)});
+  }
 }
