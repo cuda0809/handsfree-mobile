@@ -11,8 +11,10 @@ export default async function handler(req,res){
     const text=await upstream.text();
     let data=null; try{data=JSON.parse(text)}catch{}
     if(!data){
-      let title=''; const m=/<title[^>]*>([^<]*)<\/title>/i.exec(text); if(m) title=m[1].trim();
-      return res.status(502).json({ok:false,error:'upstream_invalid_json',upstreamStatus:upstream.status,contentType:String(upstream.headers.get('content-type')||''),finalHost:(()=>{try{return new URL(upstream.url).host}catch{return''}})(),htmlTitle:title,preview:String(text||'').replace(/\s+/g,' ').slice(0,160)});
+      const decoded=String(text||'').replace(/<script[\s\S]*?<\/script>/gi,' ').replace(/<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim();
+      const candidates=[/Script function not found[^.]*\.?/i,/ReferenceError:[^.]*\.?/i,/TypeError:[^.]*\.?/i,/Exception:[^.]*\.?/i,/Error:[^.]*\.?/i];
+      let detail=''; for(const re of candidates){const m=re.exec(decoded);if(m){detail=m[0];break;}}
+      return res.status(502).json({ok:false,error:'upstream_invalid_json',upstreamStatus:upstream.status,contentType:String(upstream.headers.get('content-type')||''),finalHost:(()=>{try{return new URL(upstream.url).host}catch{return''}})(),detail:detail||decoded.slice(0,500)});
     }
     return res.status(data.ok===true?200:502).json({ok:data.ok===true,status:String(data.status||''),applied:!!data.applied,requestId:String(data.requestId||''),ack:String(data.ack||''),error:String(data.error||'')});
   }catch(e){return res.status(502).json({ok:false,error:String(e&&e.message?e.message:e)});}
