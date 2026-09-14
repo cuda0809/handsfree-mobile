@@ -1,0 +1,35 @@
+name: Restore exact KMT catalog logo
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.logo-restore/**'
+      - '.github/workflows/restore-kmt-logo.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  restore-logo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Rebuild exact catalog-locked PNG
+        shell: bash
+        run: |
+          cat .logo-restore/part0.b64 .logo-restore/part1.b64 .logo-restore/part2.b64 .logo-restore/part3.b64 | tr -d '\n\r ' | base64 -d > kmt-logo.png
+          test "$(stat -c%s kmt-logo.png)" = "19212"
+          echo "dcf51309ace49e65d392b12be831bff681fe32270cfc251ebcbbd2044b3a8e7a  kmt-logo.png" | sha256sum -c -
+      - name: Commit restored asset and remove one-shot restore files
+        shell: bash
+        run: |
+          rm -rf .logo-restore
+          rm -f .github/workflows/restore-kmt-logo.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Restore exact catalog-locked KMT logo asset"
+          git push
