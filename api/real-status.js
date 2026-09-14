@@ -1,3 +1,36 @@
+import crypto from 'node:crypto';
+
+const COOKIE='hf_real_session';
+
+function safeEqual(a,b){
+  const ha=crypto.createHash('sha256').update(String(a)).digest();
+  const hb=crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(ha,hb);
+}
+function sign(exp,secret){
+  return crypto.createHmac('sha256',secret).update(`hf-real:${exp}`).digest('hex');
+}
+function parseCookies(req){
+  const raw=String(req.headers.cookie||'');
+  const out={};
+  for(const part of raw.split(';')){
+    const i=part.indexOf('=');
+    if(i<0)continue;
+    const k=part.slice(0,i).trim();
+    const v=part.slice(i+1).trim();
+    if(k)out[k]=v;
+  }
+  return out;
+}
+function validSession(req,appKey){
+  const raw=parseCookies(req)[COOKIE]||'';
+  const m=/^(\d+)\.([a-f0-9]{64})$/i.exec(raw);
+  if(!m)return false;
+  const exp=Number(m[1]);
+  if(!Number.isFinite(exp)||exp<=Math.floor(Date.now()/1000))return false;
+  return safeEqual(m[2],sign(exp,appKey));
+}
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -14,8 +47,11 @@ export default async function handler(req, res) {
     });
   }
 
+  // Browser access is authorized by the HttpOnly session cookie created by /api/unlock.
+  // Keep the direct header path for server-side diagnostics only.
   const suppliedKey = String(req.headers['x-hf-app-key'] || '');
-  if (!suppliedKey || suppliedKey !== appKey) {
+  const authorized = validSession(req, appKey) || (!!suppliedKey && safeEqual(suppliedKey, appKey));
+  if (!authorized) {
     return res.status(401).json({ok:false, live:false, error:'unauthorized_app'});
   }
 
