@@ -6,11 +6,7 @@ export default async function handler(req, res) {
   const token = process.env.HF_REAL_READ_TOKEN || '';
 
   if (!base || !token) {
-    return res.status(503).json({
-      ok: false,
-      live: false,
-      error: 'not_configured'
-    });
+    return res.status(503).json({ok:false, live:false, error:'not_configured'});
   }
 
   try {
@@ -19,19 +15,34 @@ export default async function handler(req, res) {
     const upstream = await fetch(u.toString(), {
       method: 'GET',
       headers: { accept: 'application/json' },
-      cache: 'no-store'
+      cache: 'no-store',
+      redirect: 'follow'
     });
 
     const text = await upstream.text();
     let data;
     try { data = JSON.parse(text); }
-    catch { throw new Error('upstream_invalid_json'); }
+    catch {
+      const ct = String(upstream.headers.get('content-type') || '');
+      const title = (text.match(/<title[^>]*>([^<]*)<\/title>/i) || [])[1] || '';
+      return res.status(502).json({
+        ok:false,
+        live:false,
+        error:'upstream_invalid_json',
+        upstreamStatus:upstream.status,
+        contentType:ct,
+        finalHost:(()=>{try{return new URL(upstream.url).host}catch{return ''}})(),
+        htmlTitle:String(title).slice(0,120),
+        looksLikeHtml:/^\s*</.test(text)
+      });
+    }
 
     if (!upstream.ok || !data || data.ok !== true) {
       return res.status(502).json({
-        ok: false,
-        live: false,
-        error: data?.error || `upstream_${upstream.status}`
+        ok:false,
+        live:false,
+        error:data?.error || `upstream_${upstream.status}`,
+        upstreamStatus:upstream.status
       });
     }
 
@@ -43,24 +54,24 @@ export default async function handler(req, res) {
     }, {});
 
     return res.status(200).json({
-      ok: true,
-      live: true,
-      schema: String(data.schema || ''),
-      timezone: String(data.timezone || 'Asia/Seoul'),
-      today: String(data.today || ''),
-      generatedAt: String(data.generatedAt || ''),
-      sourceLatestDate: String(data.sourceLatestDate || ''),
-      counts: {
-        currentStatus: rows.length,
-        openIssues: Number(data?.counts?.openIssues ?? rows.length)
+      ok:true,
+      live:true,
+      schema:String(data.schema || ''),
+      timezone:String(data.timezone || 'Asia/Seoul'),
+      today:String(data.today || ''),
+      generatedAt:String(data.generatedAt || ''),
+      sourceLatestDate:String(data.sourceLatestDate || ''),
+      counts:{
+        currentStatus:rows.length,
+        openIssues:Number(data?.counts?.openIssues ?? rows.length)
       },
       states
     });
   } catch (err) {
     return res.status(502).json({
-      ok: false,
-      live: false,
-      error: String(err && err.message ? err.message : err)
+      ok:false,
+      live:false,
+      error:String(err && err.message ? err.message : err)
     });
   }
 }
