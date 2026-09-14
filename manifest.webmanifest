@@ -1,20 +1,20 @@
 {
   "id": "/",
-  "name": "모바일핸즈프리",
-  "short_name": "핸즈프리",
-  "description": "HandsFree 생산 운영 모바일 앱",
+  "name": "KMT HandsFree REAL",
+  "short_name": "HandsFree REAL",
+  "description": "케이엠텍 HandsFree 생산 운영 REAL",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f4f7fb",
-  "theme_color": "#0f2747",
+  "background_color": "#f5f7fa",
+  "theme_color": "#102a4a",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "/kmt-logo.png",
+      "sizes": "1130x544",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }
