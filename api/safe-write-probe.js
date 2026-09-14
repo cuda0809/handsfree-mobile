@@ -6,9 +6,8 @@ export default async function handler(req,res){
   const base=process.env.HF_REAL_READ_URL||'';
   const token=process.env.HF_REAL_READ_TOKEN||'';
   if(!base||!token) return res.status(503).json({ok:false,error:'not_configured'});
+  const baseDeploymentId=(()=>{try{return new URL(base).pathname.match(/\/macros\/s\/([^/]+)/)?.[1]||''}catch{return''}})();
 
-  // Fixed, harmless, idempotent validation payload. The SAFE WRITE bridge dedupes
-  // identical FIELD_INPUT text on the same day, so retries cannot fan out rows.
   const payload={
     token,
     op:'safe_write',
@@ -27,14 +26,27 @@ export default async function handler(req,res){
       redirect:'follow'
     });
     const text=await upstream.text();
-    let data=null;
-    try{data=JSON.parse(text)}catch{}
+    let data=null; try{data=JSON.parse(text)}catch{}
 
-    if(!upstream.ok){
-      return res.status(502).json({ok:false,error:`upstream_${upstream.status}`,body:text.slice(0,240)});
-    }
     if(!data){
-      return res.status(502).json({ok:false,error:'upstream_invalid_json',body:text.slice(0,240)});
+      const decoded=String(text||'')
+        .replace(/<script[\s\S]*?<\/script>/gi,' ')
+        .replace(/<style[\s\S]*?<\/style>/gi,' ')
+        .replace(/<[^>]+>/g,' ')
+        .replace(/&quot;/g,'"').replace(/&#39;/g,"'")
+        .replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&')
+        .replace(/\s+/g,' ').trim();
+      const candidates=[/Script function not found[^.]*\.?/i,/ReferenceError:[^.]*\.?/i,/TypeError:[^.]*\.?/i,/Exception:[^.]*\.?/i,/Error:[^.]*\.?/i,/Authorization[^.]*\.?/i,/access[^.]*denied[^.]*\.?/i];
+      let detail=''; for(const re of candidates){const m=re.exec(decoded);if(m){detail=m[0];break;}}
+      return res.status(502).json({
+        ok:false,
+        error:'upstream_invalid_json',
+        upstreamStatus:upstream.status,
+        contentType:String(upstream.headers.get('content-type')||''),
+        finalHost:(()=>{try{return new URL(upstream.url).host}catch{return''}})(),
+        baseDeploymentId,
+        detail:detail||decoded.slice(0,900)
+      });
     }
 
     return res.status(data.ok===true?200:502).json({
@@ -46,9 +58,10 @@ export default async function handler(req,res){
       matchedIssueId:String(data.matchedIssueId||''),
       orderId:String(data.orderId||''),
       ack:String(data.ack||''),
-      error:String(data.error||'')
+      error:String(data.error||''),
+      baseDeploymentId
     });
   }catch(e){
-    return res.status(502).json({ok:false,error:String(e&&e.message?e.message:e)});
+    return res.status(502).json({ok:false,error:String(e&&e.message?e.message:e),baseDeploymentId});
   }
 }
