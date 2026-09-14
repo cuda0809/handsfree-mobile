@@ -4,13 +4,19 @@ export default async function handler(req, res) {
 
   const base = process.env.HF_REAL_READ_URL || '';
   const token = process.env.HF_REAL_READ_TOKEN || '';
-  if (!base || !token) {
+  const appKey = process.env.HF_REAL_APP_KEY || '';
+  if (!base || !token || !appKey) {
     return res.status(503).json({
       ok: false,
       live: false,
       error: 'not_configured',
-      message: 'HF_REAL_READ_URL / HF_REAL_READ_TOKEN are not configured.'
+      message: 'HF_REAL_READ_URL / HF_REAL_READ_TOKEN / HF_REAL_APP_KEY are not configured.'
     });
+  }
+
+  const suppliedKey = String(req.headers['x-hf-app-key'] || '');
+  if (!suppliedKey || suppliedKey !== appKey) {
+    return res.status(401).json({ok:false, live:false, error:'unauthorized_app'});
   }
 
   try {
