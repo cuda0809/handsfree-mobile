@@ -15,35 +15,38 @@
 - KMT catalog logo asset is not changed.
 
 ## 2026-09-15 diagnostic update
-- Vercel production is READY and `/api/real-status` is returning HTTP 200, so the configured LIVE READ Apps Script URL is alive.
-- Confirmed configured Apps Script deployment ID: `AKfycbwFqIOTo2zKQOw22akCAMBO_9vDdFk29kHx_F8TwphZB6Rr-JJDU2mhYwvUFRAWRplP`.
-- POST reaches `script.google.com` with HTTP 200 but returns: `Script function not found: doPost`.
-- Re-deploying the existing web app did not change this, proving the deployed V2 project itself still has no `doPost` entry point.
-- Saved source inspection showed the SAFE WRITE engine and Mobile bridge had been maintained as separate code files; the earlier Mobile bridge also assumed the SAFE WRITE engine existed in the same Apps Script project.
+- Vercel Authentication / Require Log In was disabled and root app access now returns HTTP 200 without Vercel SSO.
+- `/api/real-status` reaches the app layer and returns `401 unauthorized_app` without a valid HandsFree app session, confirming the Vercel function is executing normally.
+- READ V2 local verification on Apps Script has passed with `schema=HF_REAL_READ_V2`, `currentStatus=5`, `openIssues=5`, `tokenPresent=true`, and `spreadsheetConnected=true`.
+- SAFE WRITE E2E probe showed Vercel was initially still targeting an older Apps Script deployment.
+- Emotion supplied the current Apps Script deployment ID: `AKfycbwP07OxSxPd22aMlXX6k69U01sg8LZR6fg2kGT7nc1BNNGFDnb7uIGnNRJivk6epUY9`.
+- Follow-up probing then found a one-character typo in Vercel `HF_REAL_READ_URL`: `...aMIXX...` was entered instead of `...aMlXX...`, causing Google HTTP 404.
+- Canonical current Apps Script URL:
+  `https://script.google.com/macros/s/AKfycbwP07OxSxPd22aMlXX6k69U01sg8LZR6fg2kGT7nc1BNNGFDnb7uIGnNRJivk6epUY9/exec`
 
-## Root-cause refinement and fix
-- The Mobile bridge has been redesigned as a **standalone V2 bridge**.
-- It no longer depends on `HF_REAL_SAFE_WRITE_V081`, `HF_SW`, `json_`, or SAFE WRITE helper functions being present in the same Apps Script project.
-- The standalone `doPost` validates the existing `HF_REAL_READ_TOKEN`, validates the LIVE spreadsheet / safety gate / sheet IDs, writes the canonical `FIELD_INPUT` Queue row, preserves daily dedupe, and returns `QUEUED` when the SAFE WRITE processor is hosted by another Apps Script project.
-- The already-installed SAFE WRITE time trigger then consumes the Queue row and performs normalization / EXCLUDED / REVIEW / WRITTEN processing.
-- If SAFE WRITE happens to be in the same project, the bridge can process synchronously as well.
-- Canonical source updated: `apps-script/HF_REAL_MOBILE_WRITE_BRIDGE_V1.gs`.
-- GitHub commit: `533f8cb52d064a0a0b399062511229e627b44bb7`.
-- Local verified handoff file: `HF_REAL_V2_MOBILE_BRIDGE_STANDALONE.gs`.
-- Static verification: Node syntax check PASS; 12 functions, duplicate function names 0; `doPost` exactly 1.
+## Mobile bridge baseline
+- The Mobile bridge is standalone and does not depend on the SAFE WRITE engine being hosted in the same Apps Script project.
+- Canonical source: `apps-script/HF_REAL_MOBILE_WRITE_BRIDGE_V1.gs`.
+- It exposes exactly one `doPost`, validates the existing `HF_REAL_READ_TOKEN`, validates the operating spreadsheet / safety gate / sheet IDs, writes the canonical `FIELD_INPUT` Queue row, preserves daily dedupe, and returns `QUEUED` when the SAFE WRITE processor is hosted elsewhere.
 
-## Required owner action — exact target
-1. Open the Apps Script project that currently serves `HF_REAL_LIVE_READ_V2` / the configured `HF_REAL_READ_URL`.
-2. Add one new script file named `HF_REAL_V2_MOBILE_BRIDGE_STANDALONE` and paste the verified standalone bridge source.
-3. Save. No SAFE WRITE engine copy and no `setupHandsFreeSafeWrite()` run is required in this V2 project.
-4. Manage deployments -> edit the existing Web app deployment whose deployment ID is exactly:
-   `AKfycbwFqIOTo2zKQOw22akCAMBO_9vDdFk29kHx_F8TwphZB6Rr-JJDU2mhYwvUFRAWRplP`
-5. Select **New version** and deploy while preserving the same `/exec` URL.
+## Current blocker
+- Vercel `HF_REAL_READ_URL` must exactly match the canonical current Apps Script URL above and then be redeployed.
+- `HF_REAL_READ_TOKEN` and `HF_REAL_APP_KEY` must not be changed.
 
-## Immediate verification after owner action
-- Call `/api/safe-write-probe` once.
-- Expected first response: `QUEUED`, `EXCLUDED`, or `DUPLICATE` — never `Script function not found: doPost`.
-- Verify Queue row creation, then SAFE WRITE processor changes it to DONE and normalization produces `EXCLUDED` for the 2026-09-14 probe.
-- Confirm no `업무이력` write.
-- Delete temporary `api/safe-write-probe.js` after pass.
-- Then promote REAL 0.8 UI to root and run 30–50 item Shadow validation before expanding write scope.
+## Immediate verification after correction
+1. Call `/api/safe-write-probe` once.
+2. Expected response is `QUEUED`, `EXCLUDED`, or `DUPLICATE`; never Google 404 and never `Script function not found: doPost`.
+3. Verify Queue row creation and downstream SAFE WRITE processing.
+4. Confirm the 2026-09-14 probe stays EXCLUDED and does not create an `업무이력` write.
+5. Re-check `/api/real-status` through the normal HandsFree app-key session flow.
+6. Only after these checks pass, promote REAL 0.8 UI to root and run 30–50 item Shadow validation before expanding write scope.
+
+## Shared Grow × Codex operating model — effective 2026-09-15
+- Emotion owns goals, priorities, and final approval for consequential changes.
+- Grow owns architecture, requirement interpretation, sequencing, safety, integration, and final verification.
+- Codex is the preferred execution layer for repository-scale code changes, bug fixes, refactors, tests, and repeatable implementation work.
+- Grow should perform everything it can directly first and only ask Emotion for actions that require user-only permissions, physical/UI interaction, credentials, billing, destructive changes, deployment approvals, or other capabilities Grow/Codex cannot safely perform.
+- Repository code changes should be executed and tested before asking Emotion to paste or hand-edit snippets. Full replacement files are preferred whenever manual handoff is unavoidable.
+- Production data, permissions, deployment targets, cost-bearing actions, and structural changes require Emotion approval before final application.
+- PC and mobile are one continuous workstream; the latest verified checkpoint is the single source of truth.
+- The same operating model applies to HandsFree REAL and Game Project #001.
