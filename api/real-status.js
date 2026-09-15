@@ -65,10 +65,23 @@ export default async function handler(req, res) {
     });
     const text = await upstream.text();
     let data;
-    try { data = JSON.parse(text); }
-    catch { throw new Error('upstream_invalid_json'); }
+    try {
+      data = JSON.parse(text);
+    } catch {
+      console.error('[real-status] upstream_invalid_json', {
+        status: upstream.status,
+        contentType: upstream.headers.get('content-type') || '',
+        bodyPreview: String(text || '').slice(0, 300)
+      });
+      throw new Error('upstream_invalid_json');
+    }
 
     if (!upstream.ok || !data || data.ok !== true) {
+      console.error('[real-status] upstream_rejected', {
+        status: upstream.status,
+        error: data?.error || '',
+        schema: data?.schema || ''
+      });
       return res.status(502).json({ok:false, live:false, error:data?.error || `upstream_${upstream.status}`});
     }
 
@@ -102,6 +115,7 @@ export default async function handler(req, res) {
       counts: data.counts || {currentStatus: currentStatus.length}
     });
   } catch (err) {
+    console.error('[real-status] exception', String(err && err.message ? err.message : err));
     return res.status(502).json({
       ok: false,
       live: false,
