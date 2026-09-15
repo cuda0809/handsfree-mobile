@@ -1,7 +1,6 @@
 import crypto from 'node:crypto';
 
 const COOKIE='hf_real_session';
-const LAST_KNOWN_GOOD_READ_URL='https://script.google.com/macros/s/AKfycbwFqIOTo2zKQOw22akCAMBO_9vDdFk29kHx_F8TwphZB6Rr-JJDU2mhYwvUFRAWRplP/exec';
 
 function safeEqual(a,b){
   const ha=crypto.createHash('sha256').update(String(a)).digest();
@@ -43,7 +42,7 @@ async function readFromAppsScript(base,token){
   const text=await upstream.text();
   let data=null;
   try{data=JSON.parse(text)}catch{}
-  return {base,upstream,text,data};
+  return {upstream,data};
 }
 
 export default async function handler(req, res) {
@@ -69,36 +68,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    const candidates=[...new Set([base,LAST_KNOWN_GOOD_READ_URL].filter(Boolean))];
-    let chosen=null;
-    let last=null;
-
-    for(const candidate of candidates){
-      const result=await readFromAppsScript(candidate,token);
-      last=result;
-      const {upstream,text,data}=result;
-      if(upstream.ok && data && data.ok===true){
-        chosen=result;
-        if(candidate!==base){
-          console.warn('[real-status] fallback_read_url_used', {status:upstream.status});
-        }
-        break;
-      }
-      console.error('[real-status] upstream_candidate_failed', {
-        configured:candidate===base,
+    const {upstream,data}=await readFromAppsScript(base,token);
+    if(!upstream.ok || !data || data.ok!==true){
+      console.error('[real-status] configured_upstream_failed', {
         status:upstream.status,
         contentType:upstream.headers.get('content-type')||'',
-        error:data?.error||'',
-        bodyPreview:data?'':String(text||'').slice(0,180)
+        error:data?.error||''
       });
+      return res.status(502).json({ok:false,live:false,error:!data?'upstream_invalid_json':(!upstream.ok?`upstream_${upstream.status}`:String(data.error||'upstream_not_ok'))});
     }
-
-    if(!chosen){
-      const err=last?.data?.error || (last?`upstream_${last.upstream.status}`:'upstream_unavailable');
-      return res.status(502).json({ok:false,live:false,error:err});
-    }
-
-    const data=chosen.data;
     const currentStatus = Array.isArray(data.currentStatus) ? data.currentStatus.map(x => ({
       issueId: String(x.issueId || ''),
       orderId: String(x.orderId || ''),

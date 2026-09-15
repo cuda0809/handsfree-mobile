@@ -56,7 +56,15 @@ function doPost(e) {
     const q = hfMobileSheet_(ss, cfg.QUEUE, cfg.QUEUE_ID);
     const now = new Date();
     const day = Utilities.formatDate(now, cfg.TZ, 'yyyyMMdd');
-    const dedupe = hfMobileSha256_(['FIELD_INPUT', day, hfMobileNorm_(raw)].join('|'));
+    const targetHint = String(body.targetHint || '').trim().slice(0, 200);
+    const dedupe = hfMobileSha256_(['FIELD_INPUT', day, hfMobileNorm_(targetHint), hfMobileNorm_(raw)].join('|'));
+    const lock = LockService.getScriptLock();
+    if (!lock.tryLock(8000)) {
+      return hfMobileJson_({ok:false, schema:'HF_REAL_READ_V2', error:'queue_lock_busy'});
+    }
+    let queueRow;
+    let requestId;
+    try {
     const prior = hfMobileFindDedupe_(q, dedupe);
 
     if (prior) {
@@ -72,7 +80,7 @@ function doPost(e) {
 
     const requester = String(body.requester || 'Emotion').trim().slice(0, 80);
     const channel = String(body.source || 'MOBILE').trim().slice(0, 40);
-    const requestId =
+    requestId =
       'HF-' + Utilities.formatDate(now, cfg.TZ, 'yyyyMMdd-HHmmss') + '-' + Utilities.getUuid().slice(0, 8);
 
     const payload = JSON.stringify({
@@ -83,10 +91,10 @@ function doPost(e) {
       raw: raw,
       channel: channel,
       requester: requester,
-      targetHint: String(body.targetHint || '').trim().slice(0, 200)
+      targetHint: targetHint
     });
 
-    const queueRow = hfMobileBlankRow_(q, 2, 1);
+    queueRow = hfMobileBlankRow_(q, 2, 1);
     hfMobileEnsureRows_(q, queueRow);
     q.getRange(queueRow, 1, 1, 15).setValues([[
       requestId,
@@ -102,6 +110,9 @@ function doPost(e) {
       '모바일 Queue 등록'
     ]]);
     SpreadsheetApp.flush();
+    } finally {
+      lock.releaseLock();
+    }
 
     if (typeof processHandsFreeSafeWriteQueue === 'function') {
       try {
@@ -128,6 +139,16 @@ function doPost(e) {
 
     const normStatus = hfMobileNormStatus_(ss, requestId);
     const finalStatus = normStatus || qStatus || 'QUEUED';
+    if (finalStatus === 'FAILED') {
+      return hfMobileJson_({
+        ok:false,
+        schema:'HF_REAL_READ_V2',
+        error:qError || 'safe_write_failed',
+        status:'FAILED',
+        requestId:requestId,
+        ack:qAck || qResult
+      });
+    }
     return hfMobileJson_({
       ok:true,
       schema:'HF_REAL_READ_V2',
