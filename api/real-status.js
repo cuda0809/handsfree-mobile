@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 
 const COOKIE='hf_real_session';
+const LAST_KNOWN_GOOD_READ_URL='https://script.google.com/macros/s/AKfycbwFqIOTo2zKQOw22akCAMBO_9vDdFk29kHx_F8TwphZB6Rr-JJDU2mhYwvUFRAWRplP/exec';
 
 function safeEqual(a,b){
   const ha=crypto.createHash('sha256').update(String(a)).digest();
@@ -31,6 +32,20 @@ function validSession(req,appKey){
   return safeEqual(m[2],sign(exp,appKey));
 }
 
+async function readFromAppsScript(base,token){
+  const u=new URL(base);
+  u.searchParams.set('token',token);
+  const upstream=await fetch(u.toString(),{
+    method:'GET',
+    headers:{accept:'application/json'},
+    cache:'no-store'
+  });
+  const text=await upstream.text();
+  let data=null;
+  try{data=JSON.parse(text)}catch{}
+  return {base,upstream,text,data};
+}
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -47,8 +62,6 @@ export default async function handler(req, res) {
     });
   }
 
-  // Browser access is authorized by the HttpOnly session cookie created by /api/unlock.
-  // Keep the direct header path for server-side diagnostics only.
   const suppliedKey = String(req.headers['x-hf-app-key'] || '');
   const authorized = validSession(req, appKey) || (!!suppliedKey && safeEqual(suppliedKey, appKey));
   if (!authorized) {
@@ -56,35 +69,36 @@ export default async function handler(req, res) {
   }
 
   try {
-    const u = new URL(base);
-    u.searchParams.set('token', token);
-    const upstream = await fetch(u.toString(), {
-      method: 'GET',
-      headers: { accept: 'application/json' },
-      cache: 'no-store'
-    });
-    const text = await upstream.text();
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      console.error('[real-status] upstream_invalid_json', {
-        status: upstream.status,
-        contentType: upstream.headers.get('content-type') || '',
-        bodyPreview: String(text || '').slice(0, 300)
+    const candidates=[...new Set([base,LAST_KNOWN_GOOD_READ_URL].filter(Boolean))];
+    let chosen=null;
+    let last=null;
+
+    for(const candidate of candidates){
+      const result=await readFromAppsScript(candidate,token);
+      last=result;
+      const {upstream,text,data}=result;
+      if(upstream.ok && data && data.ok===true){
+        chosen=result;
+        if(candidate!==base){
+          console.warn('[real-status] fallback_read_url_used', {status:upstream.status});
+        }
+        break;
+      }
+      console.error('[real-status] upstream_candidate_failed', {
+        configured:candidate===base,
+        status:upstream.status,
+        contentType:upstream.headers.get('content-type')||'',
+        error:data?.error||'',
+        bodyPreview:data?'':String(text||'').slice(0,180)
       });
-      throw new Error('upstream_invalid_json');
     }
 
-    if (!upstream.ok || !data || data.ok !== true) {
-      console.error('[real-status] upstream_rejected', {
-        status: upstream.status,
-        error: data?.error || '',
-        schema: data?.schema || ''
-      });
-      return res.status(502).json({ok:false, live:false, error:data?.error || `upstream_${upstream.status}`});
+    if(!chosen){
+      const err=last?.data?.error || (last?`upstream_${last.upstream.status}`:'upstream_unavailable');
+      return res.status(502).json({ok:false,live:false,error:err});
     }
 
+    const data=chosen.data;
     const currentStatus = Array.isArray(data.currentStatus) ? data.currentStatus.map(x => ({
       issueId: String(x.issueId || ''),
       orderId: String(x.orderId || ''),
