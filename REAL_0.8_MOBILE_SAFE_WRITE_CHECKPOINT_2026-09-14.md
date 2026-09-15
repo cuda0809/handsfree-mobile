@@ -4,8 +4,7 @@
 - Google Sheet `현장입력` SAFE WRITE engine is OPEN and PC Enter test passed.
 - Queue -> classification -> normalization -> EXCLUDED safety gate verified on 2026-09-14 test input.
 - Vercel `/api/write` exists and is protected by REAL session/app key.
-- Added `apps-script/HF_REAL_MOBILE_WRITE_BRIDGE_V1.gs` with `doPost(e)` bridge.
-- Added `/real-v08/` mobile UI: FIELD INPUT now posts to `/api/write`; Enter submits, Shift+Enter inserts newline; failed sends are locally backed up.
+- Added `/real-v08/` mobile UI: FIELD INPUT posts to `/api/write`; Enter submits, Shift+Enter inserts newline; failed sends are locally backed up.
 - Vercel production deployment for REAL 0.8 staging is READY and `/real-v08/` returns HTTP 200.
 - Existing root REAL 0.7.1 is intentionally preserved until end-to-end write verification passes.
 
@@ -17,23 +16,34 @@
 
 ## 2026-09-15 diagnostic update
 - Vercel production is READY and `/api/real-status` is returning HTTP 200, so the configured LIVE READ Apps Script URL is alive.
-- Replaced guessed Apps Script deployment-ID probing with a fixed, idempotent E2E SAFE WRITE diagnostic that uses the configured `HF_REAL_READ_URL` and `HF_REAL_READ_TOKEN` directly.
 - Confirmed configured Apps Script deployment ID: `AKfycbwFqIOTo2zKQOw22akCAMBO_9vDdFk29kHx_F8TwphZB6Rr-JJDU2mhYwvUFRAWRplP`.
-- POST reaches `script.google.com` with HTTP 200 but returns HTML error: `Script function not found: doPost`.
-- Therefore Vercel, LIVE READ, token, and route reachability are not the blocker. The currently configured Apps Script deployment is still an older web-app version that does not contain `doPost`.
-- The existing `doGet` source is read-only and has no SAFE WRITE fallback path.
+- POST reaches `script.google.com` with HTTP 200 but returns: `Script function not found: doPost`.
+- Re-deploying the existing web app did not change this, proving the deployed V2 project itself still has no `doPost` entry point.
+- Saved source inspection showed the SAFE WRITE engine and Mobile bridge had been maintained as separate code files; the earlier Mobile bridge also assumed the SAFE WRITE engine existed in the same Apps Script project.
+
+## Root-cause refinement and fix
+- The Mobile bridge has been redesigned as a **standalone V2 bridge**.
+- It no longer depends on `HF_REAL_SAFE_WRITE_V081`, `HF_SW`, `json_`, or SAFE WRITE helper functions being present in the same Apps Script project.
+- The standalone `doPost` validates the existing `HF_REAL_READ_TOKEN`, validates the LIVE spreadsheet / safety gate / sheet IDs, writes the canonical `FIELD_INPUT` Queue row, preserves daily dedupe, and returns `QUEUED` when the SAFE WRITE processor is hosted by another Apps Script project.
+- The already-installed SAFE WRITE time trigger then consumes the Queue row and performs normalization / EXCLUDED / REVIEW / WRITTEN processing.
+- If SAFE WRITE happens to be in the same project, the bridge can process synchronously as well.
+- Canonical source updated: `apps-script/HF_REAL_MOBILE_WRITE_BRIDGE_V1.gs`.
+- GitHub commit: `533f8cb52d064a0a0b399062511229e627b44bb7`.
+- Local verified handoff file: `HF_REAL_V2_MOBILE_BRIDGE_STANDALONE.gs`.
+- Static verification: Node syntax check PASS; 12 functions, duplicate function names 0; `doPost` exactly 1.
 
 ## Required owner action — exact target
-1. Open the existing Apps Script project that contains the REAL LIVE READ code and `HF_REAL_MOBILE_WRITE_BRIDGE_V1.gs`.
-2. Open **Manage deployments**.
-3. Edit the existing Web app deployment whose deployment ID is exactly:
+1. Open the Apps Script project that currently serves `HF_REAL_LIVE_READ_V2` / the configured `HF_REAL_READ_URL`.
+2. Add one new script file named `HF_REAL_V2_MOBILE_BRIDGE_STANDALONE` and paste the verified standalone bridge source.
+3. Save. No SAFE WRITE engine copy and no `setupHandsFreeSafeWrite()` run is required in this V2 project.
+4. Manage deployments -> edit the existing Web app deployment whose deployment ID is exactly:
    `AKfycbwFqIOTo2zKQOw22akCAMBO_9vDdFk29kHx_F8TwphZB6Rr-JJDU2mhYwvUFRAWRplP`
-4. Select **New version** and deploy while preserving the same `/exec` URL.
-5. Do not create another unrelated deployment URL.
+5. Select **New version** and deploy while preserving the same `/exec` URL.
 
 ## Immediate verification after owner action
 - Call `/api/safe-write-probe` once.
-- Expected: `/api/write`/configured Apps Script POST path -> `doPost` -> Queue DONE -> normalization `EXCLUDED` -> no `업무이력` write.
-- Verify Queue / normalization ledger / no source work-history mutation.
+- Expected first response: `QUEUED`, `EXCLUDED`, or `DUPLICATE` — never `Script function not found: doPost`.
+- Verify Queue row creation, then SAFE WRITE processor changes it to DONE and normalization produces `EXCLUDED` for the 2026-09-14 probe.
+- Confirm no `업무이력` write.
 - Delete temporary `api/safe-write-probe.js` after pass.
 - Then promote REAL 0.8 UI to root and run 30–50 item Shadow validation before expanding write scope.
