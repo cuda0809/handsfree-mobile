@@ -3,7 +3,7 @@ let scheduleView=null,scheduleEdit=null;
 const scheduleErrors={personal_login_required:'개인 Google 로그인이 필요합니다.',identity_denied:'허용된 계정으로 로그인하세요.',forbidden:'이 계정은 일정을 수정할 수 없습니다.',source_mismatch:'월간계획과 원장 값이 달라 수정할 수 없습니다.',outside_edit_month:'월간계획에 표시된 기간에서만 이동할 수 있습니다.',destination_occupied:'그 날짜에 이미 일정이 있습니다.',stale_record:'다른 변경이 있습니다. 최신 일정을 다시 불러오세요.',invalid_date:'올바른 날짜를 입력하세요.',invalid_reason:'변경 사유를 입력하세요.',edit_gate_closed:'일정 수정 개방 전입니다.',formula_cell:'계산식으로 관리되는 일정입니다.',ambiguous_record:'원본 기록을 하나로 식별할 수 없습니다.',monthly_project_missing:'월간계획에서 이 프로젝트를 찾을 수 없습니다.'};
 function scheduleMessage(code){return scheduleErrors[code]||'결과를 확정하지 못했습니다. 저장 결과를 확인하세요.';}
 scheduleReport=async function(id){
- const x=items[id];if(!x)return;const request=++planRequest;
+ const x=typeof id==='object'?id:items[id];if(!x)return;const request=++planRequest;
  open(heading('계획일정',x.customer,x.model)+'<p id="planResult">일정을 불러오는 중…</p>');const result=$('planResult');
  if(!x.orderId){result.textContent='프로젝트 ID가 없어 일정을 연결할 수 없습니다.';return;}
  try{

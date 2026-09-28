@@ -21,6 +21,7 @@ export default async function handler(req,res){
   const body=req.body&&typeof req.body==='object'?req.body:{};
   const text=clean(body.text,1000);
   if(!text) return res.status(400).json({ok:false,error:'empty_text'});
+  if(body.submissionId!==undefined&&!/^[a-zA-Z0-9-]{16,80}$/.test(body.submissionId))return res.status(400).json({ok:false,error:'invalid_submission_id'});
 
   const payload={
     token,
@@ -28,6 +29,7 @@ export default async function handler(req,res){
     text,
     source:clean(body.source||'MOBILE',40),
     requester:actor.email,
+    submissionId:body.submissionId||'',
     targetHint:clean(body.targetHint||'',200)
   };
 

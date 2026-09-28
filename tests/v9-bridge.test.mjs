@@ -1,0 +1,14 @@
+import vm from 'node:vm';import fs from 'node:fs';import assert from 'node:assert/strict';import crypto from 'node:crypto';
+let locked=false,busy=false,fail=false,rows=[];
+const hash=s=>crypto.createHash('sha256').update(s).digest('hex');
+const q={getRange:(r,c)=>({getDisplayValue:()=>rows[r-2]?.[c-1]||''})};
+const c=vm.createContext({HF_TOKEN_KEY:'key',HF_SCHEMA:'read',HF_SW:{SSID:'test',TZ:'Asia/Seoul',VERSION:'v9',SHEET:{QUEUE:'queue',NORM:'norm'},ID:{}},PropertiesService:{getScriptProperties:()=>({getProperty:()=> 'token'})},SpreadsheetApp:{openById:()=>({}),flush(){}},assertStructure_(){},fieldOpen_:()=>true,getSheet_:(ss,n)=>n==='queue'?q:{getLastRow:()=>1},Utilities:{formatDate:()=> '20260928',getUuid:()=>crypto.randomUUID()},sha256_:hash,norm_:s=>String(s).toLowerCase().replace(/\s+/g,' ').trim(),json_:x=>x,dt_:()=> 'now',priority_:()=> 'NORMAL',hfAppPriorSubmission_:()=>null,hfKmtDispatch_:b=>({ok:true,op:b.op}),LockService:{getScriptLock:()=>({tryLock:()=>{if(busy)return false;locked=true;return true},releaseLock:()=>{locked=false}})},findDedupe_:(q,k)=>{assert(locked);let i=rows.findIndex(r=>r[6]===k);return i<0?0:i+2},appendQueue_:(q,r)=>{assert(locked);if(fail)throw Error('test-write-fail');rows.push(r);return rows.length+1},processHandsFreeSafeWriteQueue:()=>assert(!locked)});
+vm.runInContext(fs.readFileSync(new URL('../apps-script/HF_REAL_V9_BRIDGE_PATCH.gs',import.meta.url),'utf8'),c);
+const post=(target,text='probe',token='token')=>c.doPost({postData:{contents:JSON.stringify({token,op:'safe_write',text,targetHint:target})}});
+assert.equal(post('A','probe','wrong').error,'unauthorized');assert.equal(rows.length,0);
+busy=true;assert.equal(post('A').error,'queue_lock_busy');busy=false;
+const first=post('A');assert.equal(first.status,'QUEUED');assert.equal(locked,false);assert.equal(post('A').requestId,first.requestId);assert.equal(rows.length,1);post('B');assert.equal(rows.length,2);
+rows.push(['legacy','','','',JSON.stringify({targetHint:'A'}),'',hash('FIELD_INPUT|20260928|legacy')]);assert.equal(post('A','legacy').requestId,'legacy');assert.equal(rows.length,3);post('B','legacy');assert.equal(rows.length,4);
+fail=true;assert.equal(post('C').error,'test-write-fail');assert.equal(locked,false);
+assert.equal(c.doPost({postData:{contents:JSON.stringify({token:'token',op:'kmt_read'})}}).op,'kmt_read');
+console.log('PASS V9 minimal patch auth, lock, release on exception, target dedupe, legacy receipts, KMT dispatch');
