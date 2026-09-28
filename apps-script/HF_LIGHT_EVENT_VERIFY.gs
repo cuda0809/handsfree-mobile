@@ -1,3 +1,4 @@
+function verifyLightEventIsolated(){
 /** HandsFree REAL 0.8 SAFE WRITE
  * 운영수정센터 = 수정/정정 요청 전용(원본 직접 수정 금지)
  * 현장입력 = 신규 기록 전용(Queue -> 자동분류 -> 원본형식 SAFE WRITE)
@@ -7,7 +8,7 @@
 
 const HF_SW = Object.freeze({
   VERSION:'HF_REAL_SAFE_WRITE_V08',
-  SSID:'1maCCn4XQogypiVAn0GZeEZUclxR7A9cLc-03FRmDxZM',
+  SSID:'1vPLZCBdloeOK52Xm6nQmIyfhzvMtCoblXW2w0a7wFSo',
   TZ:'Asia/Seoul',
   SHEET:{CORRECTION:'운영수정센터',FIELD:'현장입력',QUEUE:'HF_DATA_입력대기열',NORM:'HF_DATA_입력정규화',WORK:'업무이력',RETURN:'반출일지',PRODUCT:'제품마스터',SAFETY:'HF_SYS_운영안전'},
   ID:{CORRECTION:390914001,FIELD:390914002,QUEUE:1907002003,NORM:1907002006,WORK:464453564,SAFETY:1907002001,MONTHLY:1001001},
@@ -199,4 +200,22 @@ function dt_(d){return Utilities.formatDate(d,HF_SW.TZ,'yyyy-MM-dd HH:mm:ss z');
 function testHandsFreeSafeWriteClassifier(){
   const ss=SpreadsheetApp.openById(HF_SW.SSID);assertStructure_(ss);
   return ['미코 KDM-150 수정품 확인 후 조립 재개','오랜드바이오 PDM-300C 에어칠러 입고대기','이상준 연차'].map((raw,i)=>{const e=normalEvent_(ss,raw,i+1,{inputSheet:'TEST',inputRow:0});return{raw,type:e.type,customer:e.customer,model:e.model,orderId:e.orderId,confidence:e.confidence,safeToWrite:e.safe,excluded:e.excluded};});
+}
+
+const ss=SpreadsheetApp.openById(HF_SW.SSID);
+if(ss.getId()===HF_SPREADSHEET_ID||ss.getName()!=='HF_LIGHT_V1_일정검증_격리사본_20260928')throw Error('wrong_test_copy');
+const actor=Session.getEffectiveUser().getEmail();if(!actor)throw Error('no_actor');
+const id='HF-EVENT-ISOLATED-'+Utilities.getUuid(),raw='2026-09-28 260710A-052 미코 KDM - 150 검수 완료\n2026-09-28 260601A-039-02 트루메카(대덕전자) PDM - 1KV - A 검수 완료\n2026-09-28 트루메카(대덕전자) PDM - 1KV - A 점검';
+const p={source:'FIELD_INPUT',inputSheet:'MOBILE',inputRow:0,raw:raw,requester:'spoofed@example.invalid'},q=getSheet_(ss,HF_SW.SHEET.QUEUE,HF_SW.ID.QUEUE);
+const row=[id,dt_(new Date()),'FIELD_INPUT',actor,JSON.stringify(p),'QUEUED','isolated-'+id,0,'','','','','','NORMAL','격리 Event 검증'];
+const lock=LockService.getScriptLock();lock.waitLock(8000);
+try{
+const n=appendQueue_(q,row);processQueueRow_(ss,q,n,row);SpreadsheetApp.flush();
+const norm=getSheet_(ss,HF_SW.SHEET.NORM,HF_SW.ID.NORM),r=norm.getRange(2,1,norm.getLastRow()-1,23).getDisplayValues().filter(x=>x[22]===id);
+if(q.getRange(n,6).getDisplayValue()!=='DONE'||r.length!==3)throw Error('queue_or_event_count');
+if(r[0][17]!=='WRITTEN'||r[1][17]!=='WRITTEN'||r[2][17]!=='REVIEW')throw Error('event_status');
+if(r[0][20]!=='260710A-052'||r[1][20]!=='260601A-039-02'||r[2][20]!=='')throw Error('project_identity');
+if(r.some(x=>x[21]!==actor||x[22]!==id)||r.map(x=>x[3]).join('\n')!==raw)throw Error('audit_identity');
+console.log(JSON.stringify({ok:true,test:'EVENT_ISOLATED_PASS',requestId:id,events:r.length,written:2,ambiguousReview:1,actorFromTrustedQueue:true,projectIdsPreserved:true,rawPreserved:true,productionTouched:false}));
+}finally{lock.releaseLock();}
 }
