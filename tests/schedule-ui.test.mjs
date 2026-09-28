@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';
+const code=fs.readFileSync(new URL('../kmt/schedule.js',import.meta.url),'utf8');
+let html='',fetches=0,record={key:'key',revision:'revision',date:'2026-09-01',minDate:'2026-09-01',maxDate:'2026-10-01',process:'조립',sourceMonth:'2026-09',editable:true};
+const nodes={planResult:{isConnected:true},scheduleDate:{value:'2026-09-05'},scheduleReason:{value:'<script>reason</script>'},scheduleHint:{isConnected:true},scheduleSave:{}};
+const stored=new Map();const ctx=vm.createContext({items:[{orderId:'P-1',customer:'고객',model:'모델'}],planRequest:0,scheduleReport(){},dialog:{open:true},heading:()=>'',esc:s=>String(s).replaceAll('<','&lt;'),open:s=>html=s,$:k=>nodes[k],toast:s=>html=s,crypto:{randomUUID:()=> 'unique-request-000001'},localStorage:{setItem:(k,v)=>stored.set(k,v),getItem:k=>stored.get(k),removeItem:k=>stored.delete(k)},api:async()=>({ok:true,orderId:'P-1',editingAvailable:true,records:[record]})});
+vm.runInContext(code,ctx);await ctx.scheduleReport(0);assert.match(nodes.planResult.outerHTML,/날짜 변경/);
+ctx.editSchedule(0);assert.match(html,/변경 사유/);
+ctx.api=async()=>{fetches++;throw {data:{error:'pending_verification'}};};await ctx.saveSchedule();assert.equal(fetches,1);assert.ok(stored.has('hf-schedule-pending'));assert.match(nodes.scheduleSave.outerHTML,/저장 결과 확인/);
+ctx.api=async(path,b)=>{assert.equal(b.action,'receipt');return {status:'APPLIED',requestId:'unique-request-000001',orderId:'P-1',beforeDate:'2026-09-01',date:'2026-09-05',reason:'<script>reason</script>',actor:'user@gmail.com'};};await ctx.checkScheduleReceipt();assert.equal(stored.size,0);assert.match(html,/&lt;script>/);assert.match(html,/작성자/);
+console.log('PASS schedule UI form, durable pending request, no automatic retry, receipt recovery and escaped content');
