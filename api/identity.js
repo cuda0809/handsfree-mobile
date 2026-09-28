@@ -1,9 +1,9 @@
 import crypto from 'node:crypto';
-import {person,personCookie,clearPersonCookie,cookies,sameOrigin,verifyGoogle,actorProof} from '../lib/person-auth.mjs';
-import {reply} from '../lib/kmt-server.mjs';
-import {roleFor} from '../lib/access.mjs';
 
 export default async function handler(req,res){
+ const {person,personCookie,clearPersonCookie,cookies,sameOrigin,verifyGoogle}=await import('../lib/person-auth.mjs');
+ const {reply}=await import('../lib/kmt-server.mjs');
+ const {roleFor}=await import('../lib/access.mjs');
  if(req.method==='GET'){
   const p=person(req);
   if(p){try{return reply(res,200,{ok:true,user:{email:p.email,role:roleFor(p.email)},clientId:process.env.HF_GOOGLE_CLIENT_ID||''});}catch{res.setHeader('Set-Cookie',clearPersonCookie());return reply(res,403,{ok:false,error:'identity_denied'});}}
