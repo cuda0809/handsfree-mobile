@@ -1,6 +1,6 @@
 /* Loaded after mobile.js. Daily plan editing preserves the existing visual shell. */
 let scheduleView=null,scheduleEdit=null;
-const scheduleErrors={personal_login_required:'개인 Google 로그인이 필요합니다.',identity_denied:'허용된 계정으로 로그인하세요.',forbidden:'이 계정은 일정을 수정할 수 없습니다.',source_mismatch:'월간계획과 원장 값이 달라 수정할 수 없습니다.',outside_edit_month:'월간계획에 표시된 기간에서만 이동할 수 있습니다.',destination_occupied:'그 날짜에 이미 일정이 있습니다.',stale_record:'다른 변경이 있습니다. 최신 일정을 다시 불러오세요.',invalid_date:'올바른 날짜를 입력하세요.',invalid_reason:'변경 사유를 입력하세요.',edit_gate_closed:'일정 수정 개방 전입니다.',formula_cell:'계산식으로 관리되는 일정입니다.',ambiguous_record:'원본 기록을 하나로 식별할 수 없습니다.',monthly_project_missing:'월간계획에서 이 프로젝트를 찾을 수 없습니다.'};
+const scheduleErrors={personal_login_required:'사용자 등록이 필요합니다.',activation_required:'사용자 등록이 필요합니다.',identity_denied:'허용된 사용자인지 확인하세요.',forbidden:'이 계정은 일정을 수정할 수 없습니다.',source_mismatch:'월간계획과 원장 값이 달라 수정할 수 없습니다.',outside_edit_month:'월간계획에 표시된 기간에서만 이동할 수 있습니다.',destination_occupied:'그 날짜에 이미 일정이 있습니다.',stale_record:'다른 변경이 있습니다. 최신 일정을 다시 불러오세요.',invalid_date:'올바른 날짜를 입력하세요.',invalid_reason:'변경 사유를 입력하세요.',edit_gate_closed:'일정 수정 개방 전입니다.',formula_cell:'계산식으로 관리되는 일정입니다.',ambiguous_record:'원본 기록을 하나로 식별할 수 없습니다.',monthly_project_missing:'월간계획에서 이 프로젝트를 찾을 수 없습니다.'};
 function scheduleMessage(code){return scheduleErrors[code]||'결과를 확정하지 못했습니다. 저장 결과를 확인하세요.';}
 scheduleReport=async function(id){
  const x=typeof id==='object'?id:items[id];if(!x)return;const request=++planRequest;
@@ -13,7 +13,7 @@ scheduleReport=async function(id){
   scheduleView={id,orderId:x.orderId,records:d.records};
   result.outerHTML='<p>날짜별 계획입니다. 완료 실적과는 별도로 관리됩니다.</p><button class="secondary" onclick="checkScheduleReceipt()">이 기기의 마지막 저장 결과 확인</button>'+(!d.editingAvailable?'<div class="alert">일정 수정 개방 전입니다.</div>':'')+
    (d.records.map((r,i)=>'<article class="item"><b>'+esc(r.date||'날짜 확인 필요')+' · '+esc(r.process)+'</b><p>원본월 '+esc(r.sourceMonth)+'</p>'+(r.editable&&d.editingAvailable?'<button class="secondary" onclick="editSchedule('+i+')">날짜 변경</button>':'<p class="note">'+esc(scheduleMessage(r.blockedReason||'edit_gate_closed'))+'</p>')+'</article>').join('')||'<p>등록된 계획이 없습니다.</p>');
- }catch(e){if(request===planRequest&&result.isConnected)result.innerHTML=esc(scheduleMessage(e.data?.error))+' <a href="./login.html">개인 로그인</a>';}
+ }catch(e){if(request===planRequest&&result.isConnected)result.innerHTML=esc(scheduleMessage(e.data?.error))+' <a href="./login.html">사용자 등록</a>';}
 };
 function editSchedule(index){
  const r=scheduleView?.records[index];if(!r?.editable)return;
