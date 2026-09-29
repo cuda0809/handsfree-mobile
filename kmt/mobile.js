@@ -1,5 +1,5 @@
 'use strict';
-const BUILD='2026.09.29.3', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1';
+const BUILD='2026.09.29.4', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1';
 const main=document.getElementById('main'),dialog=document.getElementById('detail');
 let items=[],live=false,readPending=null,sourceDate='',lastRead='',screen='home',filter='all',returnFocus=null,readMessage='현재 상태를 불러오는 중…',recognition=null,installPrompt=null;
 const $=id=>document.getElementById(id);
