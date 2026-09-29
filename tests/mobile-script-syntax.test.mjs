@@ -19,3 +19,17 @@ test('kmt/login.js: mobile Google account selection uses FedCM and returns to Ha
   assert.match(source, /button_auto_select:false/);
   assert.match(source, /location\.replace\('\/kmt\/'\)/);
 });
+
+
+test('kmt processing edits keep a stable local record but use a fresh server submission id', () => {
+  const mobile = readFileSync(new URL('../kmt/mobile.js', import.meta.url), 'utf8');
+  const appFlow = readFileSync(new URL('../kmt/app-flow.js', import.meta.url), 'utf8');
+  const sw = readFileSync(new URL('../kmt/sw.js', import.meta.url), 'utf8');
+  new Script(mobile, { filename: 'kmt/mobile.js' });
+  new Script(appFlow, { filename: 'kmt/app-flow.js' });
+  new Script(sw, { filename: 'kmt/sw.js' });
+  assert.match(mobile, /submissionId:r\.submissionId\|\|r\.id/);
+  assert.match(appFlow, /submissionId:crypto\.randomUUID\(\)/);
+  assert.match(appFlow, /applyIssueReceiptLocal/);
+  assert.match(sw, /fetch\(event\.request,\{cache:'no-store'\}\)/);
+});
