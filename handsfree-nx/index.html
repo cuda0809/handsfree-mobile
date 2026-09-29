@@ -31,7 +31,8 @@
       font-family: Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif;
       -webkit-font-smoothing: antialiased;
     }
-    button { font: inherit; }
+    button, label { font: inherit; }
+    .concept-radio { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
     .study-head {
       max-width: 1600px;
       margin: 0 auto;
@@ -52,11 +53,15 @@
       display: none; position: sticky; top: 0; z-index: 20; padding: 10px 12px;
       background: rgba(235,239,241,.94); backdrop-filter: blur(12px); border-bottom: 1px solid #d1d9dd;
     }
-    .concept-switch button {
+    .concept-switch label {
       flex: 1; min-height: 44px; border: 0; background: transparent; color: #65717b;
-      border-radius: 11px; font-size: 13px; font-weight: 800; cursor: pointer;
+      border-radius: 11px; font-size: 13px; font-weight: 800; cursor: pointer; display: grid; place-items: center;
     }
-    .concept-switch button.active { background: var(--navy); color: white; box-shadow: 0 6px 18px rgba(11,21,32,.2); }
+    #view-briefing:checked ~ .concept-switch label[for="view-briefing"],
+    #view-control:checked ~ .concept-switch label[for="view-control"],
+    #view-ledger:checked ~ .concept-switch label[for="view-ledger"] {
+      background: var(--navy); color: white; box-shadow: 0 6px 18px rgba(11,21,32,.2);
+    }
     .stage { max-width: 1600px; margin: 0 auto; padding: 0 22px 55px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
     .concept-wrap { min-width: 0; }
     .concept-label { min-height: 66px; padding: 0 4px 10px; display: flex; align-items: end; justify-content: space-between; gap: 10px; }
@@ -211,7 +216,9 @@
       .concept-switch { display: flex; gap: 5px; }
       .stage { display: block; padding: 15px 12px 35px; }
       .concept-wrap { display: none; }
-      .concept-wrap.active { display: block; }
+      #view-briefing:checked ~ .stage [data-concept="briefing"],
+      #view-control:checked ~ .stage [data-concept="control"],
+      #view-ledger:checked ~ .stage [data-concept="ledger"] { display: block; }
       .concept-label { min-height: 55px; padding-left: 6px; padding-right: 6px; }
       .phone { max-width: 520px; min-height: 810px; margin: 0 auto; border-width: 0; border-radius: 19px; }
     }
@@ -233,10 +240,13 @@
     <div class="study-note">디자인 검토용 독립 시안입니다. 화면의 수치는 운영 DB 항목을 바탕으로 구성한 예시이며, 저장·수정·인증 기능은 연결하지 않았습니다.</div>
   </header>
 
+  <input class="concept-radio" type="radio" name="concept" id="view-briefing" checked />
+  <input class="concept-radio" type="radio" name="concept" id="view-control" />
+  <input class="concept-radio" type="radio" name="concept" id="view-ledger" />
   <nav class="concept-switch" aria-label="시안 선택">
-    <button class="active" data-target="briefing">대표 브리핑</button>
-    <button data-target="control">생산 통제판</button>
-    <button data-target="ledger">프로젝트 원장</button>
+    <label for="view-briefing">대표 브리핑</label>
+    <label for="view-control">생산 통제판</label>
+    <label for="view-ledger">프로젝트 원장</label>
   </nav>
 
   <main class="stage">
@@ -354,15 +364,5 @@
     </section>
   </main>
 
-  <script>
-    const buttons = [...document.querySelectorAll('.concept-switch button')];
-    const concepts = [...document.querySelectorAll('.concept-wrap')];
-    buttons.forEach((button) => {
-      button.addEventListener('click', () => {
-        buttons.forEach((item) => item.classList.toggle('active', item === button));
-        concepts.forEach((item) => item.classList.toggle('active', item.dataset.concept === button.dataset.target));
-      });
-    });
-  </script>
 </body>
 </html>
