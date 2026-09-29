@@ -11,9 +11,11 @@ const sw=fs.readFileSync(new URL('../kmt-sa2/sw.js',import.meta.url),'utf8');
 const androidBuild=fs.readFileSync(new URL('../android/app/build.gradle',import.meta.url),'utf8');
 const androidMain=fs.readFileSync(new URL('../android/app/src/main/java/com/handsfree/mobile/MainActivity.java',import.meta.url),'utf8');
 
-assert.match(mobile,/BUILD='2026\.09\.29\.SA2\.8\.1'/);
+assert.match(mobile,/BUILD='2026\.09\.29\.SA2\.8\.2'/);
 assert.match(mobile,/서버로 보내고 바로 반영/);
 assert.match(mobile,/d\.target!==target\?'':d\.text/);
+assert.match(mobile,/class="issue">\$\{esc\(x\.state/);
+assert.match(mobile,/기존 원인 \/ 이슈/);
 assert.match(flow,/async function syncProgressIssue\(/);
 assert.doesNotMatch(flow,/id="editLinkedIssue"/);
 assert.match(mobile,/api\('\/api\/sa2-real-status'/);
