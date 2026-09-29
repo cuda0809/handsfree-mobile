@@ -5,7 +5,7 @@
     <application
         android:allowBackup="true"
         android:usesCleartextTraffic="false"
-        android:label="핸즈프리 SA2.1"
+        android:label="핸즈프리 SA2.2"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
             android:name=".MainActivity"
