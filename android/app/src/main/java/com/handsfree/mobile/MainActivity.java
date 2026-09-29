@@ -10,7 +10,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 public class MainActivity extends Activity {
-    private static final String APP_URL = "https://handsfree-mobile-alpha-02.vercel.app/";
+    private static final String APP_URL = "https://handsfree-mobile-alpha-02.vercel.app/kmt/?app=202609295";
     private WebView webView;
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -28,7 +28,7 @@ public class MainActivity extends Activity {
         settings.setDatabaseEnabled(true);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
-        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
         settings.setMediaPlaybackRequiresUserGesture(false);
 
         webView.setWebViewClient(new WebViewClient());
