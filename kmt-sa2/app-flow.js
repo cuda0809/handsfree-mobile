@@ -5,28 +5,32 @@ function appError(e){if(!e.status&&!e.data)return '연결 실패 또는 응답 �
 function appFailure(el,e){if(el?.isConnected)el.innerHTML=esc(appError(e))+(e.status===401?' <a href="./login.html">사용자 등록</a>':'');}
 function appDay(v){if(/^\d{5}(?:\.\d+)?$/.test(String(v)))return new Date(Date.UTC(1899,11,30)+Math.floor(Number(v))*86400000).toISOString().slice(0,10);return String(v||'');}
 function appQuantity(v){const n=Number(String(v).replaceAll(',',''));if(!String(v).trim()||!Number.isFinite(n)||n<0)throw Error('invalid_report');return n;}
-reports=function(){return '<section><div class="section-title"><h2>생산 · 지원 집계</h2></div><div class="report-links"><button onclick="productionReport(\'month\')">▥ 월간생산량<small>실제 납품 집계 ›</small></button><button onclick="productionReport(\'year\')">▤ 연간생산량<small>연도별 기록 ›</small></button><button onclick="supportReport()">⇄ 타부서지원<small>지원 기록 조회 ›</small></button></div></section>';};
+reports=function(){return '<section><div class="section-title"><h2>생산 · 지원 집계</h2></div><div class="report-links"><button onclick="productionReport(\'month\')">▥ 월간생산량<small>선택한 한 달의 실제 납품 ›</small></button><button onclick="productionReport(\'year\')">▤ 연간생산량<small>선택한 한 해의 실제 납품 ›</small></button><button onclick="supportReport(\'month\')">⇄ 월간 타부서지원<small>선택한 한 달의 지원 기록 ›</small></button><button onclick="supportReport(\'year\')">⇄ 연간 타부서지원<small>선택한 한 해의 지원 기록 ›</small></button></div></section>';};
 productionReport=async function(mode){await loadAppReport(mode);};
-supportReport=async function(){await loadAppReport('support');};
-async function loadAppReport(mode){open(heading('생산 · 지원 집계',mode==='support'?'타부서지원':mode==='month'?'월간생산량':'연간생산량')+'<div id="appReportResult">원본 집계를 불러오는 중…</div>');const el=$('appReportResult');try{const d=await appCall({action:'reports'});if(!el.isConnected)return;appReport={mode,data:d};renderAppReport();}catch(e){appFailure(el,e);}}
+supportReport=async function(period='month'){await loadAppReport('support-'+period);};
+async function loadAppReport(mode){const title=mode==='support-month'?'월간 타부서지원':mode==='support-year'?'연간 타부서지원':mode==='month'?'월간생산량':'연간생산량';open(heading('생산 · 지원 집계',title)+'<div id="appReportResult">원본 집계를 불러오는 중…</div>');const el=$('appReportResult');try{const d=await appCall({action:'reports'});if(!el.isConnected)return;appReport={mode,data:d};renderAppReport();}catch(e){appFailure(el,e);}}
 function renderAppReport(){
  const el=$('appReportResult');if(!el||!appReport)return;const {mode,data}=appReport;
  try{
-  const rows=(mode==='support'?data.support:mode==='month'?data.monthly:data.annual).slice(1).filter(r=>r[0]&&r[1]);
-  const years=[...new Set(rows.map(r=>mode==='support'?appDay(r[0]).slice(0,4):String(r[0])))].sort().reverse();
-  const year=$('reportYear')?.value||years[0]||'',month=$('reportMonth')?.value||'all';
-  const selected=rows.filter(r=>(mode==='support'?appDay(r[0]).slice(0,4):String(r[0]))===year&&(mode!=='month'||month==='all'||Number(r[1])===Number(month)));
+  const support=mode.startsWith('support-'),monthly=mode==='month'||mode==='support-month';
+  const rows=(support?data.support:mode==='month'?data.monthly:data.annual).slice(1).filter(r=>r[0]&&r[1]);
+  const rowYear=r=>support?appDay(r[0]).slice(0,4):String(r[0]),rowMonth=r=>support?Number(appDay(r[0]).slice(5,7)):Number(r[1]);
+  const years=[...new Set(rows.map(rowYear).filter(Boolean))].sort().reverse();
+  const year=$('reportYear')?.value||years[0]||'';
+  const months=monthly?[...new Set(rows.filter(r=>rowYear(r)===year).map(rowMonth).filter(n=>n>=1&&n<=12))].sort((a,b)=>b-a):[];
+  const requestedMonth=Number($('reportMonth')?.value),month=months.includes(requestedMonth)?requestedMonth:(months[0]||0);
+  const selected=rows.filter(r=>rowYear(r)===year&&(!monthly||rowMonth(r)===month));
   let body;
-  if(mode==='support'){
+  if(support){
    const shown=selected.filter(r=>r[11]==='Y'&&r[8]==='확정'),groups={};shown.forEach(r=>{const k=r[9]||r[1];groups[k]=(groups[k]||0)+1;});
-   body='<p>원본에서 표시 대상으로 확정한 지원·납품 기록 '+shown.length+'건</p>'+Object.entries(groups).map(([k,v])=>'<span class="chip">'+esc(k)+' '+v+'건</span>').join('')+shown.map(r=>'<article class="item"><b>'+esc(appDay(r[0]))+' · '+esc(r[9]||r[1])+'</b><p>'+esc(r[2])+' '+esc(r[3])+'</p><p>'+esc(r[4])+'</p><small>참여자 '+esc(r[5]||'미기록')+'</small></article>').join('')+(!shown.length?'<p>선택한 연도의 집계 기록이 없습니다.</p>':'')+'<p class="note">지원시간은 원본에 기록되어 있지 않아 건수로 표시합니다.</p>';
+   body='<div class="action-box">확정된 타부서 지원 <b>'+shown.length+'건</b></div>'+Object.entries(groups).map(([k,v])=>'<span class="chip">'+esc(k)+' '+v+'건</span>').join('')+shown.map(r=>'<article class="item"><b>'+esc(appDay(r[0]))+' · '+esc(r[9]||r[1])+'</b><p>'+esc(r[2])+' '+esc(r[3])+'</p><p>'+esc(r[4])+'</p><small>참여자 '+esc(r[5]||'미기록')+'</small></article>').join('')+(!shown.length?'<p>선택한 기간의 지원 기록이 없습니다.</p>':'')+'<p class="note">원본에서 확정되고 운영현황 표시가 Y인 기록을 건수로 집계합니다. 지원시간은 원본에 없어 표시하지 않습니다.</p>';
   }else{
    const byModel=new Map();selected.forEach(r=>{const name=r[mode==='month'?2:1],qty=appQuantity(r[mode==='month'?3:2]);byModel.set(name,(byModel.get(name)||0)+qty);});
    const total=[...byModel.values()].reduce((a,b)=>a+b,0);
    body=selected.length?'<div class="action-box">실제 납품 집계 <b>'+total+'대</b></div><table class="report-table"><thead><tr><th>장비</th><th>대수</th></tr></thead><tbody>'+[...byModel].map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+v+'</td></tr>').join('')+'</tbody></table>':'<p>선택한 기간의 집계 기록이 없습니다.</p>';
    body+='<p class="note">원본 납품 집계표 기준 · B팀 · 실제 납품일 · 수리/PT 제외. 계획 진행률을 완료 실적으로 계산하지 않습니다.</p>';
   }
-  el.innerHTML='<div class="report-controls"><label>연도<select id="reportYear" onchange="renderAppReport()">'+years.map(y=>'<option '+(y===year?'selected':'')+'>'+esc(y)+'</option>').join('')+'</select></label>'+(mode==='month'?'<label>월<select id="reportMonth" onchange="renderAppReport()"><option value="all">전체 월</option>'+Array.from({length:12},(_,i)=>'<option value="'+(i+1)+'" '+(Number(month)===i+1?'selected':'')+'>'+(i+1)+'월</option>').join('')+'</select></label>':'')+'</div>'+body;
+  el.innerHTML='<div class="report-controls"><label>연도<select id="reportYear" onchange="renderAppReport()">'+years.map(y=>'<option '+(y===year?'selected':'')+'>'+esc(y)+'</option>').join('')+'</select></label>'+(monthly?'<label>월<select id="reportMonth" onchange="renderAppReport()">'+months.map(m=>'<option value="'+m+'" '+(month===m?'selected':'')+'>'+m+'월</option>').join('')+'</select></label>':'')+'</div>'+body;
  }catch(e){appFailure(el,e);}
 }
 const appWorkBase=work;
@@ -65,7 +69,7 @@ async function checkIssueReceipt(){const b=readStore('hf-issue-pending',null);if
 function receiptState(d){if(d.applied&&/REVIEW|EXCLUDED|FAILED/.test(d.status))return 'partial';if(/FAILED|PROCESSING/.test(d.status))return 'unknown';return /REVIEW/.test(d.status)?'review':d.applied?'saved_unverified':/EXCLUDED/.test(d.status)?'excluded':/DUPLICATE/.test(d.status)?'duplicate':'received';}
 const appReceiptBase=receiptDetail;
 receiptDetail=function(id){appReceiptBase(id);const r=notes().find(x=>x.id===id);if(!r)return;if(r.copiedFrom)$('sheetBody').insertAdjacentHTML('beforeend','<p class="note">원문 보관 번호 '+esc(r.copiedFrom)+'</p>');if(r.revisions?.length)$('sheetBody').insertAdjacentHTML('beforeend','<details><summary>기기에 보관한 수정 이력</summary>'+r.revisions.map(v=>'<p>'+esc(v.target)+'<br>'+esc(v.text)+'</p>').join('')+'</details>');if(r.status!=='draft'){$('sheetBody').insertAdjacentHTML('beforeend','<button id="serverReceiptButton" class="secondary">서버 저장 결과 다시 확인</button>');$('serverReceiptButton').onclick=()=>checkEventReceipt(id);}if(r.status!=='sending'){$('sheetBody').insertAdjacentHTML('beforeend','<button id="editLocalNote" class="secondary">'+(['draft','rejected'].includes(r.status)?'내용 수정하기':'내용 수정 후 새로 접수')+'</button>');$('editLocalNote').onclick=()=>editLocalNote(id);}};
-async function checkEventReceipt(id){const r=notes().find(x=>x.id===id);if(!r)return;try{const d=await appCall({action:'receipt',requestId:r.requestId||'',submissionId:r.submissionId||r.id,text:`${r.target} ${r.text}`,targetHint:r.target});if(d.status==='NOT_FOUND')return toast('서버 기록이 아직 확인되지 않습니다. 자동 재전송하지 않습니다.');updateNote(id,{status:receiptState(d),requestId:d.requestId,ack:d.ack,respondedAt:new Date().toISOString()});if(d.applied)await verifyEventNote(id,d);receiptDetail(id);}catch(e){toast(appError(e));}}
+async function checkEventReceipt(id){const r=notes().find(x=>x.id===id);if(!r)return false;try{const d=await appCall({action:'receipt',requestId:r.requestId||'',submissionId:r.submissionId||r.id,text:`${r.target} ${r.text}`,targetHint:r.target});if(d.status==='NOT_FOUND'){updateNote(id,{status:'received',ack:'서버 요청 번호는 받았지만 저장 기록은 아직 확인되지 않았습니다. 자동 재전송하지 않습니다.',respondedAt:new Date().toISOString()});receiptDetail(id);return false;}updateNote(id,{status:receiptState(d),requestId:d.requestId||r.requestId,ack:d.ack||r.ack||'서버 저장 결과를 확인했습니다.',respondedAt:new Date().toISOString()});if(d.applied)await verifyEventNote(id,d);receiptDetail(id);return true;}catch(e){updateNote(id,{ack:appError(e)});receiptDetail(id);return false;}}
 function editLocalNote(id){const r=notes().find(x=>x.id===id);if(!r||r.status==='sending')return;if(!canSendNote(r,true))return;let editId=id;if(!['draft','rejected'].includes(r.status)){try{const edit={id:crypto.randomUUID(),target:r.target,text:r.text,status:'draft',createdAt:new Date().toISOString(),copiedFrom:r.id};edit.submissionId=edit.id;const list=notes();list.unshift(edit);persist(KEY,list);editId=edit.id;}catch{return toast('수정본을 새 입력으로 만들지 못했습니다.');}}appInputBase();const e=notes().find(x=>x.id===editId);$('inputTarget').value=e.target;$('draft').value=e.text;editingNoteId=editId;$('sheetBody').querySelector('button.primary').textContent='기기에만 보관';$('sheetBody').insertAdjacentHTML('beforeend','<p class="alert">대상과 수정 내용을 확인한 뒤 보내세요. 업무이력으로 접수하며 현재 상태·다음 행동·일정은 별도 화면에서 변경합니다.</p><button id="sendEditedNote" class="primary" onclick="saveEditedAndSend()">수정한 내용 서버로 보내기</button>');}
 const appSaveNoteBase=saveNote;
 saveNote=function(){if(!editingNoteId)return appSaveNoteBase();const id=editingNoteId,r=notes().find(x=>x.id===id);if(!r||!['draft','rejected'].includes(r.status))return;const target=$('inputTarget').value.trim(),text=$('draft').value.trim();if(!target||!text){$('inputHint').textContent='입력 대상과 진행 내용을 모두 작성하세요.';return;}try{updateNote(id,{revisions:[...(r.revisions||[]),{target:r.target,text:r.text,at:r.updatedAt||r.createdAt,submissionId:r.submissionId}],verifiedAt:'',target,text,status:'draft',submissionId:crypto.randomUUID(),requestId:'',ack:'',respondedAt:'',updatedAt:new Date().toISOString()});localStorage.removeItem(DRAFT);editingNoteId=null;receiptDetail(id);return id;}catch{toast('수정 내용을 기기에 저장하지 못했습니다.');}};
@@ -104,4 +108,3 @@ async function verifyIssueReceipt(d){
  }catch{open(heading('현재 상태 저장 응답 확인','재조회 확인 필요',d.orderId)+'<p class="alert">서버 저장 응답은 받았지만 최신 조회값과의 일치를 확인하지 못했습니다. 자동 재전송하지 않습니다.</p><button class="secondary" onclick="checkIssueReceipt()">서버 저장 결과 다시 확인</button>');}
 }
 home();
-

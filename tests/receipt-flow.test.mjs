@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
-const mobile=fs.readFileSync(new URL('../kmt/mobile.js',import.meta.url),'utf8');
-const flow=fs.readFileSync(new URL('../kmt/app-flow.js',import.meta.url),'utf8');
+const mobile=fs.readFileSync(new URL('../kmt-sa2/mobile.js',import.meta.url),'utf8');
+const flow=fs.readFileSync(new URL('../kmt-sa2/app-flow.js',import.meta.url),'utf8');
 let list=[],calls=[],writes=0,online=true,readOK=true,historyMatch=true,html='',shown=0;
 let receipt={ok:true,status:'WRITTEN',applied:true,requestId:'HF-1',events:[{id:'HF-1-E01',status:'WRITTEN',orderId:'P-1',raw:'latest'}]};
 const els={inputTarget:{value:'P-1'},draft:{value:'latest'},inputHint:{},sheetBody:{insertAdjacentHTML(){},querySelector:()=>({})},issueSaveButton:{disabled:false},issueSaveHint:{isConnected:true}};
@@ -10,6 +10,7 @@ const c=vm.createContext({crypto:{randomUUID:()=>`submission-${writes++}-unique-
 function run(src,start,end){vm.runInContext(src.slice(src.indexOf(start),end?src.indexOf(end,src.indexOf(start)):undefined),c);}
 run(flow,'function appError(','function appFailure(');
 run(flow,'function receiptState(','const appReceiptBase');
+run(flow,'async function checkEventReceipt(','function editLocalNote(');
 run(flow,'function canSendNote(','\nhome();');
 run(mobile,'async function sendNote(','async function refreshAndShow');
 run(flow,'function editLocalNote(','function canSendNote(');
@@ -20,9 +21,12 @@ fresh();online=false;c.editingNoteId='local-1';await c.saveEditedAndSend();asser
 fresh();historyMatch=false;await c.sendNote('local-1');assert.equal(list[0].status,'saved_unverified');assert.ok(!list[0].verifiedAt);
 fresh();readOK=false;await c.sendNote('local-1');assert.equal(list[0].status,'saved_unverified');
 console.log('PASS offline edit preservation and failed/mismatched readback stays pending');
+fresh();receipt={ok:true,status:'REVIEW',applied:false,requestId:'HF-review',ack:'검토 대기'};c.api=async(p,b)=>{calls.push(b);return {ok:true,status:'REVIEW',applied:false,requestId:'HF-review',ack:'검토 대기'};};await c.sendNote('local-1');assert.equal(list[0].status,'review');assert.equal(list[0].ack,'검토 대기');assert.equal(calls.filter(x=>x.action==='receipt').length,1);assert.equal(calls.filter(x=>x.op==='safe_write').length,1);
+receipt={ok:true,status:'WRITTEN',applied:true,requestId:'HF-1',events:[{id:'HF-1-E01',status:'WRITTEN',orderId:'P-1',raw:'latest'}]};c.api=async(p,b)=>{calls.push(b);return receipt;};
+console.log('PASS non-applied server response is shown and receipt is checked once without resending');
 fresh();list[0].status='unknown';assert.equal(c.canSendNote(list[0],true),false);list.push({id:'copy',status:'draft',copiedFrom:'local-1'});await c.sendNote('copy');assert.equal(calls.length,0);
 fresh();list[0].status='applied';assert.equal(c.canSendNote(list[0],true),false);
-for(const [status,error,pattern] of [[401,'personal_login_required',/개인 Google 로그인/],[403,'forbidden',/권한/],[401,'unauthorized',/로그인 상태/]]){fresh();c.api=async()=>{throw Object.assign(Error(error),{status,data:{error}});};await c.sendNote('local-1');assert.equal(list[0].status,'rejected');assert.match(list[0].ack,pattern);assert.doesNotMatch(list[0].ack,/만료/);}
+for(const [status,error,pattern] of [[401,'personal_login_required',/사용자 등록/],[403,'forbidden',/권한/],[401,'unauthorized',/로그인 상태/]]){fresh();c.api=async()=>{throw Object.assign(Error(error),{status,data:{error}});};await c.sendNote('local-1');assert.equal(list[0].status,'rejected');assert.match(list[0].ack,pattern);assert.doesNotMatch(list[0].ack,/만료/);}
 fresh();c.api=async()=>{throw Error('network');};await c.sendNote('local-1');assert.equal(list[0].status,'unknown');
 console.log('PASS unresolved ancestor and old unverified receipt blocked; login/permission/network distinguished');
 run(mobile,'const labels=','function receiptDetail(');fresh();list.push({id:'done',status:'applied',verifiedAt:'now',target:'saved',text:'history',createdAt:'2026-09-29'});c.showInbox();assert.ok(html.indexOf('확인 필요')<html.indexOf('old'));assert.ok(html.indexOf('저장 완료')<html.indexOf('history'));assert.equal(list.length,2);

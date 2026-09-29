@@ -52,6 +52,7 @@ export default async function handler(req,res){
       return res.status(notReady?503:422).json({ok:false,error:err,requestId:String(data?.requestId||''),status:String(data?.status||''),ack:String(data?.ack||'')});
     }
 
+    console.info('sa2-write-result',{status:String(data.status||''),applied:!!data.applied,requestId:String(data.requestId||'')});
     return res.status(200).json({
       ok:true,
       applied:!!data.applied,
