@@ -1,93 +1,368 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#0d1b2a">
-  <title>HandsFree NX · 생산관리 UI 시안</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23103968'/%3E%3Cpath d='M15 17h9v11h16V17h9v30h-9V36H24v11h-9z' fill='white'/%3E%3C/svg%3E">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1520" />
+  <title>HandsFree WORKS · Design Study 0.2</title>
   <style>
-    :root{--blue:#0f4c81;--navy:#0d1b2a;--orange:#ff8a00;--line:#dce3ea;--soft:#f3f6f8;--green:#0f9960;--red:#db3a34;--text:#17212b;--muted:#62707d}
-    *{box-sizing:border-box}html{font-family:"Pretendard","Noto Sans KR","Malgun Gothic",system-ui,sans-serif;background:#e9edf1;color:var(--text)}body{margin:0}button{font:inherit;color:inherit;cursor:pointer}.lab-head{max-width:1240px;margin:auto;padding:28px 24px 20px;display:flex;align-items:end;justify-content:space-between;gap:24px}.lab-title small{display:block;color:#52606d;font-size:.78rem;font-weight:800;letter-spacing:.13em}.lab-title h1{font-size:1.7rem;margin:7px 0 0;letter-spacing:-.04em}.lab-note{max-width:470px;margin:0;color:#66737f;font-size:.9rem;line-height:1.65}.switcher{display:none}.gallery{max-width:1240px;margin:auto;padding:0 24px 48px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}.concept-card{min-width:0}.concept-label{height:70px;padding:0 3px 12px;display:flex;align-items:end;justify-content:space-between;gap:10px}.concept-label b{font-size:1.08rem}.concept-label span{display:block;color:#687581;font-size:.78rem;margin-top:4px}.concept-number{font:800 .78rem ui-monospace,monospace;color:#84909a}.phone{height:790px;overflow:hidden;border:1px solid #cad3db;border-radius:30px;background:white;box-shadow:0 18px 50px #2334431c;position:relative}.phone button{border:0}.scroll{height:100%;overflow:hidden;padding-bottom:76px}.topbar{height:76px;padding:18px 19px 12px;display:flex;align-items:center;justify-content:space-between}.brand{display:flex;align-items:center;gap:10px}.logo-box{width:48px;height:34px;background:white;border-radius:8px;display:grid;place-items:center;flex:0 0 48px;color:#174c92;font-size:1rem;font-weight:950;letter-spacing:-.08em}.brand strong{display:block;font-size:.94rem}.brand small{display:block;font-size:.67rem;margin-top:2px;letter-spacing:.08em}.avatar{width:39px;height:39px;border-radius:13px;display:grid;place-items:center;font-size:.78rem;font-weight:800}.bottom-nav{position:absolute;z-index:5;left:0;right:0;bottom:0;height:70px;display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);background:#fffffff2;backdrop-filter:blur(16px);padding-bottom:6px}.bottom-nav button{background:none;font-size:.69rem;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px}.nav-ico{font-size:1.2rem;line-height:1}.pill{display:inline-flex;align-items:center;border-radius:999px;font-size:.71rem;font-weight:800;padding:5px 9px}.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px}.section-title{display:flex;justify-content:space-between;align-items:center;margin:21px 0 11px}.section-title h2{font-size:1rem;margin:0;letter-spacing:-.02em}.section-title span{font-size:.75rem;color:var(--muted)}
+    :root {
+      --ink: #132231;
+      --muted: #64717d;
+      --line: #dce3e7;
+      --paper: #f4f6f7;
+      --white: #fff;
+      --navy: #0b1520;
+      --orange: #ff6b1a;
+      --red: #d9473f;
+      --green: #15866d;
+      --blue: #3273dc;
+      --amber: #f2a900;
+      --shadow: 0 18px 45px rgba(13, 26, 37, .12);
+    }
+    * { box-sizing: border-box; }
+    html { background: #dfe4e7; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(255,107,26,.12), transparent 28rem),
+        linear-gradient(135deg, #edf0f2, #dce2e5);
+      font-family: Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    button { font: inherit; }
+    .study-head {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 34px 26px 20px;
+      display: flex;
+      gap: 24px;
+      align-items: end;
+      justify-content: space-between;
+    }
+    .study-kicker { color: #b8470c; font-size: 12px; font-weight: 900; letter-spacing: .14em; }
+    .study-head h1 { margin: 7px 0 7px; font-size: clamp(25px, 3vw, 40px); line-height: 1.08; letter-spacing: -.04em; }
+    .study-head p { margin: 0; color: #596673; font-size: 14px; }
+    .study-note {
+      flex: 0 0 auto; max-width: 390px; padding: 12px 15px; border: 1px solid #ccd5da;
+      border-radius: 14px; background: rgba(255,255,255,.62); color: #596673; font-size: 12px; line-height: 1.5;
+    }
+    .concept-switch {
+      display: none; position: sticky; top: 0; z-index: 20; padding: 10px 12px;
+      background: rgba(235,239,241,.94); backdrop-filter: blur(12px); border-bottom: 1px solid #d1d9dd;
+    }
+    .concept-switch button {
+      flex: 1; min-height: 44px; border: 0; background: transparent; color: #65717b;
+      border-radius: 11px; font-size: 13px; font-weight: 800; cursor: pointer;
+    }
+    .concept-switch button.active { background: var(--navy); color: white; box-shadow: 0 6px 18px rgba(11,21,32,.2); }
+    .stage { max-width: 1600px; margin: 0 auto; padding: 0 22px 55px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
+    .concept-wrap { min-width: 0; }
+    .concept-label { min-height: 66px; padding: 0 4px 10px; display: flex; align-items: end; justify-content: space-between; gap: 10px; }
+    .concept-label b { display: block; font-size: 16px; }
+    .concept-label span { display: block; margin-top: 4px; color: #6c7781; font-size: 12px; }
+    .concept-label em { color: #9aa4ab; font-size: 11px; font-style: normal; font-weight: 800; letter-spacing: .12em; }
+    .phone {
+      min-height: 840px; overflow: hidden; position: relative; border: 8px solid #1a2229; border-radius: 30px;
+      background: var(--paper); box-shadow: var(--shadow); isolation: isolate;
+    }
+    .appbar { height: 67px; padding: 15px 17px 11px; display: flex; align-items: center; justify-content: space-between; }
+    .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .mark {
+      width: 35px; height: 35px; display: grid; place-items: center; border-radius: 8px;
+      background: var(--orange); color: #111820; font-size: 12px; font-weight: 1000; letter-spacing: -.04em;
+      transform: skew(-5deg);
+    }
+    .brand-name { font-size: 13px; font-weight: 950; letter-spacing: -.01em; }
+    .brand-sub { color: var(--muted); font-size: 10px; font-weight: 700; }
+    .head-action { display: flex; gap: 7px; align-items: center; }
+    .head-pill { padding: 7px 9px; border-radius: 999px; font-size: 10px; font-weight: 900; }
+    .head-icon { width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 10px; display: grid; place-items: center; background: white; color: #384651; font-weight: 900; }
+    .scroll { padding: 0 13px 84px; }
+    .eyebrow { font-size: 10px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    h2 { margin: 6px 0 4px; font-size: 25px; line-height: 1.14; letter-spacing: -.05em; }
+    .lead { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+    .card { border: 1px solid var(--line); border-radius: 16px; background: white; }
+    .section-row { display: flex; align-items: center; justify-content: space-between; margin: 17px 2px 9px; }
+    .section-row strong { font-size: 14px; letter-spacing: -.02em; }
+    .section-row span { color: var(--muted); font-size: 10px; font-weight: 700; }
+    .bottom-nav {
+      position: absolute; z-index: 5; left: 0; right: 0; bottom: 0; height: 66px; padding: 8px 10px 10px;
+      display: grid; grid-template-columns: repeat(4,1fr); border-top: 1px solid var(--line); background: rgba(255,255,255,.96);
+    }
+    .nav-item { display: grid; justify-items: center; align-content: center; gap: 3px; color: #8b959d; font-size: 9px; font-weight: 800; }
+    .nav-item i { width: 20px; height: 16px; display: block; border: 2px solid currentColor; border-radius: 5px; }
+    .nav-item.active { color: var(--orange); }
 
-    /* A · Command */
-    .command{background:#f5f7fa}.command .topbar{background:var(--navy);color:white}.command .brand small{color:#9fb2c2}.command .avatar{background:#203b52;color:#fff}.command .content{padding:0 18px}.command .shift{margin:14px 0 0;background:linear-gradient(135deg,#123452,#0d263b);color:white;border-radius:18px;padding:18px;position:relative;overflow:hidden}.command .shift:after{content:"B";position:absolute;right:5px;bottom:-31px;font:900 8rem/1 sans-serif;color:#ffffff0b}.shift-kicker{font-size:.72rem;color:#9fc5e3;font-weight:700}.shift h2{font-size:1.38rem;margin:9px 0 16px;letter-spacing:-.04em}.shift-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.shift-grid div{padding:9px 8px;background:#ffffff0e;border:1px solid #ffffff14;border-radius:10px}.shift-grid b{display:block;font-size:1.18rem}.shift-grid span{font-size:.66rem;color:#b9ccda}.alarm{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;margin-top:12px;border-left:5px solid var(--orange);background:#fff;border-radius:8px;padding:12px;box-shadow:0 3px 12px #2437460a}.alarm-icon{width:32px;height:32px;border-radius:9px;background:#fff3df;color:#b95e00;display:grid;place-items:center;font-weight:900}.alarm b{font-size:.82rem}.alarm p{margin:3px 0 0;font-size:.71rem;color:var(--muted)}.alarm time{font-size:.7rem;font-weight:800;color:#aa5700}.machine-row{background:#fff;border:1px solid #e1e7ec;border-radius:13px;padding:13px;margin-bottom:8px}.machine-head{display:flex;align-items:center;justify-content:space-between}.machine-head b{font-size:.88rem}.machine-head small{font-size:.68rem;color:var(--muted)}.machine-row p{font-size:.75rem;color:#4e5f6e;margin:8px 0}.progress{height:7px;background:#e9eef2;border-radius:8px;overflow:hidden}.progress i{display:block;height:100%;background:var(--blue);border-radius:8px}.machine-foot{display:flex;justify-content:space-between;margin-top:7px;font-size:.67rem;color:#687681}.command .bottom-nav button:first-child{color:var(--blue);font-weight:800}
+    /* A · 대표 브리핑 */
+    .briefing { background: #f3f5f6; }
+    .briefing .appbar { background: var(--navy); color: white; }
+    .briefing .brand-sub { color: #93a1ad; }
+    .briefing .head-icon { color: white; background: #152331; border-color: #2a3a47; }
+    .brief-hero { margin: 0 -13px; padding: 21px 16px 23px; background: var(--navy); color: white; }
+    .brief-hero .eyebrow { color: #8fa0ac; }
+    .brief-hero .lead { color: #a8b4bd; }
+    .decision-count { color: #ff8a48; }
+    .metrics { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; margin: -12px 0 0; position: relative; z-index: 2; }
+    .metric { padding: 13px 10px 12px; background: white; border: 1px solid var(--line); border-radius: 13px; box-shadow: 0 8px 20px rgba(12,28,41,.07); }
+    .metric small { color: var(--muted); font-size: 9px; font-weight: 800; }
+    .metric b { display: block; margin: 4px 0 2px; font-size: 21px; letter-spacing: -.05em; }
+    .metric span { color: var(--green); font-size: 9px; font-weight: 900; }
+    .metric.risk span { color: var(--red); }
+    .decision { margin-bottom: 9px; padding: 13px; position: relative; overflow: hidden; }
+    .decision::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--orange); }
+    .decision.red::before { background: var(--red); }
+    .decision-top { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
+    .decision-top small { color: var(--muted); font-size: 9px; font-weight: 800; }
+    .decision h3 { margin: 3px 0 5px; font-size: 14px; line-height: 1.35; letter-spacing: -.02em; }
+    .badge { padding: 5px 7px; border-radius: 7px; background: #fff0e8; color: #b84a12; font-size: 9px; font-weight: 900; white-space: nowrap; }
+    .red .badge { background: #fdeceb; color: #b6302a; }
+    .decision p { margin: 0; color: #53616c; font-size: 11px; line-height: 1.5; }
+    .action-line { margin-top: 10px; padding-top: 9px; border-top: 1px solid #edf0f2; display: flex; justify-content: space-between; gap: 10px; font-size: 10px; }
+    .action-line b { color: var(--ink); }
+    .action-line span { color: var(--orange); font-weight: 900; white-space: nowrap; }
+    .promise-list { padding: 4px 12px; }
+    .promise { display: grid; grid-template-columns: 46px 1fr auto; align-items: center; gap: 8px; padding: 11px 0; border-bottom: 1px solid #edf0f2; }
+    .promise:last-child { border: 0; }
+    .promise time { font-size: 12px; font-weight: 950; }
+    .promise b { display: block; font-size: 11px; }
+    .promise small { color: var(--muted); font-size: 9px; }
+    .status { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px #e5f4f0; }
+    .status.warn { background: var(--red); box-shadow: 0 0 0 4px #fbe8e7; }
 
-    /* B · Flowline */
-    .flowline{background:#fbfcfd}.flowline .topbar{border-bottom:1px solid #e7ebef}.flowline .brand small{color:#50779c}.flowline .avatar{background:#e9f1fb;color:#155897}.flowline .content{padding:0 18px}.flowline .date-row{display:flex;justify-content:space-between;align-items:center;margin:14px 0 12px}.flowline .date-row h2{font-size:1.32rem;margin:0;letter-spacing:-.04em}.date-row button{background:#102f4c;color:#fff;border-radius:11px;padding:10px 12px;font-size:.73rem;font-weight:800}.target-strip{display:grid;grid-template-columns:1.25fr 1fr 1fr;border:1px solid #dce5ed;border-radius:14px;overflow:hidden}.target-strip div{padding:13px 11px;border-right:1px solid #e2e9ef}.target-strip div:last-child{border:0}.target-strip small{display:block;font-size:.66rem;color:var(--muted)}.target-strip b{display:block;font-size:1.1rem;margin-top:5px}.target-strip .good b{color:var(--green)}.flow-card{border:1px solid #dbe4eb;border-radius:16px;margin-bottom:11px;overflow:hidden;background:white}.flow-card-head{display:flex;justify-content:space-between;align-items:start;padding:14px 14px 10px}.flow-card h3{font-size:.9rem;margin:0}.flow-card h3 span{display:block;color:#71808d;font-size:.69rem;font-weight:500;margin-top:4px}.stage-track{display:grid;grid-template-columns:repeat(5,1fr);padding:4px 13px 13px;gap:2px}.stage{position:relative;text-align:center;color:#96a1aa;font-size:.6rem;padding-top:18px}.stage:before{content:"";position:absolute;top:5px;left:0;right:0;height:5px;background:#e6ebef}.stage:first-child:before{border-radius:8px 0 0 8px}.stage:last-child:before{border-radius:0 8px 8px 0}.stage.done{color:#296c9f}.stage.done:before{background:#4a90c7}.stage.now{color:#17212b;font-weight:800}.stage.now:before{background:var(--orange)}.flow-note{margin:0 13px 13px;padding:10px 11px;background:#f4f7fa;border-radius:9px;font-size:.7rem;color:#536573;display:flex;justify-content:space-between;gap:8px}.flow-note strong{color:#203b52;white-space:nowrap}.flowline .bottom-nav button:nth-child(2){color:#155897;font-weight:800}
+    /* B · 생산 통제판 */
+    .control { background: #f8f7f3; }
+    .control .appbar { background: #fff; border-bottom: 1px solid #e2e0d9; }
+    .control .mark { background: #111b24; color: #ff7a2e; }
+    .control-top { padding: 17px 3px 11px; display: flex; justify-content: space-between; align-items: end; }
+    .control-top h2 { font-size: 23px; }
+    .live { padding: 6px 8px; background: #e4f2ed; border-radius: 999px; color: #17715e; font-size: 9px; font-weight: 900; }
+    .live::before { content: ""; width: 6px; height: 6px; display: inline-block; margin-right: 5px; border-radius: 50%; background: #1b9d80; }
+    .flow { padding: 12px 8px 9px; display: grid; grid-template-columns: repeat(5,1fr); gap: 4px; }
+    .step { text-align: center; position: relative; }
+    .step:not(:last-child)::after { content: ""; position: absolute; left: 64%; right: -34%; top: 14px; height: 2px; background: #d7d5ce; }
+    .step b { position: relative; z-index: 1; width: 29px; height: 29px; margin: 0 auto 5px; display: grid; place-items: center; border-radius: 50%; background: #ecebe5; color: #62707b; font-size: 11px; }
+    .step span { font-size: 9px; font-weight: 800; color: #66727b; }
+    .step.active b { background: var(--orange); color: white; box-shadow: 0 0 0 4px #ffeadf; }
+    .step.alert b { background: var(--red); color: white; box-shadow: 0 0 0 4px #fae4e2; }
+    .bottleneck { margin: 9px 0 12px; padding: 11px 12px; display: flex; gap: 10px; align-items: center; background: #202b34; color: white; border-radius: 13px; }
+    .bottleneck i { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; background: #3a2722; color: #ff8a48; font-style: normal; font-weight: 950; }
+    .bottleneck b { display: block; font-size: 11px; }
+    .bottleneck small { color: #aeb7bd; font-size: 9px; }
+    .machine { margin-bottom: 8px; padding: 12px; display: grid; grid-template-columns: 39px 1fr auto; gap: 10px; align-items: center; }
+    .machine-code { width: 39px; height: 39px; display: grid; place-items: center; border-radius: 11px; background: #edf1f2; color: #334451; font-size: 10px; font-weight: 950; }
+    .machine.risk .machine-code { background: #fbe5e2; color: #b8342d; }
+    .machine.done .machine-code { background: #e2f2ed; color: #14735e; }
+    .machine h3 { margin: 0 0 3px; font-size: 12px; }
+    .machine p { margin: 0; color: var(--muted); font-size: 9px; line-height: 1.4; }
+    .machine-side { text-align: right; }
+    .machine-side b { display: block; color: var(--orange); font-size: 10px; }
+    .machine-side small { color: var(--muted); font-size: 8px; }
+    .load { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .load-card { padding: 12px; }
+    .load-card small { color: var(--muted); font-size: 9px; font-weight: 800; }
+    .load-card b { display: block; margin-top: 3px; font-size: 18px; }
+    .load-card span { color: var(--green); font-size: 9px; font-weight: 800; }
 
-    /* C · Focus */
-    .focus{background:#11171d;color:#f4f7f9}.focus .topbar{background:#11171d}.focus .brand img{filter:saturate(.9)}.focus .brand small{color:#8b9aa6}.focus .avatar{background:#24313a;color:#e9f0f4}.focus .content{padding:0 17px}.focus .hello{margin:9px 0 18px}.focus .hello small{color:#82919c;font-size:.76rem}.focus .hello h2{font-size:1.55rem;margin:5px 0 0;letter-spacing:-.045em}.focus .now-card{background:#f3f6f8;color:#111820;border-radius:21px;padding:18px;margin-bottom:13px}.focus .now-top{display:flex;justify-content:space-between;align-items:center}.focus .now-top small{font-size:.7rem;color:#62717c;font-weight:700}.focus .now-card h3{font-size:1.36rem;margin:15px 0 4px}.focus .now-card>p{margin:0;color:#65727c;font-size:.78rem}.focus .work-step{display:flex;gap:12px;margin:18px 0 0;padding-top:15px;border-top:1px solid #d8e0e5}.step-no{flex:0 0 37px;height:37px;border-radius:11px;background:#111b24;color:white;display:grid;place-items:center;font-weight:900}.work-step b{display:block;font-size:.87rem}.work-step span{font-size:.7rem;color:#6c7881;display:block;margin-top:4px;line-height:1.5}.focus-action{width:100%;margin-top:16px;padding:14px;border-radius:12px;background:#ffb000;color:#1c1607;font-weight:900;font-size:.88rem}.next-card{background:#1a232b;border:1px solid #2a3741;border-radius:15px;padding:14px;margin-bottom:9px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:11px}.next-time{font:800 .72rem ui-monospace,monospace;color:#9aabb7}.next-card b{font-size:.83rem}.next-card p{margin:4px 0 0;font-size:.69rem;color:#8f9da7}.next-status{font-size:.65rem;background:#293741;color:#c5d0d7;border-radius:999px;padding:5px 7px}.focus .section-title h2{color:#f2f5f7}.focus .section-title span{color:#84929d}.focus .bottom-nav{background:#151d23ed;border-color:#27313a}.focus .bottom-nav button{color:#84929b}.focus .bottom-nav button:nth-child(3){color:#ffb000;font-weight:800}
+    /* C · 프로젝트 원장 */
+    .ledger { background: #f5f7fa; }
+    .ledger .appbar { background: white; border-bottom: 1px solid #e3e8ed; }
+    .ledger .mark { background: #1a59a6; color: white; }
+    .project-head { margin: 10px 0 11px; padding: 15px; color: white; background: linear-gradient(145deg,#17497f,#0c2d50); border: 0; }
+    .project-head small { color: #a9c3dc; font-size: 9px; font-weight: 800; }
+    .project-head h2 { margin: 4px 0; font-size: 19px; }
+    .project-head p { margin: 0; color: #c5d4e1; font-size: 10px; }
+    .current { margin-top: 12px; padding: 10px 11px; display: flex; justify-content: space-between; gap: 8px; align-items: center; border-radius: 11px; background: rgba(255,255,255,.11); }
+    .current span { color: #c5d7e6; font-size: 9px; }
+    .current b { font-size: 11px; }
+    .timeline { padding: 14px 11px 11px; display: grid; grid-template-columns: repeat(5,1fr); gap: 0; }
+    .milestone { position: relative; text-align: center; }
+    .milestone::before { content: ""; position: absolute; top: 7px; left: 0; right: 0; height: 2px; background: #dbe3ea; }
+    .milestone:first-child::before { left: 50%; }
+    .milestone:last-child::before { right: 50%; }
+    .milestone i { position: relative; z-index: 1; width: 15px; height: 15px; margin: 0 auto 7px; display: block; border: 3px solid white; border-radius: 50%; background: #bdc7cf; box-shadow: 0 0 0 1px #bdc7cf; }
+    .milestone.done i { background: var(--green); box-shadow: 0 0 0 1px var(--green); }
+    .milestone.now i { background: var(--orange); box-shadow: 0 0 0 1px var(--orange); }
+    .milestone b { display: block; font-size: 8px; }
+    .milestone small { color: var(--muted); font-size: 7px; }
+    .next-action { margin-top: 9px; padding: 11px 12px; display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; border: 1px solid #f4d3bc; background: #fff8f3; border-radius: 13px; }
+    .next-action small { color: #a85a2e; font-size: 8px; font-weight: 900; }
+    .next-action b { display: block; margin-top: 2px; font-size: 11px; }
+    .next-action time { padding: 6px 7px; border-radius: 8px; background: white; color: #b34b11; font-size: 9px; font-weight: 950; }
+    .history { padding: 2px 12px; }
+    .history-item { display: grid; grid-template-columns: 42px 9px 1fr; gap: 8px; padding: 10px 0; border-bottom: 1px solid #edf0f3; }
+    .history-item:last-child { border: 0; }
+    .history-item time { color: #64727e; font-size: 8px; font-weight: 800; line-height: 1.4; text-align: right; }
+    .history-item i { width: 7px; height: 7px; margin-top: 3px; border-radius: 50%; background: #6e91b5; box-shadow: 0 0 0 4px #edf3f8; }
+    .history-item b { display: block; margin-bottom: 2px; font-size: 10px; }
+    .history-item p { margin: 0; color: var(--muted); font-size: 9px; line-height: 1.45; }
+    .evidence { margin-top: 9px; padding: 10px 11px; display: flex; justify-content: space-between; align-items: center; color: #5f6e7a; font-size: 9px; }
+    .evidence b { color: #1c5f9e; }
 
-    @media(max-width:860px){.lab-head{display:block;padding:18px 16px 10px}.lab-title h1{font-size:1.35rem}.lab-note{margin-top:10px;font-size:.8rem}.switcher{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;position:sticky;top:0;z-index:20;background:#e9edf1eF;backdrop-filter:blur(14px);padding:10px 14px}.switcher button{border:1px solid #cbd4dc;background:#f8fafb;border-radius:10px;padding:10px 5px;font-size:.72rem;font-weight:800}.switcher button.active{background:#102f4c;color:white;border-color:#102f4c}.gallery{display:block;padding:0 12px 30px}.concept-card{display:none}.concept-card.active{display:block}.concept-label{height:58px;padding:0 6px 10px}.phone{height:min(790px,calc(100dvh - 145px));min-height:610px;border-radius:24px}.bottom-nav{padding-bottom:max(6px,env(safe-area-inset-bottom));height:calc(70px + env(safe-area-inset-bottom))}}
+    @media (max-width: 1100px) and (min-width: 861px) {
+      .stage { gap: 12px; padding-left: 12px; padding-right: 12px; }
+      .phone { border-width: 5px; border-radius: 24px; }
+      .study-head { padding-left: 16px; padding-right: 16px; }
+    }
+    @media (max-width: 860px) {
+      .study-head { padding: 22px 18px 16px; align-items: start; flex-direction: column; }
+      .study-note { max-width: none; }
+      .concept-switch { display: flex; gap: 5px; }
+      .stage { display: block; padding: 15px 12px 35px; }
+      .concept-wrap { display: none; }
+      .concept-wrap.active { display: block; }
+      .concept-label { min-height: 55px; padding-left: 6px; padding-right: 6px; }
+      .phone { max-width: 520px; min-height: 810px; margin: 0 auto; border-width: 0; border-radius: 19px; }
+    }
+    @media (max-width: 420px) {
+      .study-head { padding: 18px 15px 13px; }
+      .study-head p { font-size: 13px; line-height: 1.5; }
+      .stage { padding-left: 7px; padding-right: 7px; }
+      .phone { min-height: 800px; border-radius: 15px; }
+    }
   </style>
 </head>
 <body>
-  <header class="lab-head">
-    <div class="lab-title"><small>HANDSFREE NX · DESIGN PREVIEW 0.1</small><h1>생산관리 현장 UI 방향 3안</h1></div>
-    <p class="lab-note">기능 연결 전 디자인 비교용 화면입니다. 각 시안은 같은 정보를 다른 우선순위로 보여줍니다.</p>
+  <header class="study-head">
+    <div>
+      <div class="study-kicker">HANDSFREE WORKS · DESIGN STUDY 0.2</div>
+      <h1>대표의 질문에서 시작한 생산관리</h1>
+      <p>오늘 결정할 일 → 공정 병목 → 프로젝트 근거까지, 같은 운영 데이터를 세 가지 시선으로 설계했습니다.</p>
+    </div>
+    <div class="study-note">디자인 검토용 독립 시안입니다. 화면의 수치는 운영 DB 항목을 바탕으로 구성한 예시이며, 저장·수정·인증 기능은 연결하지 않았습니다.</div>
   </header>
-  <nav class="switcher" aria-label="디자인 시안 선택">
-    <button class="active" data-show="a">A 관제형</button><button data-show="b">B 흐름형</button><button data-show="c">C 집중형</button>
+
+  <nav class="concept-switch" aria-label="시안 선택">
+    <button class="active" data-target="briefing">대표 브리핑</button>
+    <button data-target="control">생산 통제판</button>
+    <button data-target="ledger">프로젝트 원장</button>
   </nav>
-  <main class="gallery">
-    <section class="concept-card active" data-concept="a">
-      <div class="concept-label"><div><b>A · SHIFT COMMAND</b><span>한 화면에서 이상과 전체 현황을 판단</span></div><i class="concept-number">01</i></div>
-      <div class="phone command">
+
+  <main class="stage">
+    <section class="concept-wrap active" data-concept="briefing">
+      <div class="concept-label"><div><b>A. 대표 브리핑</b><span>판단이 필요한 일부터 보여주는 홈</span></div><em>DECIDE</em></div>
+      <article class="phone briefing">
+        <header class="appbar">
+          <div class="brand"><div class="mark">KMT</div><div><div class="brand-name">HandsFree WORKS</div><div class="brand-sub">대표 브리핑</div></div></div>
+          <div class="head-action"><div class="head-icon">2</div></div>
+        </header>
         <div class="scroll">
-          <header class="topbar"><div class="brand"><span class="logo-box" aria-label="케이엠텍">KMT</span><div><strong>HandsFree NX</strong><small>생산 B · 주간</small></div></div><div class="avatar">SJ</div></header>
-          <div class="content">
-            <section class="shift"><div class="shift-kicker">09.30 수요일 · 주간조</div><h2>생산 흐름은 정상입니다</h2><div class="shift-grid"><div><b>12</b><span>진행 장비</span></div><div><b>3</b><span>오늘 출고</span></div><div><b>1</b><span>확인 필요</span></div></div></section>
-            <div class="alarm"><div class="alarm-icon">!</div><div><b>KPM-300F 조립 지연</b><p>베어링 입고 확인이 필요합니다</p></div><time>10:30</time></div>
-            <div class="section-title"><h2>라인 현황</h2><span>납기순</span></div>
-            <article class="machine-row"><div class="machine-head"><b>KDM-200 · 01호기</b><span class="pill" style="background:#e8f4ef;color:#08794b"><i class="dot" style="background:#0f9960"></i>조립</span></div><p>프레임 조립 완료 · 갭세팅 진행</p><div class="progress"><i style="width:68%"></i></div><div class="machine-foot"><span>260727A-061-01</span><b>68%</b></div></article>
-            <article class="machine-row"><div class="machine-head"><b>KDM-200 · 02호기</b><span class="pill" style="background:#fff3df;color:#a85900"><i class="dot" style="background:#ff8a00"></i>자재 확인</span></div><p>베이스 가공품 2종 입고 대기</p><div class="progress"><i style="width:42%;background:#ff8a00"></i></div><div class="machine-foot"><span>260727A-061-02</span><b>42%</b></div></article>
-            <article class="machine-row"><div class="machine-head"><b>PDM-300C · 오랜드바이오</b><span class="pill" style="background:#eaf0f7;color:#31577b">출고대기</span></div><p>검수 완료 · 출고 서류 확인</p><div class="progress"><i style="width:94%"></i></div><div class="machine-foot"><span>260714A-054</span><b>94%</b></div></article>
+          <section class="brief-hero">
+            <div class="eyebrow">2026. 09. 30 · 수요일</div>
+            <h2>오늘 결정할 일<br><span class="decision-count">2건</span>이 있습니다</h2>
+            <p class="lead">납기와 다음 공정에 영향이 큰 순서입니다.</p>
+          </section>
+          <div class="metrics">
+            <div class="metric"><small>9월 누적 생산</small><b>18대</b><span>계획 흐름 정상</span></div>
+            <div class="metric"><small>이번 주 출고</small><b>3대</b><span>완료 1 · 예정 2</span></div>
+            <div class="metric risk"><small>납기 위험</small><b>2건</b><span>대표 확인 필요</span></div>
+          </div>
+
+          <div class="section-row"><strong>대표 결정 대기</strong><span>영향도 순</span></div>
+          <div class="card decision red">
+            <div class="decision-top"><div><small>KDM-200 · 260727A-061-02</small><h3>자재 입고 지연으로 조립 착수일 조정</h3></div><span class="badge">납기 영향</span></div>
+            <p>02호기 핵심 자재가 10월 2일 입고 예정입니다. 기존 조립 순서를 유지하면 검수가 하루 밀립니다.</p>
+            <div class="action-line"><b>제안 · 03호기 선조립 전환</b><span>담당 생산B ›</span></div>
+          </div>
+          <div class="card decision">
+            <div class="decision-top"><div><small>KPM-300F · 124번</small><h3>자전컵 베어링 사양 변경 확인</h3></div><span class="badge">품질 확인</span></div>
+            <p>6922ZZ 고열 타입에서 6922DD 일반 타입으로 교체 기록이 등록됐습니다.</p>
+            <div class="action-line"><b>제안 · 변경 이력 승인 후 다음 공정</b><span>09:42 기록 ›</span></div>
+          </div>
+
+          <div class="section-row"><strong>고객 약속</strong><span>출고 예정 기준</span></div>
+          <div class="card promise-list">
+            <div class="promise"><time>10.08</time><div><b>PDM-300C · 오랜드바이오</b><small>검수 완료 · 포장 대기</small></div><i class="status"></i></div>
+            <div class="promise"><time>10.15</time><div><b>KDM-200 · 01호기</b><small>조립 진행 · 일정 내</small></div><i class="status"></i></div>
+            <div class="promise"><time>10.15</time><div><b>KDM-200 · 02호기</b><small>자재 대기 · 1일 위험</small></div><i class="status warn"></i></div>
           </div>
         </div>
-        <nav class="bottom-nav"><button><span class="nav-ico">▦</span>현황</button><button><span class="nav-ico">◫</span>장비</button><button><span class="nav-ico">＋</span>입력</button><button><span class="nav-ico">◎</span>내 업무</button></nav>
-      </div>
+        <nav class="bottom-nav"><div class="nav-item active"><i></i>브리핑</div><div class="nav-item"><i></i>생산</div><div class="nav-item"><i></i>프로젝트</div><div class="nav-item"><i></i>이력</div></nav>
+      </article>
     </section>
 
-    <section class="concept-card" data-concept="b">
-      <div class="concept-label"><div><b>B · LINE FLOW</b><span>장비별 공정과 납기를 한 줄로 추적</span></div><i class="concept-number">02</i></div>
-      <div class="phone flowline">
+    <section class="concept-wrap" data-concept="control">
+      <div class="concept-label"><div><b>B. 생산 통제판</b><span>현장의 막힌 지점과 작업 순서를 한눈에</span></div><em>CONTROL</em></div>
+      <article class="phone control">
+        <header class="appbar">
+          <div class="brand"><div class="mark">KMT</div><div><div class="brand-name">HandsFree WORKS</div><div class="brand-sub">생산 통제판</div></div></div>
+          <div class="head-action"><div class="head-pill" style="background:#edf2f3;color:#344550">9월 누적</div><div class="head-icon">⋮</div></div>
+        </header>
         <div class="scroll">
-          <header class="topbar"><div class="brand"><span class="logo-box" aria-label="케이엠텍">KMT</span><div><strong>HandsFree NX</strong><small>공정 흐름</small></div></div><div class="avatar">B팀</div></header>
-          <div class="content">
-            <div class="date-row"><h2>오늘의 공정</h2><button>진행내용 입력</button></div>
-            <section class="target-strip"><div><small>9월 누적 생산</small><b>18대</b></div><div class="good"><small>납기 준수</small><b>94%</b></div><div><small>지원 인원</small><b>7명</b></div></section>
-            <div class="section-title"><h2>출고 일정</h2><span>전체 12대</span></div>
-            <article class="flow-card"><div class="flow-card-head"><h3>KDM-200 · 01호기<span>260727A-061-01 · 출고 10.08</span></h3><span class="pill" style="background:#fff1dc;color:#a65700">조립</span></div><div class="stage-track"><div class="stage done">자재</div><div class="stage now">조립</div><div class="stage">전장</div><div class="stage">검수</div><div class="stage">출고</div></div><div class="flow-note"><span>오늘 · 베이스 체결 후 갭세팅</span><strong>담당 김성진</strong></div></article>
-            <article class="flow-card"><div class="flow-card-head"><h3>KPM-300F · 124번<span>260816A-072 · 출고 10.15</span></h3><span class="pill" style="background:#e7f3ed;color:#08774a">자재</span></div><div class="stage-track"><div class="stage now">자재</div><div class="stage">조립</div><div class="stage">전장</div><div class="stage">검수</div><div class="stage">출고</div></div><div class="flow-note"><span>베어링 6922DD 교체 준비</span><strong>담당 이상준</strong></div></article>
-            <article class="flow-card"><div class="flow-card-head"><h3>PDM-300C · 오랜드바이오<span>260714A-054 · 출고 오늘</span></h3><span class="pill" style="background:#e7eef7;color:#24537d">출고</span></div><div class="stage-track"><div class="stage done">자재</div><div class="stage done">조립</div><div class="stage done">전장</div><div class="stage done">검수</div><div class="stage now">출고</div></div><div class="flow-note"><span>검수 완료 · 출고 서류 확인</span><strong>15:00</strong></div></article>
+          <div class="control-top"><div><div class="eyebrow" style="color:#a34c1e">PRODUCTION B</div><h2>지금 공장은<br>어디가 막혔나</h2></div><span class="live">09:48 갱신</span></div>
+          <div class="card flow">
+            <div class="step alert"><b>2</b><span>자재</span></div>
+            <div class="step active"><b>4</b><span>조립</span></div>
+            <div class="step"><b>2</b><span>전장</span></div>
+            <div class="step"><b>1</b><span>검수</span></div>
+            <div class="step"><b>1</b><span>출고</span></div>
           </div>
+          <div class="bottleneck"><i>!</i><div><b>병목 · KDM-200 02호기 자재 대기</b><small>후속 2개 작업에 영향 · 담당 생산B</small></div></div>
+
+          <div class="section-row"><strong>오늘 작업 우선순위</strong><span>10개 진행 중</span></div>
+          <div class="card machine risk"><div class="machine-code">02</div><div><h3>KDM-200 · 260727A-061-02</h3><p>자재 대기 · 입고 확인 후 조립 시작</p></div><div class="machine-side"><b>10.15</b><small>출고 예정</small></div></div>
+          <div class="card machine"><div class="machine-code">01</div><div><h3>KDM-200 · 260727A-061-01</h3><p>본체 조립 진행 · 생산B 김OO</p></div><div class="machine-side"><b>10.15</b><small>출고 예정</small></div></div>
+          <div class="card machine"><div class="machine-code">03</div><div><h3>KDM-200 · 260727A-061-03</h3><p>선조립 가능 · 작업 순서 확인</p></div><div class="machine-side"><b>10.15</b><small>출고 예정</small></div></div>
+          <div class="card machine done"><div class="machine-code">PDM</div><div><h3>PDM-300C · 오랜드바이오</h3><p>검수 완료 · 포장 및 출고 대기</p></div><div class="machine-side"><b>10.08</b><small>출고 예정</small></div></div>
+          <div class="card machine"><div class="machine-code">124</div><div><h3>KPM-300F · 124번</h3><p>베어링 교체 · 변경 이력 확인</p></div><div class="machine-side"><b>오늘</b><small>확인 필요</small></div></div>
+
+          <div class="section-row"><strong>작업 부하</strong><span>9월 기준</span></div>
+          <div class="load"><div class="card load-card"><small>월 누적 생산</small><b>18대</b><span>완료 기준</span></div><div class="card load-card"><small>타부서 지원</small><b>7명</b><span>월 누적 인원</span></div></div>
         </div>
-        <nav class="bottom-nav"><button><span class="nav-ico">⌂</span>오늘</button><button><span class="nav-ico">≋</span>공정</button><button><span class="nav-ico">▥</span>실적</button><button><span class="nav-ico">◎</span>내 업무</button></nav>
-      </div>
+        <nav class="bottom-nav"><div class="nav-item"><i></i>브리핑</div><div class="nav-item active"><i></i>생산</div><div class="nav-item"><i></i>프로젝트</div><div class="nav-item"><i></i>이력</div></nav>
+      </article>
     </section>
 
-    <section class="concept-card" data-concept="c">
-      <div class="concept-label"><div><b>C · FLOOR FOCUS</b><span>장갑을 낀 현장에서도 다음 행동이 명확</span></div><i class="concept-number">03</i></div>
-      <div class="phone focus">
+    <section class="concept-wrap" data-concept="ledger">
+      <div class="concept-label"><div><b>C. 프로젝트 원장</b><span>계획·현재 상태·기록의 근거를 한곳에</span></div><em>TRACE</em></div>
+      <article class="phone ledger">
+        <header class="appbar">
+          <div class="brand"><div class="mark">KMT</div><div><div class="brand-name">HandsFree WORKS</div><div class="brand-sub">프로젝트 원장</div></div></div>
+          <div class="head-action"><div class="head-icon">⌕</div></div>
+        </header>
         <div class="scroll">
-          <header class="topbar"><div class="brand"><span class="logo-box" aria-label="케이엠텍">KMT</span><div><strong>HandsFree NX</strong><small>MY SHIFT</small></div></div><div class="avatar">이상준</div></header>
-          <div class="content">
-            <div class="hello"><small>09:42 · 주간조</small><h2>지금 할 일 1건</h2></div>
-            <section class="now-card"><div class="now-top"><small>우선 작업 · 납기 D-3</small><span class="pill" style="background:#ffead0;color:#9f5200">조립</span></div><h3>KPM-300F · 124번</h3><p>260816A-072</p><div class="work-step"><div class="step-no">01</div><div><b>자전컵 베어링 교체</b><span>6922ZZ 고열타입 → 6922DD 일반타입</span></div></div><button class="focus-action">진행내용 바로 입력</button></section>
-            <div class="section-title"><h2>다음 작업</h2><span>오늘 3건</span></div>
-            <article class="next-card"><div class="next-time">11:00</div><div><b>KDM-200 · 01호기</b><p>갭세팅 확인 · 조립장 A</p></div><span class="next-status">대기</span></article>
-            <article class="next-card"><div class="next-time">14:00</div><div><b>PDM-300C · 오랜드바이오</b><p>출고 전 최종 확인 · 출하장</p></div><span class="next-status">검수</span></article>
-            <article class="next-card"><div class="next-time">16:30</div><div><b>타부서 지원</b><p>A팀 전장 배선 · 2명</p></div><span class="next-status">지원</span></article>
+          <div class="card project-head">
+            <small>260727A-061-01 · KDM-200 01호기</small>
+            <h2>본체 조립 진행 중</h2>
+            <p>출고 예정 2026.10.15 · 생산B</p>
+            <div class="current"><div><span>현재 상태</span><b>기구 조립 · 일정 내</b></div><div><span>최근 갱신</span><b>09.30 09:34</b></div></div>
           </div>
+
+          <div class="section-row"><strong>전체 조립 일정</strong><span>자재 수령 → 출고</span></div>
+          <div class="card timeline">
+            <div class="milestone done"><i></i><b>자재</b><small>09.26</small></div>
+            <div class="milestone now"><i></i><b>조립</b><small>진행 중</small></div>
+            <div class="milestone"><i></i><b>전장</b><small>10.06</small></div>
+            <div class="milestone"><i></i><b>검수</b><small>10.12</small></div>
+            <div class="milestone"><i></i><b>출고</b><small>10.15</small></div>
+          </div>
+          <div class="next-action"><div><small>다음 행동</small><b>본체 조립 완료 후 전장팀 인계</b></div><time>10.05</time></div>
+
+          <div class="section-row"><strong>진행 내용</strong><span>입력된 순서 · 원문 보존</span></div>
+          <div class="card history">
+            <div class="history-item"><time>09.30<br>09:34</time><i></i><div><b>본체 프레임 조립 진행</b><p>측면 프레임 체결 후 수평 확인. 다음 작업은 구동부 장착.</p></div></div>
+            <div class="history-item"><time>09.29<br>16:18</time><i></i><div><b>260727A-061 재고 조립 진행</b><p>01·02·03호기 대상. 호기별 프로젝트 이력에 연결.</p></div></div>
+            <div class="history-item"><time>09.27<br>11:05</time><i></i><div><b>입고 자재 수량 확인</b><p>01호기 조립분 확인 완료. 부족 자재 없음.</p></div></div>
+          </div>
+
+          <div class="section-row"><strong>변경 근거</strong><span>감사 이력</span></div>
+          <div class="card evidence"><div><b>최근 변경 3건</b><br>상태 1 · 일정 1 · 업무이력 1</div><div>RAW 원문 보존 ›</div></div>
         </div>
-        <nav class="bottom-nav"><button><span class="nav-ico">▦</span>현황</button><button><span class="nav-ico">≋</span>장비</button><button><span class="nav-ico">●</span>지금 할 일</button><button><span class="nav-ico">◎</span>내 기록</button></nav>
-      </div>
+        <nav class="bottom-nav"><div class="nav-item"><i></i>브리핑</div><div class="nav-item"><i></i>생산</div><div class="nav-item active"><i></i>프로젝트</div><div class="nav-item"><i></i>이력</div></nav>
+      </article>
     </section>
   </main>
+
   <script>
-    const buttons=[...document.querySelectorAll('[data-show]')],cards=[...document.querySelectorAll('[data-concept]')];
-    buttons.forEach(button=>button.addEventListener('click',()=>{buttons.forEach(x=>x.classList.toggle('active',x===button));cards.forEach(x=>x.classList.toggle('active',x.dataset.concept===button.dataset.show));}));
+    const buttons = [...document.querySelectorAll('.concept-switch button')];
+    const concepts = [...document.querySelectorAll('.concept-wrap')];
+    buttons.forEach((button) => {
+      button.addEventListener('click', () => {
+        buttons.forEach((item) => item.classList.toggle('active', item === button));
+        concepts.forEach((item) => item.classList.toggle('active', item.dataset.concept === button.dataset.target));
+      });
+    });
   </script>
 </body>
 </html>
