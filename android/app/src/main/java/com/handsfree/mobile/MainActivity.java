@@ -15,7 +15,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 public class MainActivity extends Activity {
-    private static final String APP_URL = "https://handsfree-mobile-alpha-02-cuda0809-8210.vercel.app/kmt/?app=202609295";
+    private static final String APP_URL = "https://handsfree-mobile-alpha-02-p4ifrc0sk-cuda0809-8210.vercel.app/kmt/?copy=sa1";
     private WebView webView;
 
     @SuppressLint("SetJavaScriptEnabled")
