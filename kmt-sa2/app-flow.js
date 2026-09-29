@@ -5,32 +5,30 @@ function appError(e){if(!e.status&&!e.data)return '연결 실패 또는 응답 �
 function appFailure(el,e){if(el?.isConnected)el.innerHTML=esc(appError(e))+(e.status===401?' <a href="./login.html">사용자 등록</a>':'');}
 function appDay(v){if(/^\d{5}(?:\.\d+)?$/.test(String(v)))return new Date(Date.UTC(1899,11,30)+Math.floor(Number(v))*86400000).toISOString().slice(0,10);return String(v||'');}
 function appQuantity(v){const n=Number(String(v).replaceAll(',',''));if(!String(v).trim()||!Number.isFinite(n)||n<0)throw Error('invalid_report');return n;}
-reports=function(){return '<section><div class="section-title"><h2>생산 · 지원 집계</h2></div><div class="report-links"><button onclick="productionReport(\'month\')">▥ 월간생산량<small>선택한 한 달의 실제 납품 ›</small></button><button onclick="productionReport(\'year\')">▤ 연간생산량<small>선택한 한 해의 실제 납품 ›</small></button><button onclick="supportReport(\'month\')">⇄ 월간 타부서지원<small>선택한 한 달의 지원 기록 ›</small></button><button onclick="supportReport(\'year\')">⇄ 연간 타부서지원<small>선택한 한 해의 지원 기록 ›</small></button></div></section>';};
-productionReport=async function(mode){await loadAppReport(mode);};
-supportReport=async function(period='month'){await loadAppReport('support-'+period);};
-async function loadAppReport(mode){const title=mode==='support-month'?'월간 타부서지원':mode==='support-year'?'연간 타부서지원':mode==='month'?'월간생산량':'연간생산량';open(heading('생산 · 지원 집계',title)+'<div id="appReportResult">원본 집계를 불러오는 중…</div>');const el=$('appReportResult');try{const d=await appCall({action:'reports'});if(!el.isConnected)return;appReport={mode,data:d};renderAppReport();}catch(e){appFailure(el,e);}}
+reports=function(){return '<section><div class="section-title"><h2>생산 · 지원 집계</h2></div><div class="report-links compact"><button onclick="productionReport()">▥ 생산 실적<small>월별 누적 · 과거 연도 합계 ›</small></button><button onclick="supportReport()">⇄ 타부서 지원<small>월별 인원 · 연간 합계 ›</small></button></div></section>';};
+productionReport=async function(){await loadAppReport('production');};
+supportReport=async function(){await loadAppReport('support');};
+async function loadAppReport(mode){const title=mode==='support'?'타부서 지원':'생산 실적';open(heading('생산 · 지원 집계',title)+'<div id="appReportResult">원본 집계를 불러오는 중…</div>');const el=$('appReportResult');try{const d=await appCall({action:'reports'});if(!el.isConnected)return;appReport={mode,data:d};renderAppReport();}catch(e){appFailure(el,e);}}
 function renderAppReport(){
  const el=$('appReportResult');if(!el||!appReport)return;const {mode,data}=appReport;
  try{
-  const support=mode.startsWith('support-'),monthly=mode==='month'||mode==='support-month';
-  const rows=(support?data.support:mode==='month'?data.monthly:data.annual).slice(1).filter(r=>r[0]&&r[1]);
-  const rowYear=r=>support?appDay(r[0]).slice(0,4):String(r[0]),rowMonth=r=>support?Number(appDay(r[0]).slice(5,7)):Number(r[1]);
-  const years=[...new Set(rows.map(rowYear).filter(Boolean))].sort().reverse();
-  const year=$('reportYear')?.value||years[0]||'';
-  const months=monthly?[...new Set(rows.filter(r=>rowYear(r)===year).map(rowMonth).filter(n=>n>=1&&n<=12))].sort((a,b)=>b-a):[];
-  const requestedMonth=Number($('reportMonth')?.value),month=months.includes(requestedMonth)?requestedMonth:(months[0]||0);
-  const selected=rows.filter(r=>rowYear(r)===year&&(!monthly||rowMonth(r)===month));
-  let body;
+  const support=mode==='support',monthly=(data.monthly||[]).slice(1).filter(r=>r[0]&&r[1]),annual=(data.annual||[]).slice(1).filter(r=>r[0]&&r[1]),supportRows=(data.support||[]).slice(1).filter(r=>r[0]);
+  const years=[...new Set((support?supportRows.map(r=>appDay(r[0]).slice(0,4)):monthly.map(r=>String(r[0]))).filter(Boolean))].sort().reverse();
+  const year=$('reportYear')?.value||years[0]||String(new Date().getFullYear());
+  let body='';
   if(support){
-   const shown=selected.filter(r=>r[11]==='Y'&&r[8]==='확정'),groups={};shown.forEach(r=>{const k=r[9]||r[1];groups[k]=(groups[k]||0)+1;});
-   body='<div class="action-box">확정된 타부서 지원 <b>'+shown.length+'건</b></div>'+Object.entries(groups).map(([k,v])=>'<span class="chip">'+esc(k)+' '+v+'건</span>').join('')+shown.map(r=>'<article class="item"><b>'+esc(appDay(r[0]))+' · '+esc(r[9]||r[1])+'</b><p>'+esc(r[2])+' '+esc(r[3])+'</p><p>'+esc(r[4])+'</p><small>참여자 '+esc(r[5]||'미기록')+'</small></article>').join('')+(!shown.length?'<p>선택한 기간의 지원 기록이 없습니다.</p>':'')+'<p class="note">원본에서 확정되고 운영현황 표시가 Y인 기록을 건수로 집계합니다. 지원시간은 원본에 없어 표시하지 않습니다.</p>';
+   const selected=supportRows.filter(r=>appDay(r[0]).startsWith(year)&&r[11]==='Y'&&r[8]==='확정'),monthPeople=new Map(),allPeople=new Set();
+   selected.forEach(r=>{const month=Number(appDay(r[0]).slice(5,7)),names=String(r[5]||'').split(/[,·/]+/).map(v=>v.trim()).filter(Boolean);if(!monthPeople.has(month))monthPeople.set(month,{people:new Set(),cases:0});const group=monthPeople.get(month);group.cases++;names.forEach(name=>{group.people.add(name);allPeople.add(name);});});
+   body='<div class="action-box"><small>'+esc(year)+'년 타부서 지원</small><strong>'+allPeople.size+'명</strong><span>확정 '+selected.length+'건</span></div><h3>월별 지원 인원</h3><div class="month-list">'+Array.from({length:12},(_,i)=>i+1).map(m=>{const v=monthPeople.get(m);return '<div><b>'+m+'월</b><span>'+(v?v.people.size:0)+'명</span><small>'+(v?v.cases:0)+'건</small></div>';}).join('')+'</div><p class="note">월 인원은 참여자 이름의 중복을 제거한 인원수입니다. 연간 인원도 같은 사람의 중복을 제거합니다. 원본에서 확정되고 운영현황 표시가 Y인 기록만 포함합니다.</p>';
   }else{
-   const byModel=new Map();selected.forEach(r=>{const name=r[mode==='month'?2:1],qty=appQuantity(r[mode==='month'?3:2]);byModel.set(name,(byModel.get(name)||0)+qty);});
-   const total=[...byModel.values()].reduce((a,b)=>a+b,0);
-   body=selected.length?'<div class="action-box">실제 납품 집계 <b>'+total+'대</b></div><table class="report-table"><thead><tr><th>장비</th><th>대수</th></tr></thead><tbody>'+[...byModel].map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+v+'</td></tr>').join('')+'</tbody></table>':'<p>선택한 기간의 집계 기록이 없습니다.</p>';
-   body+='<p class="note">원본 납품 집계표 기준 · B팀 · 실제 납품일 · 수리/PT 제외. 계획 진행률을 완료 실적으로 계산하지 않습니다.</p>';
+   const selected=monthly.filter(r=>String(r[0])===year),byMonth=new Map();selected.forEach(r=>byMonth.set(Number(r[1]),(byMonth.get(Number(r[1]))||0)+appQuantity(r[3])));
+   const currentYear=String(new Date().getFullYear()),lastDataMonth=Math.max(0,...byMonth.keys()),lastMonth=year===currentYear?Math.max(new Date().getMonth()+1,lastDataMonth):Math.max(12,lastDataMonth);let cumulative=0;
+   const monthRows=Array.from({length:lastMonth},(_,i)=>i+1).map(m=>{const qty=byMonth.get(m)||0;cumulative+=qty;return '<tr><td>'+m+'월</td><td>'+qty+'대</td><td><b>'+cumulative+'대</b></td></tr>';}).join('');
+   const annualTotals=new Map();annual.forEach(r=>{const y=String(r[0]);annualTotals.set(y,(annualTotals.get(y)||0)+appQuantity(r[2]));});
+   const past=[...annualTotals].filter(([y])=>y<year).sort((a,b)=>b[0].localeCompare(a[0]));
+   body='<div class="action-box"><small>'+esc(year)+'년 실제 납품 누적</small><strong>'+cumulative+'대</strong><span>'+lastMonth+'월까지</span></div><h3>월별 · 연간 누적</h3><table class="report-table"><thead><tr><th>월</th><th>월 생산</th><th>연간 누적</th></tr></thead><tbody>'+monthRows+'</tbody></table><h3>과거 연도 합계</h3>'+(past.length?'<div class="year-totals">'+past.map(([y,v])=>'<div><b>'+esc(y)+'년</b><strong>'+v+'대</strong></div>').join('')+'</div>':'<p>과거 연도 집계 기록이 없습니다.</p>')+'<p class="note">원본 납품 집계표 기준 · B팀 · 실제 납품일 · 수리/PT 제외. 계획 진행률은 생산 실적으로 계산하지 않습니다.</p>';
   }
-  el.innerHTML='<div class="report-controls"><label>연도<select id="reportYear" onchange="renderAppReport()">'+years.map(y=>'<option '+(y===year?'selected':'')+'>'+esc(y)+'</option>').join('')+'</select></label>'+(monthly?'<label>월<select id="reportMonth" onchange="renderAppReport()">'+months.map(m=>'<option value="'+m+'" '+(month===m?'selected':'')+'>'+m+'월</option>').join('')+'</select></label>':'')+'</div>'+body;
+  el.innerHTML='<div class="report-controls"><label>기준 연도<select id="reportYear" onchange="renderAppReport()">'+years.map(y=>'<option '+(y===year?'selected':'')+'>'+esc(y)+'</option>').join('')+'</select></label></div>'+body;
  }catch(e){appFailure(el,e);}
 }
 const appWorkBase=work;
@@ -43,19 +41,23 @@ async function allProjects(prefix='',purpose='detail'){
   el.querySelectorAll('[data-project]').forEach(button=>button.onclick=()=>openProject(button.dataset.project,button.dataset.purpose));
  }catch(e){appFailure(el,e);}
 }
-function openProject(orderId,purpose='detail'){
- const p=appProjects.find(x=>x.orderId===orderId);if(!p)return;
- if(purpose==='schedule')return scheduleReport(p);if(purpose==='input')return input(p);
- open(heading('프로젝트',p.customer,p.model)+'<p>'+esc(p.orderId)+'</p><p>납기 '+esc(p.due||'미등록')+' · '+esc(p.state)+'</p><button id="projectPlan" class="primary">계획일정</button><button id="projectInput" class="secondary">진행 내용 입력</button><button id="projectHistory" class="secondary">Event · 변경이력</button>');
- appIssues.filter(x=>['OPEN','MONITOR','CLOSED'].includes(x.status)&&(x.orderId===p.orderId||(x.orderId.includes('*')&&p.orderId.startsWith(x.orderId.replace(/\*.*$/,''))))).forEach(x=>{const b=document.createElement('button');b.className='secondary';b.textContent=x.status+' · '+x.state+' · 상태 수정';b.onclick=()=>editIssue(x.issueId);$('sheetBody').appendChild(b);});
- $('projectPlan').onclick=()=>scheduleReport(p);$('projectInput').onclick=()=>input(p);$('projectHistory').onclick=()=>projectHistory(p.orderId);
+function groupProjectPlans(rows){const sorted=rows.slice().sort((a,b)=>appDay(a[3]).localeCompare(appDay(b[3]))),groups=[];for(const row of sorted){const date=appDay(row[3]),process=String(row[10]||'공정 미등록'),last=groups.at(-1),next=last&&new Date(last.end+'T00:00:00Z').getTime()+86400000===new Date(date+'T00:00:00Z').getTime();if(last&&last.process===process&&next){last.end=date;last.status=String(row[11]||last.status);}else groups.push({start:date,end:date,process,status:String(row[11]||'상태 미등록')});}return groups;}
+async function openProject(orderId,purpose='detail'){
+ let p=appProjects.find(x=>x.orderId===orderId)||items.find(x=>x.orderId===orderId);if(!p)return toast('최신 프로젝트 목록을 다시 불러오세요.');
+ if(purpose==='input')return input(p);
+ open(heading('프로젝트 전체 보기',p.customer,p.model)+'<p>'+esc(p.orderId)+'</p><div id="projectOverview">전체 조립일정과 진행 기록을 불러오는 중…</div>');const el=$('projectOverview');
+ try{const [plans,history]=await Promise.all([api('/api/sa2-lifecycle',{action:'plans',orderId:p.orderId}),appCall({action:'history',orderId:p.orderId})]);if(!el.isConnected)return;if(plans.orderId!==p.orderId||!Array.isArray(plans.plans)||!Array.isArray(history.events))throw Error('invalid_project');
+  const stages=groupProjectPlans(plans.plans),events=history.events.slice().sort((a,b)=>String(a.at||'').localeCompare(String(b.at||''))),linked=items.find(x=>x.orderId===p.orderId)||p;
+  el.innerHTML='<div class="project-summary"><span>납기 '+esc(p.due||'미등록')+'</span><b>현재 '+esc(p.state||linked.state||'미등록')+'</b></div><h3>전체 조립일정</h3><p class="note">자재수령부터 출고까지 원본 계획에 등록된 공정만 표시합니다.</p><div class="timeline">'+(stages.length?stages.map(s=>'<p><b>'+esc(s.process)+'</b><small>'+esc(s.start)+(s.end!==s.start?' ~ '+esc(s.end):'')+' · '+esc(s.status)+'</small></p>').join(''):'<p>연결된 조립일정이 없습니다.</p>')+'</div><h3>진행 내용</h3><p class="note">서버에 입력된 순서대로 표시합니다.</p><div class="progress-history">'+(events.length?events.map(r=>'<article class="item"><p>'+esc(r.raw||'내용 없음')+'</p><small>'+esc(r.at||'시간 미기록')+' · '+esc(r.actor||'입력자 미기록')+'</small></article>').join(''):'<p>입력된 진행 내용이 없습니다.</p>')+'</div><button id="projectInput" class="primary">진행내용 입력</button>';
+  $('projectInput').onclick=()=>input(linked);
+ }catch(e){appFailure(el,e);}
 }
 const appScheduleBase=scheduleReport;
 scheduleReport=function(id){const x=typeof id==='object'?id:items[id];if(x?.orderId?.includes('*'))return allProjects(x.orderId.replace(/\*.*$/,''),'schedule');return appScheduleBase(id);};
 const appInputBase=input;
 input=function(id){const x=typeof id==='object'?id:items[id];if(x?.orderId?.includes('*'))return allProjects(x.orderId.replace(/\*.*$/,''),'input');editingNoteId=null;return appInputBase(id);};
 const appItemBase=openItem;
-openItem=function(id){appItemBase(id);const x=items[id];if(!x)return;const box=$('sheetBody');box.insertAdjacentHTML('beforeend','<button id="issueHistoryButton" class="secondary">Event · 변경이력</button>');$('issueHistoryButton').onclick=()=>projectHistory(x.orderId);};
+openItem=function(id){appItemBase(id);const x=items[id];if(!x)return;const box=$('sheetBody');box.insertAdjacentHTML('beforeend','<button id="issueHistoryButton" class="secondary">전체 조립일정 · 진행이력</button>');$('issueHistoryButton').onclick=()=>openProject(x.orderId);};
 async function projectHistory(orderId){open(heading('Event · 변경이력',orderId)+'<div id="historyResult">서버 기록을 불러오는 중…</div>');const el=$('historyResult');try{const d=await appCall({action:'history',orderId});if(!el.isConnected)return;
  el.innerHTML='<h3>변경이력</h3>'+d.changes.map(r=>'<article class="item"><b>'+esc(r.kind==='schedule'?'일정 변경':'현재 상태 변경')+'</b><p>'+esc(r.kind==='schedule'?appDay(r.before[3])+' → '+appDay(r.after[3]):r.before[16]+' → '+r.after[16])+'</p><p>'+esc(r.reason)+'</p><small>'+esc(r.at)+' · '+esc(r.actor)+'<br>'+esc(r.id)+'</small></article>').join('')+(!d.changes.length?'<p>기록된 변경이력이 없습니다.</p>':'')+'<h3>Event</h3>'+d.events.map(r=>'<article class="item"><b>'+esc(r.type)+' · '+esc(r.status)+'</b><p>'+esc(r.raw)+'</p><small>'+esc(r.at)+' · '+esc(r.actor||'과거 기록: 입력자 직접 기록 없음')+'<br>'+esc(r.requestId)+'</small></article>').join('')+(!d.events.length?'<p>연결된 Event 기록이 없습니다.</p>':'');
  }catch(e){appFailure(el,e);}}

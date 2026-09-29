@@ -5,6 +5,8 @@ const manifest=fs.readFileSync(new URL('../android/app/src/main/AndroidManifest.
 const main=fs.readFileSync(new URL('../android/app/src/main/java/com/handsfree/mobile/MainActivity.java',import.meta.url),'utf8');
 const gradle=fs.readFileSync(new URL('../android/app/build.gradle',import.meta.url),'utf8');
 const workflow=fs.readFileSync(new URL('../.github/workflows/build-apk.yml',import.meta.url),'utf8');
+const icon=fs.readFileSync(new URL('../android/app/src/main/res/drawable/ic_handsfree.xml',import.meta.url),'utf8');
+const companyLogo=new URL('../android/app/src/main/res/drawable/kmt_company_logo.png',import.meta.url);
 
 assert.match(manifest,/android\.permission\.RECORD_AUDIO/);
 assert.match(manifest,/android:allowBackup="false"/);
@@ -19,6 +21,8 @@ assert.match(main,/setMixedContentMode\(WebSettings\.MIXED_CONTENT_NEVER_ALLOW\)
 assert.match(main,/setDecorFitsSystemWindows\(false\)/);
 assert.match(main,/WindowInsets\.Type\.ime\(\)/);
 assert.match(main,/document\.querySelector\('dialog\[open\]'/);
-assert.match(workflow,/sa28preview/);
-assert.match(workflow,/HandsFree-REAL-SA2\.8-Preview\.apk/);
-console.log('PASS Android stable release identity, isolated preview lane, audio permission, backup lock, trusted origin and dialog back handling');
+assert.match(workflow,/sa283preview/);
+assert.match(workflow,/HandsFree-REAL-SA2\.8\.3-Preview\.apk/);
+assert.match(icon,/@drawable\/kmt_company_logo/);
+assert.ok(fs.statSync(companyLogo).size>1000);
+console.log('PASS Android stable identity, SA2.8.3 preview lane, company-logo icon, audio permission, backup lock, trusted origin and dialog back handling');
