@@ -13,11 +13,11 @@ android {
     compileSdk 35
 
     defaultConfig {
-        applicationId 'com.handsfree.mobile.preview8'
+        applicationId 'com.handsfree.mobile.preview9'
         minSdk 26
         targetSdk 35
-        versionCode 1
-        versionName '2026.09.29.5-prod'
+        versionCode 2
+        versionName '2026.09.29.7-browser'
     }
 
     signingConfigs {
@@ -42,4 +42,8 @@ android {
             }
         }
     }
+}
+
+dependencies {
+    implementation 'androidx.browser:browser:1.8.0'
 }
