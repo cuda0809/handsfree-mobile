@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import handler from '../api/sa2-write.js';
 import {sa2Cookie} from '../lib/sa2-auth.mjs';
+import {authUser} from '../lib/sa2-auth-user.mjs';
 
 const mobile=fs.readFileSync(new URL('../kmt-sa2/mobile.js',import.meta.url),'utf8');
 const flow=fs.readFileSync(new URL('../kmt-sa2/app-flow.js',import.meta.url),'utf8');
@@ -34,9 +35,14 @@ assert.match(androidMain,/\/kmt-sa2\/\?app=sa25/);
 Object.assign(process.env,{
   HF_REAL_APP_KEY:'test-app-key',
   HF_REAL_READ_TOKEN:'test-read-token',
-  HF_REAL_READ_URL:'https://example.invalid/exec'
+  HF_REAL_READ_URL:'https://example.invalid/exec',
+  HF_REAL_ALLOWED_USERS:JSON.stringify({'reader@test':'reader','writer@test':'writer'})
 });
 const cookie=sa2Cookie({sub:'sa2-test',email:'SA2:테스트',label:'테스트'});
+const delegated=authUser({headers:{cookie}});
+assert.equal(delegated.email,'writer@test');
+assert.equal(delegated.role,'writer');
+assert.match(delegated.sub,/\|테스트$/);
 let calls=[];
 globalThis.fetch=async(_url,options)=>{
   calls.push(JSON.parse(options.body));

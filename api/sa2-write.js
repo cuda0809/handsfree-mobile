@@ -27,7 +27,7 @@ export default async function handler(req,res){
     op:'safe_write',
     text,
     source:clean(body.source||'MOBILE',40),
-    requester:actor.email,
+    requester:actor.sa2Label?'SA2:'+actor.sa2Label:actor.email,
     submissionId:body.submissionId||'',
     targetHint:clean(body.targetHint||'',200)
   };
