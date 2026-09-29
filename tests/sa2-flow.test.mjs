@@ -7,6 +7,8 @@ const mobile=fs.readFileSync(new URL('../kmt-sa2/mobile.js',import.meta.url),'ut
 const flow=fs.readFileSync(new URL('../kmt-sa2/app-flow.js',import.meta.url),'utf8');
 const schedule=fs.readFileSync(new URL('../kmt-sa2/schedule.js',import.meta.url),'utf8');
 const sw=fs.readFileSync(new URL('../kmt-sa2/sw.js',import.meta.url),'utf8');
+const androidBuild=fs.readFileSync(new URL('../android/app/build.gradle',import.meta.url),'utf8');
+const androidMain=fs.readFileSync(new URL('../android/app/src/main/java/com/handsfree/mobile/MainActivity.java',import.meta.url),'utf8');
 
 assert.match(mobile,/BUILD='2026\.09\.29\.SA2\.5'/);
 assert.match(mobile,/api\('\/api\/sa2-real-status'/);
@@ -24,6 +26,10 @@ assert.match(schedule,/await showScheduleReceipt\(d\)/);
 assert.match(schedule,/readback_mismatch/);
 assert.match(sw,/kmt-sa2-prod-sa25/);
 assert.match(sw,/startsWith\('kmt-sa2-prod-'\)/);
+assert.match(androidBuild,/applicationId 'com\.handsfree\.mobile\.sa24'/);
+assert.match(androidBuild,/versionCode 2/);
+assert.match(androidBuild,/versionName 'SA2\.5-2026\.09\.29'/);
+assert.match(androidMain,/\/kmt-sa2\/\?app=sa25/);
 
 Object.assign(process.env,{
   HF_REAL_APP_KEY:'test-app-key',
