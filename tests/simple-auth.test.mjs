@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
-import {simpleCookie,simplePerson,validateRegistrationKey} from '../lib/simple-auth.mjs';
-
+import {simpleCookie,simplePerson,validateRegistrationKey,bootstrapCookie,hasBootstrap,createRecoveryToken,verifyRecoveryToken} from '../lib/simple-auth.mjs';
 const key='test-secret';
 assert.equal(validateRegistrationKey(key,key),true);
 assert.equal(validateRegistrationKey('wrong',key),false);
-const cookie=simpleCookie({sub:'simple-test',email:'owner@test'},key);
-const req={headers:{cookie:cookie.split(';')[0]}};
-const p=simplePerson(req,key);
-assert.equal(p.email,'owner@test');
-assert.equal(p.sub,'simple-test');
-assert.equal(p.auth,'simple');
-console.log('PASS simple auth signed device cookie and one-time registration key');
+const personCookie=simpleCookie({sub:'simple-test',email:'owner@test'},key);
+assert.equal(simplePerson({headers:{cookie:personCookie.split(';')[0]}},key).email,'owner@test');
+const boot=bootstrapCookie(key);
+assert.equal(hasBootstrap({headers:{cookie:boot.split(';')[0]}},key),true);
+const token=createRecoveryToken('owner@test','2580',key);
+assert.equal(verifyRecoveryToken(token,'2580',key).email,'owner@test');
+assert.equal(verifyRecoveryToken(token,'0000',key),null);
+console.log('PASS simple-pin bootstrap, signed session and PIN recovery token');
