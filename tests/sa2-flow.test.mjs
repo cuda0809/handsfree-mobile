@@ -61,6 +61,7 @@ const ok=await call();
 assert.equal(ok.code,200);
 assert.equal(ok.body.status,'WRITTEN');
 assert.equal(calls.length,1);
-assert.equal(calls[0].requester,'SA2:테스트');
+assert.equal(calls[0].requester,'writer@test');
+assert.equal(calls[0].source,'MOBILE|SA2:테스트');
 assert.equal(calls[0].submissionId,'sa2-test-submission-0001');
 console.log('PASS SA2.5 auth, explicit write identity, readback UI contracts, resume refresh and cache update');
