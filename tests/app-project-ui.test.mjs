@@ -2,7 +2,7 @@ import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:asser
 const source=fs.readFileSync(new URL('../kmt-sa2/app-flow.js',import.meta.url),'utf8');
 const start=source.indexOf('function groupProjectPlans('),end=source.indexOf('const appScheduleBase',start),overview={isConnected:true,innerHTML:''},inputButton={};let opened='';
 const c=vm.createContext({
- appProjects:[{orderId:'P-1',customer:'고객',model:'모델',state:'조립',due:'2026-10-20'}],items:[],
+ personalConnected:true,login(){throw Error('unexpected_login');},appProjects:[{orderId:'P-1',customer:'고객',model:'모델',state:'조립',due:'2026-10-20'}],items:[],
  appDay:String,esc:String,heading:()=>'',open(){},toast(){},$:id=>id==='projectOverview'?overview:id==='projectInput'?inputButton:null,input:p=>opened=p.orderId,
  api:async()=>({orderId:'P-1',plans:[['','','','2026-10-02','','','','','','','조립','예정'],['','','','2026-10-01','','','','','','','조립','예정'],['','','','2026-10-03','','','','','','','전장','예정']]}),
  appCall:async()=>({events:[{raw:'두 번째',at:'2026-09-02',actor:'나'},{raw:'첫 번째',at:'2026-09-01',actor:'나'}]})

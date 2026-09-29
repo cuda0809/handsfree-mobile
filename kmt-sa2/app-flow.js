@@ -8,7 +8,7 @@ function appQuantity(v){const n=Number(String(v).replaceAll(',',''));if(!String(
 reports=function(){return '<section><div class="section-title"><h2>생산 · 지원 집계</h2></div><div class="report-links compact"><button onclick="productionReport()">▥ 생산 실적<small>월별 누적 · 과거 연도 합계 ›</small></button><button onclick="supportReport()">⇄ 타부서 지원<small>월별 인원 · 연간 합계 ›</small></button></div></section>';};
 productionReport=async function(){await loadAppReport('production');};
 supportReport=async function(){await loadAppReport('support');};
-async function loadAppReport(mode){const title=mode==='support'?'타부서 지원':'생산 실적';open(heading('생산 · 지원 집계',title)+'<div id="appReportResult">원본 집계를 불러오는 중…</div>');const el=$('appReportResult');try{const d=await appCall({action:'reports'});if(!el.isConnected)return;appReport={mode,data:d};renderAppReport();}catch(e){appFailure(el,e);}}
+async function loadAppReport(mode){if(!personalConnected)return login();const title=mode==='support'?'타부서 지원':'생산 실적';open(heading('생산 · 지원 집계',title)+'<div id="appReportResult">원본 집계를 불러오는 중…</div>');const el=$('appReportResult');try{const d=await appCall({action:'reports'});if(!el.isConnected)return;appReport={mode,data:d};renderAppReport();}catch(e){appFailure(el,e);}}
 function renderAppReport(){
  const el=$('appReportResult');if(!el||!appReport)return;const {mode,data}=appReport;
  try{
@@ -43,6 +43,7 @@ async function allProjects(prefix='',purpose='detail'){
 }
 function groupProjectPlans(rows){const sorted=rows.slice().sort((a,b)=>appDay(a[3]).localeCompare(appDay(b[3]))),groups=[];for(const row of sorted){const date=appDay(row[3]),process=String(row[10]||'공정 미등록'),last=groups.at(-1),next=last&&new Date(last.end+'T00:00:00Z').getTime()+86400000===new Date(date+'T00:00:00Z').getTime();if(last&&last.process===process&&next){last.end=date;last.status=String(row[11]||last.status);}else groups.push({start:date,end:date,process,status:String(row[11]||'상태 미등록')});}return groups;}
 async function openProject(orderId,purpose='detail'){
+ if(!personalConnected)return login();
  let p=appProjects.find(x=>x.orderId===orderId)||items.find(x=>x.orderId===orderId);if(!p)return toast('최신 프로젝트 목록을 다시 불러오세요.');
  if(purpose==='input')return input(p);
  open(heading('프로젝트 전체 보기',p.customer,p.model)+'<p>'+esc(p.orderId)+'</p><div id="projectOverview">전체 조립일정과 진행 기록을 불러오는 중…</div>');const el=$('projectOverview');
@@ -53,9 +54,9 @@ async function openProject(orderId,purpose='detail'){
  }catch(e){appFailure(el,e);}
 }
 const appScheduleBase=scheduleReport;
-scheduleReport=function(id){const x=typeof id==='object'?id:items[id];if(x?.orderId?.includes('*'))return allProjects(x.orderId.replace(/\*.*$/,''),'schedule');return appScheduleBase(id);};
+scheduleReport=function(id){if(!personalConnected)return login();const x=typeof id==='object'?id:items[id];if(x?.orderId?.includes('*'))return allProjects(x.orderId.replace(/\*.*$/,''),'schedule');return appScheduleBase(id);};
 const appInputBase=input;
-input=function(id){const x=typeof id==='object'?id:items[id];if(x?.orderId?.includes('*'))return allProjects(x.orderId.replace(/\*.*$/,''),'input');editingNoteId=null;return appInputBase(id);};
+input=function(id){if(!personalConnected)return login();const x=typeof id==='object'?id:items[id];if(x?.orderId?.includes('*'))return allProjects(x.orderId.replace(/\*.*$/,''),'input');editingNoteId=null;return appInputBase(id);};
 const appItemBase=openItem;
 openItem=function(id){appItemBase(id);const x=items[id];if(!x)return;const box=$('sheetBody');box.insertAdjacentHTML('beforeend','<button id="issueHistoryButton" class="secondary">전체 조립일정 · 진행이력</button>');$('issueHistoryButton').onclick=()=>openProject(x.orderId);};
 async function projectHistory(orderId){open(heading('Event · 변경이력',orderId)+'<div id="historyResult">서버 기록을 불러오는 중…</div>');const el=$('historyResult');try{const d=await appCall({action:'history',orderId});if(!el.isConnected)return;

@@ -100,6 +100,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       live: true,
+      personalConnected: !!user,
       schema: String(data.schema || ''),
       timezone: String(data.timezone || 'Asia/Seoul'),
       today: String(data.today || ''),

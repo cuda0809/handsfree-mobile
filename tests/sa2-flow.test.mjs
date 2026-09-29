@@ -24,6 +24,8 @@ assert.match(mobile,/확인 필요/);
 assert.match(mobile,/저장 완료/);
 assert.match(mobile,/saved_unverified/);
 assert.match(mobile,/function resumeRead\(/);
+assert.match(mobile,/personalConnected=d\.personalConnected===true/);
+assert.match(flow,/if\(!personalConnected\)return login\(\)/);
 assert.doesNotMatch(mobile,/\/api\/sa2-plans/);
 assert.match(flow,/api\('\/api\/sa2-app'/);
 assert.match(flow,/async function verifyEventNote\(/);
