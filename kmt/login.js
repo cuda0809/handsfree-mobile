@@ -3,6 +3,7 @@ const RECOVERY='hf-simple-recovery-v2';
 const $=id=>document.getElementById(id);
 const statusEl=$('status'),bootstrapEl=$('bootstrap'),profileEl=$('profile'),pinLoginEl=$('pinLogin'),logoutEl=$('logout');
 let profiles=[];
+function bindSecretToggles(){document.querySelectorAll('[data-secret]').forEach(button=>{button.onclick=()=>{const input=$(button.dataset.secret);if(!input)return;const show=input.type==='password';input.type=show?'text':'password';button.textContent=show?'숨기기':'보기';button.setAttribute('aria-pressed',show?'true':'false');};});}
 
 async function call(body){
  const r=await fetch('/api/simple-auth',{method:body?'POST':'GET',credentials:'same-origin',cache:'no-store',headers:body?{'Content-Type':'application/json'}:{},...(body?{body:JSON.stringify(body)}:{})});
@@ -61,4 +62,4 @@ $('pinBtn').onclick=async()=>{
 
 $('resetBtn').onclick=()=>{clearRecovery();showBootstrap();};
 logoutEl.onclick=async()=>{logoutEl.disabled=true;try{await call({action:'logout'});clearRecovery();showBootstrap();statusEl.textContent='이 기기 연결을 해제했습니다.';}catch{statusEl.textContent='연결 해제를 확인하지 못했습니다.';}finally{logoutEl.disabled=false;}};
-window.addEventListener('load',start);
+window.addEventListener('load',()=>{bindSecretToggles();start();});
