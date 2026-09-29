@@ -1,4 +1,4 @@
-const CACHE='kmt-shell-2026-09-29-5';
+const CACHE='kmt-shell-simple-auth-sa1';
 const FILES=['./','./index.html','./mobile.js','./theme.js','./schedule.js','./app-flow.js','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('kmt-shell-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
