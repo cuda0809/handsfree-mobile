@@ -13,11 +13,11 @@ android {
     compileSdk 35
 
     defaultConfig {
-        applicationId 'com.handsfree.mobile.preview6'
+        applicationId 'com.handsfree.mobile.preview7'
         minSdk 26
         targetSdk 35
         versionCode 1
-        versionName '2026.09.29.5'
+        versionName '2026.09.29.5-url2'
     }
 
     signingConfigs {
