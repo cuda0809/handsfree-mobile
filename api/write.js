@@ -10,13 +10,12 @@ export default async function handler(req,res){
   const appKey=process.env.HF_REAL_APP_KEY||'';
   if(!base||!token||!appKey) return res.status(503).json({ok:false,error:'not_configured'});
 
-  const {person,sameOrigin}=await import('../lib/person-auth.mjs');
-  const {roleFor}=await import('../lib/access.mjs');
+  const {sameOrigin}=await import('../lib/person-auth.mjs');
+  const {authUser}=await import('../lib/auth-user.mjs');
   if(!sameOrigin(req))return res.status(403).json({ok:false,error:'invalid_origin'});
-  const actor=person(req);
-  if(!actor)return res.status(401).json({ok:false,error:'personal_login_required'});
-  let role;try{role=roleFor(actor.email);}catch{return res.status(403).json({ok:false,error:'forbidden'});}
-  if(!['owner','writer'].includes(role))return res.status(403).json({ok:false,error:'forbidden'});
+  const actor=authUser(req);
+  if(!actor)return res.status(401).json({ok:false,error:'activation_required'});
+  if(!['owner','writer'].includes(actor.role))return res.status(403).json({ok:false,error:'forbidden'});
 
   const body=req.body&&typeof req.body==='object'?req.body:{};
   const text=clean(body.text,1000);

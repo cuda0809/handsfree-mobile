@@ -62,12 +62,9 @@ export default async function handler(req, res) {
   }
 
   const suppliedKey = String(req.headers['x-hf-app-key'] || '');
-  const {person}=await import('../lib/person-auth.mjs');
-  const {roleFor}=await import('../lib/access.mjs');
-  const user=person(req);
-  let personalAccess=false;
-  if(user){try{roleFor(user.email);personalAccess=true;}catch{}}
-  const authorized = personalAccess || validSession(req, appKey) || (!!suppliedKey && safeEqual(suppliedKey, appKey));
+  const {authUser}=await import('../lib/auth-user.mjs');
+  const user=authUser(req);
+  const authorized = !!user || validSession(req, appKey) || (!!suppliedKey && safeEqual(suppliedKey, appKey));
   if (!authorized) {
     return res.status(401).json({ok:false, live:false, error:'unauthorized_app'});
   }
