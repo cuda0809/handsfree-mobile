@@ -1,5 +1,5 @@
 'use strict';
-const BUILD='2026.09.29.1', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1';
+const BUILD='2026.09.29.2', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1';
 const main=document.getElementById('main'),dialog=document.getElementById('detail');
 let items=[],live=false,readPending=null,sourceDate='',lastRead='',screen='home',filter='all',returnFocus=null,readMessage='현재 상태를 불러오는 중…',recognition=null,installPrompt=null;
 const $=id=>document.getElementById(id);
@@ -9,7 +9,7 @@ function heading(k,t,sub=''){return `<div class="sheet-head"><div><div class="ey
 function open(html){stopVoice();if(!dialog.open)returnFocus=document.activeElement;$('sheetBody').innerHTML=html;if(!dialog.open)dialog.showModal();dialog.scrollTop=0;}
 dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});
 dialog.addEventListener('close',()=>{stopVoice();if(returnFocus?.isConnected)returnFocus.focus();});
-function toast(text){$('toast').textContent=text;$('toast').hidden=false;clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('toast').hidden=true,4500);}
+function toast(text){clearTimeout(toast.timer);$('toast').hidden=true;let target=$('toast');if(dialog.open){target=$('dialogStatus');if(!target){target=document.createElement('p');target.id='dialogStatus';target.className='alert';target.setAttribute('role','status');$('sheetBody').appendChild(target);}}target.textContent=text;target.hidden=false;if(dialog.open)target.scrollIntoView({block:'nearest'});toast.timer=setTimeout(()=>target.hidden=true,4500);}
 function readStore(key,fallback){try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback;}catch{return fallback;}}
 function persist(key,value){localStorage.setItem(key,JSON.stringify(value));if(localStorage.getItem(key)!==JSON.stringify(value))throw Error('storage_failed');}
 function notes(){const a=readStore(KEY,[]);return Array.isArray(a)?a:[];}
@@ -66,4 +66,3 @@ const style=document.createElement('style');style.textContent=`label{display:blo
 window.addEventListener('online',()=>{toast('연결이 복구되었습니다. 보관한 입력은 처리함에서 확인하세요.');refresh();});
 window.addEventListener('offline',()=>{items=[];live=false;readMessage='오프라인 · 초안 보관 가능';banner();if(screen==='home')home();if(screen==='work')work(filter);});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(()=>toast('오프라인 앱 준비에 실패했습니다. 온라인으로 사용할 수 있습니다.'));
-
