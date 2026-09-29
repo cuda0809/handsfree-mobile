@@ -29,14 +29,14 @@ jobs:
         working-directory: android
         run: >-
           gradle assembleDebug --no-daemon
-          -PHF_APP_URL="https://handsfree-mobile-alpha-02-git-codex-real-l-fbac1c-cuda0809-8210.vercel.app/kmt-sa2/?app=sa27preview"
+          -PHF_APP_URL="https://handsfree-mobile-alpha-02-git-codex-real-l-fbac1c-cuda0809-8210.vercel.app/kmt-sa2/?app=sa28preview"
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk HandsFree-REAL-SA2.7-Preview.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk HandsFree-REAL-SA2.8-Preview.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: HandsFree-REAL-SA2.7-Preview-APK
-          path: HandsFree-REAL-SA2.7-Preview.apk
+          name: HandsFree-REAL-SA2.8-Preview-APK
+          path: HandsFree-REAL-SA2.8-Preview.apk
           if-no-files-found: error

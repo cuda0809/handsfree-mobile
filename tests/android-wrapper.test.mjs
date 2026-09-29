@@ -19,6 +19,6 @@ assert.match(main,/setMixedContentMode\(WebSettings\.MIXED_CONTENT_NEVER_ALLOW\)
 assert.match(main,/setDecorFitsSystemWindows\(false\)/);
 assert.match(main,/WindowInsets\.Type\.ime\(\)/);
 assert.match(main,/document\.querySelector\('dialog\[open\]'/);
-assert.match(workflow,/sa27preview/);
-assert.match(workflow,/HandsFree-REAL-SA2\.7-Preview\.apk/);
+assert.match(workflow,/sa28preview/);
+assert.match(workflow,/HandsFree-REAL-SA2\.8-Preview\.apk/);
 console.log('PASS Android stable release identity, isolated preview lane, audio permission, backup lock, trusted origin and dialog back handling');
