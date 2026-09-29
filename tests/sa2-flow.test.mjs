@@ -13,6 +13,7 @@ const androidMain=fs.readFileSync(new URL('../android/app/src/main/java/com/hand
 
 assert.match(mobile,/BUILD='2026\.09\.29\.SA2\.8\.1'/);
 assert.match(mobile,/서버로 보내고 바로 반영/);
+assert.match(mobile,/d\.target!==target\?'':d\.text/);
 assert.match(flow,/async function syncProgressIssue\(/);
 assert.doesNotMatch(flow,/id="editLinkedIssue"/);
 assert.match(mobile,/api\('\/api\/sa2-real-status'/);
