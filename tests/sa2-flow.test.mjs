@@ -11,7 +11,7 @@ const sw=fs.readFileSync(new URL('../kmt-sa2/sw.js',import.meta.url),'utf8');
 const androidBuild=fs.readFileSync(new URL('../android/app/build.gradle',import.meta.url),'utf8');
 const androidMain=fs.readFileSync(new URL('../android/app/src/main/java/com/handsfree/mobile/MainActivity.java',import.meta.url),'utf8');
 
-assert.match(mobile,/BUILD='2026\.09\.29\.SA2\.6'/);
+assert.match(mobile,/BUILD='2026\.09\.29\.SA2\.7'/);
 assert.match(mobile,/api\('\/api\/sa2-real-status'/);
 assert.match(mobile,/api\('\/api\/sa2-write'/);
 assert.match(mobile,/확인 필요/);
@@ -25,12 +25,15 @@ assert.match(flow,/async function verifyIssueReceipt\(/);
 assert.match(schedule,/api\('\/api\/sa2-lifecycle'/);
 assert.match(schedule,/await showScheduleReceipt\(d\)/);
 assert.match(schedule,/readback_mismatch/);
-assert.match(sw,/kmt-sa2-preview-sa26/);
+assert.match(sw,/kmt-sa2-preview-sa27/);
 assert.match(sw,/startsWith\('kmt-sa2-'\)/);
-assert.match(androidBuild,/applicationId 'com\.handsfree\.mobile\.sa24'/);
+assert.match(androidBuild,/applicationId 'com\.handsfree\.mobile'/);
+assert.match(androidBuild,/applicationIdSuffix '\.preview'/);
 assert.match(androidBuild,/versionCode 2/);
-assert.match(androidBuild,/versionName 'SA2\.5-2026\.09\.29'/);
-assert.match(androidMain,/\/kmt-sa2\/\?app=sa25/);
+assert.match(androidBuild,/versionName '1\.0\.0'/);
+assert.match(androidMain,/BuildConfig\.APP_URL/);
+assert.match(androidMain,/RESOURCE_AUDIO_CAPTURE/);
+assert.match(androidMain,/evaluateJavascript/);
 
 Object.assign(process.env,{
   HF_REAL_APP_KEY:'test-app-key',
@@ -64,4 +67,4 @@ assert.equal(calls.length,1);
 assert.equal(calls[0].requester,'writer@test');
 assert.equal(calls[0].source,'MOBILE|SA2:테스트');
 assert.equal(calls[0].submissionId,'sa2-test-submission-0001');
-console.log('PASS SA2.6 auth, explicit write identity, readback UI contracts, resume refresh and cache update');
+console.log('PASS SA2.7 auth, explicit write identity, readback UI contracts, Android wrapper and cache update');
