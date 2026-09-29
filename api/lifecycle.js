@@ -1,12 +1,12 @@
 import crypto from 'node:crypto';
 export default async function handler(req,res){
- const {person,sameOrigin}=await import('../lib/person-auth.mjs');
+ const {sameOrigin}=await import('../lib/person-auth.mjs');
  const {reply,upstream}=await import('../lib/kmt-server.mjs');
- const {roleFor}=await import('../lib/access.mjs');
+ const {authUser}=await import('../lib/auth-user.mjs');
  if(req.method!=='POST')return reply(res,405,{ok:false,error:'method_not_allowed'});
  if(!sameOrigin(req))return reply(res,403,{ok:false,error:'invalid_origin'});
- const p=person(req);if(!p)return reply(res,401,{ok:false,error:'personal_login_required'});
- let role;try{role=roleFor(p.email);}catch{return reply(res,403,{ok:false,error:'identity_denied'});}
+ const p=authUser(req);if(!p)return reply(res,401,{ok:false,error:'activation_required'});
+ const role=p.role;
  const b=req.body||{};
  if(!['plans','edit','receipt'].includes(b.action)||typeof b.orderId!=='string'||!b.orderId.trim()||b.orderId.length>100)return reply(res,400,{ok:false,error:'invalid_request'});
  if(b.action==='edit'&&!['owner','writer'].includes(role))return reply(res,403,{ok:false,error:'forbidden'});

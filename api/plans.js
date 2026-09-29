@@ -1,12 +1,10 @@
 // Read only: never forward an operation chosen by the caller.
 export default async function handler(req,res){
   const {reply,upstream}=await import('../lib/kmt-server.mjs');
-  const {person}=await import('../lib/person-auth.mjs');
-  const {roleFor}=await import('../lib/access.mjs');
+  const {authUser}=await import('../lib/auth-user.mjs');
   if(req.method!=='POST')return reply(res,405,{ok:false,error:'method_not_allowed'});
-  const actor=person(req);
-  if(!actor)return reply(res,401,{ok:false,error:'personal_login_required'});
-  try{roleFor(actor.email);}catch{return reply(res,403,{ok:false,error:'identity_denied'});}
+  const actor=authUser(req);
+  if(!actor)return reply(res,401,{ok:false,error:'activation_required'});
   const orderId=req.body?.orderId;
   if(typeof orderId!=='string'||!orderId.trim()||orderId.length>100)return reply(res,400,{ok:false,error:'invalid_project_id'});
   try{
