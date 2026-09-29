@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0d1b2a">
+  <title>HandsFree NX · 생산관리 UI 시안</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23103968'/%3E%3Cpath d='M15 17h9v11h16V17h9v30h-9V36H24v11h-9z' fill='white'/%3E%3C/svg%3E">
+  <style>
+    :root{--blue:#0f4c81;--navy:#0d1b2a;--orange:#ff8a00;--line:#dce3ea;--soft:#f3f6f8;--green:#0f9960;--red:#db3a34;--text:#17212b;--muted:#62707d}
+    *{box-sizing:border-box}html{font-family:"Pretendard","Noto Sans KR","Malgun Gothic",system-ui,sans-serif;background:#e9edf1;color:var(--text)}body{margin:0}button{font:inherit;color:inherit;cursor:pointer}.lab-head{max-width:1240px;margin:auto;padding:28px 24px 20px;display:flex;align-items:end;justify-content:space-between;gap:24px}.lab-title small{display:block;color:#52606d;font-size:.78rem;font-weight:800;letter-spacing:.13em}.lab-title h1{font-size:1.7rem;margin:7px 0 0;letter-spacing:-.04em}.lab-note{max-width:470px;margin:0;color:#66737f;font-size:.9rem;line-height:1.65}.switcher{display:none}.gallery{max-width:1240px;margin:auto;padding:0 24px 48px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}.concept-card{min-width:0}.concept-label{height:70px;padding:0 3px 12px;display:flex;align-items:end;justify-content:space-between;gap:10px}.concept-label b{font-size:1.08rem}.concept-label span{display:block;color:#687581;font-size:.78rem;margin-top:4px}.concept-number{font:800 .78rem ui-monospace,monospace;color:#84909a}.phone{height:790px;overflow:hidden;border:1px solid #cad3db;border-radius:30px;background:white;box-shadow:0 18px 50px #2334431c;position:relative}.phone button{border:0}.scroll{height:100%;overflow:hidden;padding-bottom:76px}.topbar{height:76px;padding:18px 19px 12px;display:flex;align-items:center;justify-content:space-between}.brand{display:flex;align-items:center;gap:10px}.brand img{width:48px;height:34px;object-fit:contain;background:white;border-radius:8px}.brand strong{display:block;font-size:.94rem}.brand small{display:block;font-size:.67rem;margin-top:2px;letter-spacing:.08em}.avatar{width:39px;height:39px;border-radius:13px;display:grid;place-items:center;font-size:.78rem;font-weight:800}.bottom-nav{position:absolute;z-index:5;left:0;right:0;bottom:0;height:70px;display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);background:#fffffff2;backdrop-filter:blur(16px);padding-bottom:6px}.bottom-nav button{background:none;font-size:.69rem;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px}.nav-ico{font-size:1.2rem;line-height:1}.pill{display:inline-flex;align-items:center;border-radius:999px;font-size:.71rem;font-weight:800;padding:5px 9px}.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px}.section-title{display:flex;justify-content:space-between;align-items:center;margin:21px 0 11px}.section-title h2{font-size:1rem;margin:0;letter-spacing:-.02em}.section-title span{font-size:.75rem;color:var(--muted)}
+
+    /* A · Command */
+    .command{background:#f5f7fa}.command .topbar{background:var(--navy);color:white}.command .brand small{color:#9fb2c2}.command .avatar{background:#203b52;color:#fff}.command .content{padding:0 18px}.command .shift{margin:14px 0 0;background:linear-gradient(135deg,#123452,#0d263b);color:white;border-radius:18px;padding:18px;position:relative;overflow:hidden}.command .shift:after{content:"B";position:absolute;right:5px;bottom:-31px;font:900 8rem/1 sans-serif;color:#ffffff0b}.shift-kicker{font-size:.72rem;color:#9fc5e3;font-weight:700}.shift h2{font-size:1.38rem;margin:9px 0 16px;letter-spacing:-.04em}.shift-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.shift-grid div{padding:9px 8px;background:#ffffff0e;border:1px solid #ffffff14;border-radius:10px}.shift-grid b{display:block;font-size:1.18rem}.shift-grid span{font-size:.66rem;color:#b9ccda}.alarm{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;margin-top:12px;border-left:5px solid var(--orange);background:#fff;border-radius:8px;padding:12px;box-shadow:0 3px 12px #2437460a}.alarm-icon{width:32px;height:32px;border-radius:9px;background:#fff3df;color:#b95e00;display:grid;place-items:center;font-weight:900}.alarm b{font-size:.82rem}.alarm p{margin:3px 0 0;font-size:.71rem;color:var(--muted)}.alarm time{font-size:.7rem;font-weight:800;color:#aa5700}.machine-row{background:#fff;border:1px solid #e1e7ec;border-radius:13px;padding:13px;margin-bottom:8px}.machine-head{display:flex;align-items:center;justify-content:space-between}.machine-head b{font-size:.88rem}.machine-head small{font-size:.68rem;color:var(--muted)}.machine-row p{font-size:.75rem;color:#4e5f6e;margin:8px 0}.progress{height:7px;background:#e9eef2;border-radius:8px;overflow:hidden}.progress i{display:block;height:100%;background:var(--blue);border-radius:8px}.machine-foot{display:flex;justify-content:space-between;margin-top:7px;font-size:.67rem;color:#687681}.command .bottom-nav button:first-child{color:var(--blue);font-weight:800}
+
+    /* B · Flowline */
+    .flowline{background:#fbfcfd}.flowline .topbar{border-bottom:1px solid #e7ebef}.flowline .brand small{color:#50779c}.flowline .avatar{background:#e9f1fb;color:#155897}.flowline .content{padding:0 18px}.flowline .date-row{display:flex;justify-content:space-between;align-items:center;margin:14px 0 12px}.flowline .date-row h2{font-size:1.32rem;margin:0;letter-spacing:-.04em}.date-row button{background:#102f4c;color:#fff;border-radius:11px;padding:10px 12px;font-size:.73rem;font-weight:800}.target-strip{display:grid;grid-template-columns:1.25fr 1fr 1fr;border:1px solid #dce5ed;border-radius:14px;overflow:hidden}.target-strip div{padding:13px 11px;border-right:1px solid #e2e9ef}.target-strip div:last-child{border:0}.target-strip small{display:block;font-size:.66rem;color:var(--muted)}.target-strip b{display:block;font-size:1.1rem;margin-top:5px}.target-strip .good b{color:var(--green)}.flow-card{border:1px solid #dbe4eb;border-radius:16px;margin-bottom:11px;overflow:hidden;background:white}.flow-card-head{display:flex;justify-content:space-between;align-items:start;padding:14px 14px 10px}.flow-card h3{font-size:.9rem;margin:0}.flow-card h3 span{display:block;color:#71808d;font-size:.69rem;font-weight:500;margin-top:4px}.stage-track{display:grid;grid-template-columns:repeat(5,1fr);padding:4px 13px 13px;gap:2px}.stage{position:relative;text-align:center;color:#96a1aa;font-size:.6rem;padding-top:18px}.stage:before{content:"";position:absolute;top:5px;left:0;right:0;height:5px;background:#e6ebef}.stage:first-child:before{border-radius:8px 0 0 8px}.stage:last-child:before{border-radius:0 8px 8px 0}.stage.done{color:#296c9f}.stage.done:before{background:#4a90c7}.stage.now{color:#17212b;font-weight:800}.stage.now:before{background:var(--orange)}.flow-note{margin:0 13px 13px;padding:10px 11px;background:#f4f7fa;border-radius:9px;font-size:.7rem;color:#536573;display:flex;justify-content:space-between;gap:8px}.flow-note strong{color:#203b52;white-space:nowrap}.flowline .bottom-nav button:nth-child(2){color:#155897;font-weight:800}
+
+    /* C · Focus */
+    .focus{background:#11171d;color:#f4f7f9}.focus .topbar{background:#11171d}.focus .brand img{filter:saturate(.9)}.focus .brand small{color:#8b9aa6}.focus .avatar{background:#24313a;color:#e9f0f4}.focus .content{padding:0 17px}.focus .hello{margin:9px 0 18px}.focus .hello small{color:#82919c;font-size:.76rem}.focus .hello h2{font-size:1.55rem;margin:5px 0 0;letter-spacing:-.045em}.focus .now-card{background:#f3f6f8;color:#111820;border-radius:21px;padding:18px;margin-bottom:13px}.focus .now-top{display:flex;justify-content:space-between;align-items:center}.focus .now-top small{font-size:.7rem;color:#62717c;font-weight:700}.focus .now-card h3{font-size:1.36rem;margin:15px 0 4px}.focus .now-card>p{margin:0;color:#65727c;font-size:.78rem}.focus .work-step{display:flex;gap:12px;margin:18px 0 0;padding-top:15px;border-top:1px solid #d8e0e5}.step-no{flex:0 0 37px;height:37px;border-radius:11px;background:#111b24;color:white;display:grid;place-items:center;font-weight:900}.work-step b{display:block;font-size:.87rem}.work-step span{font-size:.7rem;color:#6c7881;display:block;margin-top:4px;line-height:1.5}.focus-action{width:100%;margin-top:16px;padding:14px;border-radius:12px;background:#ffb000;color:#1c1607;font-weight:900;font-size:.88rem}.next-card{background:#1a232b;border:1px solid #2a3741;border-radius:15px;padding:14px;margin-bottom:9px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:11px}.next-time{font:800 .72rem ui-monospace,monospace;color:#9aabb7}.next-card b{font-size:.83rem}.next-card p{margin:4px 0 0;font-size:.69rem;color:#8f9da7}.next-status{font-size:.65rem;background:#293741;color:#c5d0d7;border-radius:999px;padding:5px 7px}.focus .section-title h2{color:#f2f5f7}.focus .section-title span{color:#84929d}.focus .bottom-nav{background:#151d23ed;border-color:#27313a}.focus .bottom-nav button{color:#84929b}.focus .bottom-nav button:nth-child(3){color:#ffb000;font-weight:800}
+
+    @media(max-width:860px){.lab-head{display:block;padding:18px 16px 10px}.lab-title h1{font-size:1.35rem}.lab-note{margin-top:10px;font-size:.8rem}.switcher{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;position:sticky;top:0;z-index:20;background:#e9edf1eF;backdrop-filter:blur(14px);padding:10px 14px}.switcher button{border:1px solid #cbd4dc;background:#f8fafb;border-radius:10px;padding:10px 5px;font-size:.72rem;font-weight:800}.switcher button.active{background:#102f4c;color:white;border-color:#102f4c}.gallery{display:block;padding:0 12px 30px}.concept-card{display:none}.concept-card.active{display:block}.concept-label{height:58px;padding:0 6px 10px}.phone{height:min(790px,calc(100dvh - 145px));min-height:610px;border-radius:24px}.bottom-nav{padding-bottom:max(6px,env(safe-area-inset-bottom));height:calc(70px + env(safe-area-inset-bottom))}}
+  </style>
+</head>
+<body>
+  <header class="lab-head">
+    <div class="lab-title"><small>HANDSFREE NX · DESIGN PREVIEW 0.1</small><h1>생산관리 현장 UI 방향 3안</h1></div>
+    <p class="lab-note">기능 연결 전 디자인 비교용 화면입니다. 각 시안은 같은 정보를 다른 우선순위로 보여줍니다.</p>
+  </header>
+  <nav class="switcher" aria-label="디자인 시안 선택">
+    <button class="active" data-show="a">A 관제형</button><button data-show="b">B 흐름형</button><button data-show="c">C 집중형</button>
+  </nav>
+  <main class="gallery">
+    <section class="concept-card active" data-concept="a">
+      <div class="concept-label"><div><b>A · SHIFT COMMAND</b><span>한 화면에서 이상과 전체 현황을 판단</span></div><i class="concept-number">01</i></div>
+      <div class="phone command">
+        <div class="scroll">
+          <header class="topbar"><div class="brand"><img src="../kmt-logo.png" alt="케이엠텍"><div><strong>HandsFree NX</strong><small>생산 B · 주간</small></div></div><div class="avatar">SJ</div></header>
+          <div class="content">
+            <section class="shift"><div class="shift-kicker">09.30 수요일 · 주간조</div><h2>생산 흐름은 정상입니다</h2><div class="shift-grid"><div><b>12</b><span>진행 장비</span></div><div><b>3</b><span>오늘 출고</span></div><div><b>1</b><span>확인 필요</span></div></div></section>
+            <div class="alarm"><div class="alarm-icon">!</div><div><b>KPM-300F 조립 지연</b><p>베어링 입고 확인이 필요합니다</p></div><time>10:30</time></div>
+            <div class="section-title"><h2>라인 현황</h2><span>납기순</span></div>
+            <article class="machine-row"><div class="machine-head"><b>KDM-200 · 01호기</b><span class="pill" style="background:#e8f4ef;color:#08794b"><i class="dot" style="background:#0f9960"></i>조립</span></div><p>프레임 조립 완료 · 갭세팅 진행</p><div class="progress"><i style="width:68%"></i></div><div class="machine-foot"><span>260727A-061-01</span><b>68%</b></div></article>
+            <article class="machine-row"><div class="machine-head"><b>KDM-200 · 02호기</b><span class="pill" style="background:#fff3df;color:#a85900"><i class="dot" style="background:#ff8a00"></i>자재 확인</span></div><p>베이스 가공품 2종 입고 대기</p><div class="progress"><i style="width:42%;background:#ff8a00"></i></div><div class="machine-foot"><span>260727A-061-02</span><b>42%</b></div></article>
+            <article class="machine-row"><div class="machine-head"><b>PDM-300C · 오랜드바이오</b><span class="pill" style="background:#eaf0f7;color:#31577b">출고대기</span></div><p>검수 완료 · 출고 서류 확인</p><div class="progress"><i style="width:94%"></i></div><div class="machine-foot"><span>260714A-054</span><b>94%</b></div></article>
+          </div>
+        </div>
+        <nav class="bottom-nav"><button><span class="nav-ico">▦</span>현황</button><button><span class="nav-ico">◫</span>장비</button><button><span class="nav-ico">＋</span>입력</button><button><span class="nav-ico">◎</span>내 업무</button></nav>
+      </div>
+    </section>
+
+    <section class="concept-card" data-concept="b">
+      <div class="concept-label"><div><b>B · LINE FLOW</b><span>장비별 공정과 납기를 한 줄로 추적</span></div><i class="concept-number">02</i></div>
+      <div class="phone flowline">
+        <div class="scroll">
+          <header class="topbar"><div class="brand"><img src="../kmt-logo.png" alt="케이엠텍"><div><strong>HandsFree NX</strong><small>공정 흐름</small></div></div><div class="avatar">B팀</div></header>
+          <div class="content">
+            <div class="date-row"><h2>오늘의 공정</h2><button>진행내용 입력</button></div>
+            <section class="target-strip"><div><small>9월 누적 생산</small><b>18대</b></div><div class="good"><small>납기 준수</small><b>94%</b></div><div><small>지원 인원</small><b>7명</b></div></section>
+            <div class="section-title"><h2>출고 일정</h2><span>전체 12대</span></div>
+            <article class="flow-card"><div class="flow-card-head"><h3>KDM-200 · 01호기<span>260727A-061-01 · 출고 10.08</span></h3><span class="pill" style="background:#fff1dc;color:#a65700">조립</span></div><div class="stage-track"><div class="stage done">자재</div><div class="stage now">조립</div><div class="stage">전장</div><div class="stage">검수</div><div class="stage">출고</div></div><div class="flow-note"><span>오늘 · 베이스 체결 후 갭세팅</span><strong>담당 김성진</strong></div></article>
+            <article class="flow-card"><div class="flow-card-head"><h3>KPM-300F · 124번<span>260816A-072 · 출고 10.15</span></h3><span class="pill" style="background:#e7f3ed;color:#08774a">자재</span></div><div class="stage-track"><div class="stage now">자재</div><div class="stage">조립</div><div class="stage">전장</div><div class="stage">검수</div><div class="stage">출고</div></div><div class="flow-note"><span>베어링 6922DD 교체 준비</span><strong>담당 이상준</strong></div></article>
+            <article class="flow-card"><div class="flow-card-head"><h3>PDM-300C · 오랜드바이오<span>260714A-054 · 출고 오늘</span></h3><span class="pill" style="background:#e7eef7;color:#24537d">출고</span></div><div class="stage-track"><div class="stage done">자재</div><div class="stage done">조립</div><div class="stage done">전장</div><div class="stage done">검수</div><div class="stage now">출고</div></div><div class="flow-note"><span>검수 완료 · 출고 서류 확인</span><strong>15:00</strong></div></article>
+          </div>
+        </div>
+        <nav class="bottom-nav"><button><span class="nav-ico">⌂</span>오늘</button><button><span class="nav-ico">≋</span>공정</button><button><span class="nav-ico">▥</span>실적</button><button><span class="nav-ico">◎</span>내 업무</button></nav>
+      </div>
+    </section>
+
+    <section class="concept-card" data-concept="c">
+      <div class="concept-label"><div><b>C · FLOOR FOCUS</b><span>장갑을 낀 현장에서도 다음 행동이 명확</span></div><i class="concept-number">03</i></div>
+      <div class="phone focus">
+        <div class="scroll">
+          <header class="topbar"><div class="brand"><img src="../kmt-logo.png" alt="케이엠텍"><div><strong>HandsFree NX</strong><small>MY SHIFT</small></div></div><div class="avatar">이상준</div></header>
+          <div class="content">
+            <div class="hello"><small>09:42 · 주간조</small><h2>지금 할 일 1건</h2></div>
+            <section class="now-card"><div class="now-top"><small>우선 작업 · 납기 D-3</small><span class="pill" style="background:#ffead0;color:#9f5200">조립</span></div><h3>KPM-300F · 124번</h3><p>260816A-072</p><div class="work-step"><div class="step-no">01</div><div><b>자전컵 베어링 교체</b><span>6922ZZ 고열타입 → 6922DD 일반타입</span></div></div><button class="focus-action">진행내용 바로 입력</button></section>
+            <div class="section-title"><h2>다음 작업</h2><span>오늘 3건</span></div>
+            <article class="next-card"><div class="next-time">11:00</div><div><b>KDM-200 · 01호기</b><p>갭세팅 확인 · 조립장 A</p></div><span class="next-status">대기</span></article>
+            <article class="next-card"><div class="next-time">14:00</div><div><b>PDM-300C · 오랜드바이오</b><p>출고 전 최종 확인 · 출하장</p></div><span class="next-status">검수</span></article>
+            <article class="next-card"><div class="next-time">16:30</div><div><b>타부서 지원</b><p>A팀 전장 배선 · 2명</p></div><span class="next-status">지원</span></article>
+          </div>
+        </div>
+        <nav class="bottom-nav"><button><span class="nav-ico">▦</span>현황</button><button><span class="nav-ico">≋</span>장비</button><button><span class="nav-ico">●</span>지금 할 일</button><button><span class="nav-ico">◎</span>내 기록</button></nav>
+      </div>
+    </section>
+  </main>
+  <script>
+    const buttons=[...document.querySelectorAll('[data-show]')],cards=[...document.querySelectorAll('[data-concept]')];
+    buttons.forEach(button=>button.addEventListener('click',()=>{buttons.forEach(x=>x.classList.toggle('active',x===button));cards.forEach(x=>x.classList.toggle('active',x.dataset.concept===button.dataset.show));}));
+  </script>
+</body>
+</html>
