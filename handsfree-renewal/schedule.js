@@ -44,4 +44,3 @@ async function checkScheduleReceipt(){
  let b;try{b=JSON.parse(localStorage.getItem('handsfree-renewal-schedule-pending'));}catch{}if(!b)return toast('확인할 일정 요청이 없습니다.');
  try{const d=await api('/api/sa2-lifecycle',{action:'receipt',orderId:b.orderId,requestId:b.requestId});if(d.status==='APPLIED')await showScheduleReceipt(d);else toast('아직 저장 이력이 확인되지 않습니다. 자동 재전송하지 않습니다.');}catch{toast('서버 저장 결과와 최신 일정의 일치를 확인하지 못했습니다. 요청은 기기에 보관하며 자동 재전송하지 않습니다.');}
 }
-

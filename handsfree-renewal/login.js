@@ -9,4 +9,3 @@ async function start(){try{const d=await call();if(d.user)return connected(d.use
 $('activateBtn').onclick=async()=>{const name=$('displayName').value.trim(),pin=$('pin').value.trim();if(!name){statusEl.textContent='이름을 입력하세요.';return;}if(!/^[0-9]{4}$/.test(pin)){statusEl.textContent='숫자 4자리 PIN을 입력하세요.';return;}$('activateBtn').disabled=true;statusEl.textContent='연결 중…';try{const d=await call({action:'activate',name,pin});$('pin').value='';connected(d.user);statusEl.textContent+=' · HandsFree로 이동합니다.';setTimeout(()=>location.replace('/handsfree-renewal/'),300);}catch(e){statusEl.textContent=e.status===429?'잠시 후 다시 시도하세요.':'PIN을 확인하세요.';}finally{$('activateBtn').disabled=false;}};
 logoutEl.onclick=async()=>{logoutEl.disabled=true;try{await call({action:'logout'});showSetup('이 기기 연결을 해제했습니다.');}catch{statusEl.textContent='연결 해제를 확인하지 못했습니다.';}finally{logoutEl.disabled=false;}};
 window.addEventListener('load',()=>{bindSecretToggles();start();});
-
