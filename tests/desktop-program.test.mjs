@@ -53,4 +53,5 @@ test('typing immediately enables one-click server save with visible progress',()
   assert.doesNotMatch(js,/id="previewButton"/);
   assert.match(js,/1\/3 업무이력을 서버에 저장/);
   assert.match(js,/3\/3 서버 최신값을 다시 확인/);
+  assert.match(js,/if\\(!detail\\.open\\)detail\\.showModal\\(\\)/);
 });
