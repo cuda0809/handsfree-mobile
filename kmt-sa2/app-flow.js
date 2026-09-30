@@ -55,7 +55,12 @@ async function allProjects(prefix='',purpose='detail'){
   el.querySelectorAll('[data-project]').forEach(button=>button.onclick=()=>openProject(button.dataset.project,button.dataset.purpose));
  }catch(e){appFailure(el,e);}
 }
-function lifecycleEntriesFromHistory(history){
+function legacyLifecycleDate(text,fallback=''){
+ const m=String(text||'').match(/(?:^|\s)(\d{1,2})\/(\d{1,2})(?:\s|$)/);
+ if(m){const y=(String(fallback||'').match(/^(20\d{2})/)||[])[1]||new Date().getFullYear();return y+'-'+String(m[1]).padStart(2,'0')+'-'+String(m[2]).padStart(2,'0');}
+ return appDay(fallback)||String(fallback||'');
+}
+function lifecycleEntriesFromHistory(history,item=null){
  const entries=[];
  (history?.events||[]).forEach(r=>entries.push({
    at:String(r.at||''),kind:'event',type:String(r.type||'Event'),text:String(r.raw||'내용 없음'),
@@ -71,10 +76,21 @@ function lifecycleEntriesFromHistory(history){
      actor:String(r.actor||'입력자 미기록'),id:String(r.id||'')
    });
  });
+ if(item){
+   const cause=String(item.cause||'').trim(),state=String(item.state||'').trim();
+   if(cause&&!entries.some(r=>norm(r.text).includes(norm(cause))||norm(cause).includes(norm(r.text)))){
+     entries.push({at:legacyLifecycleDate(cause,item.since||item.sourceLatestUpdate),kind:'legacy',type:'기존 이슈 · 이관',text:cause,change:'',actor:'기존 원장',id:'LEGACY-'+String(item.issueId||item.orderId||'')});
+   }
+   const stateDate=appDay(item.since)||appDay(item.sourceLatestUpdate)||'';
+   const alreadyState=entries.some(r=>r.change&&norm(r.change).endsWith(norm(state))||norm(r.text)===norm(state));
+   if(state&&!alreadyState){
+     entries.push({at:stateDate,kind:'current',type:'현재 상태',text:state,change:item.nextAction?'다음 행동 · '+String(item.nextAction):'',actor:'Core 현재상태',id:'CURRENT-'+String(item.issueId||item.orderId||'')});
+   }
+ }
  return entries.sort((a,b)=>String(a.at).localeCompare(String(b.at)));
 }
-function lifecyclePreview(history,limit=4){
- const rows=lifecycleEntriesFromHistory(history),shown=rows.slice(-limit);
+function lifecyclePreview(history,limit=4,item=null){
+ const rows=lifecycleEntriesFromHistory(history,item),shown=rows.slice(-limit);
  return shown.length?shown.map(r=>'<div class="lifecycle-row '+esc(r.kind)+'"><time>'+esc(String(r.at||'').replace('T',' ').slice(0,16))+'</time><div><span class="lifecycle-type">'+esc(r.type)+'</span><b>'+esc(r.text)+'</b>'+(r.change?'<p class="lifecycle-change">'+esc(r.change)+'</p>':'')+'<small>'+esc(r.actor)+'</small></div></div>').join(''):'<p class="empty">연결된 라이프사이클 기록이 없습니다.</p>';
 }
 async function projectLifecycle(orderId){
@@ -84,7 +100,7 @@ async function projectLifecycle(orderId){
  const render=(history,cachedAt='',syncing=false)=>{
    if(!el?.isConnected)return;
    const p=appProjects.find(x=>x.orderId===orderId)||items.find(x=>x.orderId===orderId)||{};
-   const rows=lifecycleEntriesFromHistory(history||{events:[],changes:[]});
+   const linked=items.find(x=>x.orderId===orderId)||p;const rows=lifecycleEntriesFromHistory(history||{events:[],changes:[]},linked);
    el.innerHTML='<div class="job-number"><small>JOB NO.</small><b>'+esc(orderId)+'</b></div>'+
      '<p class="lifecycle-owner">'+esc(p.customer||'')+(p.model?' · '+esc(p.model):'')+'</p>'+
      '<div class="lifecycle-legend"><span>Event '+((history?.events)||[]).length+'건</span><span>변경 '+((history?.changes)||[]).length+'건</span></div>'+
