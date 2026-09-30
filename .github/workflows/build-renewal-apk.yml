@@ -30,11 +30,11 @@ jobs:
         run: gradle assembleDebug --no-daemon
 
       - name: Rename APK
-        run: cp android-renewal/app/build/outputs/apk/debug/app-debug.apk HandsFree-Renewal-0.7-Preview.apk
+        run: cp android-renewal/app/build/outputs/apk/debug/app-debug.apk HandsFree-Renewal-0.8-Preview.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: HandsFree-Renewal-0.7-Preview-APK
-          path: HandsFree-Renewal-0.7-Preview.apk
+          name: HandsFree-Renewal-0.8-Preview-APK
+          path: HandsFree-Renewal-0.8-Preview.apk
           if-no-files-found: error
