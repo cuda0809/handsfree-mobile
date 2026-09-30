@@ -451,26 +451,65 @@ async function syncPlanOverview(force=false){
  if(!force&&fresh)return cached;
  if(planOverviewPending)return planOverviewPending;
  planOverviewPending=(async()=>{
-  const targets=items.filter(x=>x.orderId&&!/-\*$/.test(String(x.orderId))).slice(0,20);
-  const settled=await Promise.allSettled(targets.map(x=>api('/api/sa2-lifecycle',{action:'plans',orderId:x.orderId},30000)));
+  await syncProjectMeta(false);
+  const meta=projectMetaCache()?.projects||appProjects||[];
+  const today=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Seoul'}));
+  const from=new Date(today);from.setDate(from.getDate()-45);
+  const to=new Date(today);to.setDate(to.getDate()+210);
+  const iso=d=>d.toISOString().slice(0,10);
+  const fromDay=iso(from),toDay=iso(to);
+  const currentIds=new Set(items.map(x=>String(x.orderId||'')));
+  const seen=new Set(),targets=[];
+  for(const p of meta){
+   const orderId=String(p.orderId||'').trim();if(!orderId||/-\*$/.test(orderId)||seen.has(orderId))continue;
+   const due=formatHfDate(p.due);
+   const inWindow=/^\d{4}-\d{2}-\d{2}$/.test(due)&&due>=fromDay&&due<=toDay;
+   const activeState=!/^(완료|출고완료|납품완료)$/.test(String(p.state||'').trim());
+   if((inWindow&&activeState)||currentIds.has(orderId)){seen.add(orderId);targets.push(p);}
+  }
   const byOrder={...(cached?.byOrder||{})};
-  targets.forEach((x,i)=>{
-   const s=settled[i];if(s.status!=='fulfilled')return;
-   const d=s.value,records=Array.isArray(d.records)?d.records:Array.isArray(d.plans)?d.plans:[];
-   byOrder[x.orderId]=summarizePlanRecords(records);
-  });
-  persist(PLAN_OVERVIEW_KEY,{cachedAt:new Date().toISOString(),byOrder});
+  for(let i=0;i<targets.length;i+=6){
+   const batch=targets.slice(i,i+6);
+   const settled=await Promise.allSettled(batch.map(x=>api('/api/sa2-lifecycle',{action:'plans',orderId:x.orderId},30000)));
+   batch.forEach((x,j)=>{
+    const s=settled[j];if(s.status!=='fulfilled')return;
+    const d=s.value,records=Array.isArray(d.records)?d.records:Array.isArray(d.plans)?d.plans:[];
+    byOrder[x.orderId]=summarizePlanRecords(records);
+   });
+  }
+  persist(PLAN_OVERVIEW_KEY,{cachedAt:new Date().toISOString(),byOrder,candidateCount:targets.length});
   const changed=applyPlanOverview(byOrder);
-  if(changed&&screen==='plan')productionPlan(productionPlanMode,true);
-  return {byOrder};
+  if(screen==='plan')productionPlan(productionPlanMode,true);
+  return {byOrder,candidateCount:targets.length,changed};
  })().finally(()=>{planOverviewPending=null;});
  return planOverviewPending;
 }
+function productionPlanRows(){
+ const meta=projectMetaCache()?.projects||appProjects||[];
+ const current=new Map(items.map(x=>[String(x.orderId||''),x]));
+ const plans=planOverviewCache()?.byOrder||{};
+ const rows=[];
+ for(const p of meta){
+  const orderId=String(p.orderId||'').trim(),plan=plans[orderId]||{};
+  const hasPlan=['planAssembly','planElectrical','planProgram','planInspection','planDelivery'].some(k=>formatHfDate(plan[k])!=='미정');
+  if(!hasPlan)continue;
+  const live=current.get(orderId)||{};
+  rows.push({...p,...plan,...live,orderId,customer:live.customer||p.customer||'',model:live.model||p.model||'',due:live.due||p.due||'',pm:live.pm||p.pm||'',state:live.state||p.state||'계획',nextAction:live.nextAction||'',priority:live.priority||2,actualDelivery:live.actualDelivery||p.actualDelivery||''});
+ }
+ for(const x of items){
+  if(rows.some(r=>r.orderId===x.orderId))continue;
+  const plan=plans[x.orderId]||{};
+  const hasPlan=['planAssembly','planElectrical','planProgram','planInspection','planDelivery'].some(k=>formatHfDate(plan[k])!=='미정');
+  if(hasPlan)rows.push({...x,...plan});
+ }
+ return rows.sort((a,b)=>hybridDueKey(a.due).localeCompare(hybridDueKey(b.due))||(a.priority||9)-(b.priority||9));
+}
+
 let productionPlanMode='plan';
 function productionPlan(mode='plan',skipMeta=false){
  productionPlanMode=mode;active('plan');screen='plan';
  if(!skipMeta){setTimeout(()=>syncProjectMeta(false),0);setTimeout(()=>syncPlanOverview(false),80);}
- const selected=items.slice().sort((a,b)=>hybridDueKey(a.due).localeCompare(hybridDueKey(b.due))||(a.priority||9)-(b.priority||9));
+ const selected=productionPlanRows();
  const tabs='<div class="plan-switch"><button class="'+(mode==='plan'?'active':'')+'" onclick="productionPlan(\'plan\')">생산계획</button><button class="'+(mode==='delivery'?'active':'')+'" onclick="productionPlan(\'delivery\')">납기 · 출고</button></div>';
  if(mode==='delivery'){
   main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">PRODUCTION CONTROL</div><h1>계획</h1></div></div>'+tabs+
@@ -491,13 +530,13 @@ function productionPlan(mode='plan',skipMeta=false){
  '<div class="production-plan-list">'+
  (selected.length?selected.map(x=>{
    const planned=allStages.some(s=>formatHfDate(planValue(x,s))!=='미정');
-   return '<button class="production-plan-card" data-plan-id="'+x.id+'"><div class="production-plan-head"><div><small>JOB NO. '+esc(x.orderId||'미등록')+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b></div><span class="'+(planned?'set':'unset')+'">'+(planned?'일정 있음':'제작일정 미정')+'</span></div>'+
+   return '<button class="production-plan-card" data-plan-order="'+esc(x.orderId)+'"><div class="production-plan-head"><div><small>JOB NO. '+esc(x.orderId||'미등록')+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b></div><span class="'+(planned?'set':'unset')+'">'+(planned?'일정 있음':'제작일정 미정')+'</span></div>'+
    '<div class="production-plan-meta"><div><small>납기</small><b>'+esc(formatHfDate(x.due))+'</b></div><div><small>현재</small><b>'+esc(x.state||'미등록')+'</b></div></div>'+
    '<div class="production-plan-stages">'+allStages.map(name=>'<div><small>'+name+'</small><b>'+esc(formatHfDate(planValue(x,name)))+'</b></div>').join('')+'</div>'+
    '<p class="production-plan-next"><span>다음 행동</span>'+esc(x.nextAction||'미정')+'</p></button>';
  }).join(''):'<p class="empty">현재 관리 중인 장비가 없습니다.</p>')+
  '</div>';
- main.querySelectorAll('[data-plan-id]').forEach(b=>b.onclick=()=>openItem(Number(b.dataset.planId)));
+ main.querySelectorAll('[data-plan-order]').forEach(b=>b.onclick=()=>openProject(b.dataset.planOrder));
 }
 function delivery(skipMeta=false){return productionPlan('delivery',skipMeta);}
 function projects(mode='all',skipMeta=false){
