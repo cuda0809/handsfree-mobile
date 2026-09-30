@@ -489,17 +489,33 @@ async function submitUnifiedEvent(issueId,text,statusEl){
  }
 }
 
+let todayIssueOpenId='';
+function toggleTodayIssue(issueId){
+ todayIssueOpenId=todayIssueOpenId===issueId?'':issueId;
+ todayIssues();
+ if(todayIssueOpenId)setTimeout(()=>main.querySelector('[data-unified-text="'+issueId+'"]')?.focus(),0);
+}
 function todayIssues(){
  active('issues');screen='issues';
  const activeRows=items.filter(x=>x.priority!==3&&!/^(출고완료|납품완료|완료)$/.test(String(x.state||''))).sort((a,b)=>(a.priority||9)-(b.priority||9));
  const todayKey=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
  const todayLocal=notes().filter(r=>{try{return new Date(r.createdAt).toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'})===todayKey&&(r.eventType||r.eventOnly);}catch{return false;}});
- main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">TODAY ISSUES</div><h1>오늘 이슈</h1></div><button class="chip" onclick="refresh()">Core 새로고침</button></div>'+
- '<p class="hybrid-desc">진행·대기·완료·문제·사유를 한 곳에 입력합니다. 명확한 진행 문장은 현재상태를 자동 갱신하고, 문제/사유 문장은 라이프사이클 Event로만 남깁니다.</p>'+
+ main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">TODAY ISSUES</div><h1>오늘 이슈</h1></div></div>'+
+ '<p class="hybrid-desc">장비를 고른 뒤 그 장비에 오늘 생긴 진행·문제·사유를 입력합니다.</p>'+
  '<div class="today-issue-list">'+
- (activeRows.length?activeRows.map(x=>'<section class="today-issue-card"><div class="today-issue-head"><div><small>'+esc(x.orderId||x.issueId)+'</small><h3>'+esc(x.customer)+' · '+esc(x.model)+'</h3></div><span class="today-issue-priority p'+esc(x.priority||2)+'">P'+esc(x.priority||2)+'</span></div><p class="today-issue-state">현재 · '+esc(x.state||'미등록')+(x.nextAction?' <span>→ 다음 '+esc(x.nextAction)+'</span>':'')+'</p>'+(x.cause?'<p class="today-issue-cause">기존 사유 · '+esc(x.cause)+'</p>':'')+'<label class="today-issue-label">오늘 이슈 / 진행·사유<textarea data-unified-text="'+esc(x.issueId)+'" maxlength="800" placeholder="예: 마감조립 진행 / 부품 미입고로 조립 대기 / 센서값 이상 확인" oninput="previewUnifiedEvent(\''+esc(x.issueId)+'\',main)"></textarea></label><p class="note" data-unified-preview="'+esc(x.issueId)+'">내용을 입력하면 상태 반영 여부를 미리 보여줍니다.</p><div class="today-issue-actions"><button class="chip" data-today-voice="'+esc(x.issueId)+'">🎙 음성</button><button class="primary" data-today-save="'+esc(x.issueId)+'">기록 및 자동 반영</button></div><p class="note" data-today-status="'+esc(x.issueId)+'"></p></section>').join(''):'<div class="empty">현재 진행 중인 장비가 없습니다.</div>')+
+ (activeRows.length?activeRows.map(x=>{const opened=todayIssueOpenId===x.issueId;return '<section class="today-issue-card '+(opened?'open':'')+'">'+
+ '<div class="today-issue-head"><div class="today-issue-ident"><small>JOB NO.</small><b>'+esc(x.orderId||x.issueId)+'</b><h3>'+esc(x.customer)+' · '+esc(x.model)+'</h3></div><span class="today-issue-priority p'+esc(x.priority||2)+'">P'+esc(x.priority||2)+'</span></div>'+
+ '<div class="today-issue-summary"><div><small>현재 상태</small><b>'+esc(x.state||'미등록')+'</b></div><div><small>다음 행동</small><b>'+esc(x.nextAction||'확인 필요')+'</b></div></div>'+
+ (!opened?'<button class="today-issue-open" onclick="toggleTodayIssue(\''+esc(x.issueId)+'\')"><span>이 장비에 오늘 이슈 입력</span><span>＋</span></button>':
+ '<div class="today-issue-editor"><div class="today-issue-target"><span>입력 대상</span><b>'+esc(x.orderId||x.issueId)+' · '+esc(x.customer)+' · '+esc(x.model)+'</b></div>'+
+ (x.cause?'<p class="today-issue-cause">기존 사유 · '+esc(x.cause)+'</p>':'')+
+ '<label class="today-issue-label">오늘 이슈 / 진행·사유<textarea data-unified-text="'+esc(x.issueId)+'" maxlength="800" placeholder="예: 마감조립 진행 / 부품 미입고로 조립 대기 / 센서값 이상 확인" oninput="previewUnifiedEvent(\''+esc(x.issueId)+'\',main)"></textarea></label>'+
+ '<p class="note today-issue-preview" data-unified-preview="'+esc(x.issueId)+'">내용을 입력하면 상태 반영 여부를 미리 보여줍니다.</p>'+
+ '<div class="today-issue-actions"><button class="chip" data-today-voice="'+esc(x.issueId)+'">🎙 음성</button><button class="primary" data-today-save="'+esc(x.issueId)+'">기록 및 자동 반영</button></div>'+
+ '<button class="today-issue-close" onclick="toggleTodayIssue(\''+esc(x.issueId)+'\')">입력창 닫기</button><p class="note" data-today-status="'+esc(x.issueId)+'"></p></div>')+
+ '</section>';}).join(''):'<div class="empty">현재 진행 중인 장비가 없습니다.</div>')+
  '</div>'+
- '<div class="hybrid-section"><b>오늘 기록</b><span>'+todayLocal.length+'건</span></div>'+
+ '<div class="hybrid-section today-records-head"><b>오늘 기록</b><span>'+todayLocal.length+'건</span></div>'+
  (todayLocal.length?todayLocal.slice(0,12).map(r=>'<button class="hybrid-record" data-note="'+esc(r.id)+'"><b>'+esc(r.target)+'</b><p>'+esc(r.text)+'</p><small>'+esc(new Date(r.createdAt).toLocaleString('ko-KR'))+' · '+esc(r.autoClassification||labels[r.status]||r.status)+'</small></button>').join(''):'<p class="empty">오늘 입력한 이슈가 없습니다.</p>')+
  '<button id="allInputHistory" class="secondary">전체 입력 이력 보기</button>';
  main.querySelectorAll('[data-today-save]').forEach(b=>b.onclick=()=>saveTodayIssue(b.dataset.todaySave));
