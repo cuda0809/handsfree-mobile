@@ -648,3 +648,61 @@ main{padding:0 14px 84px!important}.date{font-size:11px!important}.lead{font-siz
  .hf-stat-card{padding:10px 7px}
  .hf-stat-card b{font-size:20px}
 }
+
+/* Due-date urgency */
+.hf-card.due-soon{--hf-border:#d79827!important}
+.hf-card.due-critical{--hf-border:#d45d33!important}
+.hf-card.due-overdue{--hf-border:#b94747!important}
+.hf-due-alert{
+ display:grid;
+ grid-template-columns:auto minmax(0,1fr) auto;
+ gap:8px;
+ align-items:center;
+ margin:10px 0 0;
+ padding:8px 10px;
+ border-radius:10px;
+ border:1px solid transparent;
+ font-family:var(--hf-card-font)!important;
+}
+.hf-due-alert span{
+ font-size:9px;
+ font-weight:800;
+ letter-spacing:.2px;
+}
+.hf-due-alert b{
+ font-size:11px;
+ font-weight:900;
+ line-height:1.2;
+}
+.hf-due-alert small{
+ font-size:9px;
+ font-weight:700;
+ white-space:nowrap;
+}
+.hf-due-alert.soon{
+ background:#fff8e8;
+ border-color:#efd9a1;
+ color:#8c6417;
+}
+.hf-due-alert.critical{
+ background:#fff2eb;
+ border-color:#f1c5ad;
+ color:#a54d27;
+}
+.hf-due-alert.overdue{
+ background:#fff0f0;
+ border-color:#e6b8b8;
+ color:#9f3636;
+}
+.hf-card.due-soon .hf-card-meta>div:last-child,
+.hf-card.due-critical .hf-card-meta>div:last-child,
+.hf-card.due-overdue .hf-card-meta>div:last-child,
+.hf-card.due-soon .production-plan-meta>div:first-child,
+.hf-card.due-critical .production-plan-meta>div:first-child,
+.hf-card.due-overdue .production-plan-meta>div:first-child{
+ font-weight:850;
+}
+@media(max-width:380px){
+ .hf-due-alert{grid-template-columns:auto 1fr}
+ .hf-due-alert small{grid-column:2}
+}
