@@ -79,6 +79,25 @@ async function projectLifecycle(orderId){
      '<button class="secondary" onclick="openProject(\''+esc(orderId)+'\')">프로젝트 상세로 돌아가기</button>';
  }catch(e){appFailure(el,e);}
 }
+function canonicalProjectStage(v){
+ const t=norm(v);
+ if(/자재|입고|구매|발주/.test(t))return '자재';
+ if(/조립|기구|마감|갭세팅|프레임/.test(t))return '조립';
+ if(/전장|배선|전기|프로그램|프로그래밍/.test(t))return '전장';
+ if(/검수|점검|테스트|시험/.test(t))return '검수';
+ if(/출고|납품|포장/.test(t))return '출고';
+ return '';
+}
+function projectPlanStageMap(rows){
+ const map=new Map();
+ groupProjectPlans(rows).forEach(s=>{
+   const stage=canonicalProjectStage(s.process);if(!stage)return;
+   const prev=map.get(stage);
+   if(!prev)map.set(stage,{start:s.start,end:s.end||s.start});
+   else map.set(stage,{start:[prev.start,s.start].filter(Boolean).sort()[0],end:[prev.end,s.end||s.start].filter(Boolean).sort().at(-1)});
+ });
+ return map;
+}
 function groupProjectPlans(rows){const normalized=rows.map(row=>Array.isArray(row)?{date:appDay(row[3]),process:String(row[10]||'공정 미등록'),status:String(row[11]||'상태 미등록')}:{date:appDay(row.date),process:String(row.process||'공정 미등록'),status:String(row.status||row.sourceMonth||'계획')}).filter(r=>r.date),sorted=normalized.sort((a,b)=>a.date.localeCompare(b.date)),groups=[];for(const row of sorted){const date=row.date,process=row.process,last=groups.at(-1),next=last&&new Date(last.end+'T00:00:00Z').getTime()+86400000===new Date(date+'T00:00:00Z').getTime();if(last&&last.process===process&&next){last.end=date;last.status=row.status||last.status;}else groups.push({start:date,end:date,process,status:row.status||'계획'});}return groups;}
 async function openProject(orderId,purpose='detail'){
  let p=appProjects.find(x=>x.orderId===orderId)||items.find(x=>x.orderId===orderId);if(!p)return toast('최신 프로젝트 목록을 다시 불러오세요.');
@@ -94,13 +113,14 @@ async function openProject(orderId,purpose='detail'){
   if(historyResult.status==='fulfilled')projectHistoryCache.set(p.orderId,history);
   const plans=planResult.status==='fulfilled'?planResult.value:null;
   const planRows=plans&&plans.orderId===p.orderId?(Array.isArray(plans.records)?plans.records:Array.isArray(plans.plans)?plans.plans:[]):[];
-  const stages=groupProjectPlans(planRows),linked=items.find(x=>x.orderId===p.orderId)||p;
+  const linked=items.find(x=>x.orderId===p.orderId)||p;
   const currentState=linked.state||p.state||'미등록';
-  const foundStage=stages.findIndex(s=>norm(currentState).includes(norm(s.process)));
-  const activeStage=Math.max(0,Math.min((stages.length||5)-1,foundStage<0?0:foundStage));
-  const shownStages=stages.length?stages.slice(0,5):[{process:'자재',start:'-'},{process:'조립',start:'-'},{process:'전장',start:'-'},{process:'검수',start:'-'},{process:'출고',start:'-'}];
-  const scheduleBlock=plans?'<div class="hybrid-timeline">'+shownStages.map((s,i)=>'<div class="hybrid-step '+(i<activeStage?'done':i===activeStage?'now':'')+'"><i></i><b>'+esc(s.process)+'</b><small>'+esc(s.start)+(s.end&&s.end!==s.start?'~'+esc(s.end):'')+'</small></div>').join('')+'</div>':'<p class="empty">계획일정 연결이 지연 중입니다. 라이프사이클은 아래에서 계속 확인할 수 있습니다.</p>';
-  el.innerHTML='<div class="hybrid-project-card"><small>'+esc(p.orderId)+' · PM '+esc(p.pm||'미등록')+'</small><h2>'+esc(p.customer)+' · '+esc(p.model)+'</h2><p>납기 '+esc(p.due||'미등록')+' · Core 원장 연결</p><div class="hybrid-state"><span>현재 상태 · '+esc(currentState)+'</span><span>'+esc(linked.priority===1?'우선 확인':linked.priority===3?'완료':'진행')+'</span></div></div><div class="hybrid-section"><b>전체 제작 일정</b><span>'+(plans?'원본 계획':'계획 연결 지연')+'</span></div>'+scheduleBlock+'<div class="hybrid-write"><small>지금 하는 일</small><h3>'+esc(currentState)+'</h3><p>진행·이슈·사유를 한 곳에 입력하면 Event와 현재상태에 연결됩니다.</p><button id="projectInput">🎙 오늘 이슈 입력 <span style="float:right">＋</span></button></div><div class="hybrid-section"><b>최근 라이프사이클</b><span>'+(historyResult.status==='fulfilled'?'JOB NO. 기준':'이력 연결 지연')+'</span></div><div class="lifecycle-preview">'+(historyResult.status==='fulfilled'?lifecyclePreview(history,4):'<p class="empty">라이프사이클 이력 연결이 지연 중입니다.</p>')+'</div><button id="projectLifecycleButton" class="primary">전체 라이프사이클 보기</button><button id="projectHistoryButton" class="secondary">변경 근거 · RAW 이력</button>';
+  const stageNames=['자재','조립','전장','검수','출고'],planMap=projectPlanStageMap(planRows);
+  const closed=linked.issueStatus==='CLOSED'||linked.priority===3||/^(출고완료|납품완료|완료)$/.test(String(currentState||''));
+  const currentStage=closed?4:hybridStageIndex({state:currentState,nextAction:linked.nextAction||'',process:linked.process||''});
+  const currentDate=appDay(linked.since)||appDay(linked.sourceLatestUpdate)||new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
+  const scheduleBlock='<div class="hybrid-timeline">'+stageNames.map((name,i)=>{const plan=planMap.get(name),futureLabel=plan?(plan.start+(plan.end&&plan.end!==plan.start?'~'+plan.end:'')):'예정';const cls=closed||i<currentStage?'done':i===currentStage?'now':'';const label=closed||i<currentStage?'종료':i===currentStage?currentDate:futureLabel;return '<div class="hybrid-step '+cls+'"><i></i><b>'+name+'</b><small>'+esc(label)+'</small></div>';}).join('')+'</div><div class="project-schedule-status '+(closed?'closed':'active')+'">'+(closed?'<b>제작 종료</b><span>'+esc(currentDate)+'</span>':'<b>진행중</b><span>'+esc(currentDate)+' · '+esc(currentState)+'</span>')+'</div>';
+  el.innerHTML='<div class="hybrid-project-card"><small>'+esc(p.orderId)+' · PM '+esc(p.pm||'미등록')+'</small><h2>'+esc(p.customer)+' · '+esc(p.model)+'</h2><p>납기 '+esc(p.due||'미등록')+' · Core 원장 연결</p><div class="hybrid-state"><span>현재 상태 · '+esc(currentState)+'</span><span>'+esc(linked.priority===1?'우선 확인':linked.priority===3?'완료':'진행')+'</span></div></div><div class="hybrid-section"><b>전체 제작 일정</b><span>'+(plans?'현재 + 원본 계획':'현재 상태 기준')+'</span></div>'+scheduleBlock+'<div class="hybrid-write"><small>지금 하는 일</small><h3>'+esc(currentState)+'</h3><p>진행·이슈·사유를 한 곳에 입력하면 Event와 현재상태에 연결됩니다.</p><button id="projectInput">🎙 오늘 이슈 입력 <span style="float:right">＋</span></button></div><div class="hybrid-section"><b>최근 라이프사이클</b><span>'+(historyResult.status==='fulfilled'?'JOB NO. 기준':'이력 연결 지연')+'</span></div><div class="lifecycle-preview">'+(historyResult.status==='fulfilled'?lifecyclePreview(history,4):'<p class="empty">라이프사이클 이력 연결이 지연 중입니다.</p>')+'</div><button id="projectLifecycleButton" class="primary">전체 라이프사이클 보기</button><button id="projectHistoryButton" class="secondary">변경 근거 · RAW 이력</button>';
   $('projectInput').onclick=()=>linked.issueId?openUnifiedEvent(linked.issueId):toast('현재 활성 이슈가 없는 프로젝트입니다.');
   $('projectLifecycleButton').onclick=()=>projectLifecycle(p.orderId);
   $('projectHistoryButton').onclick=()=>projectHistory(p.orderId);
