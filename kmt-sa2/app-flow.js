@@ -548,18 +548,19 @@ function summarizePlanRecords(records){
  const list=(records||[]).filter(r=>r&&r.date&&r.process);
  if(!list.length)return {};
  const months=[...new Set(list.map(r=>String(r.sourceMonth||'')).filter(Boolean))].sort();
- const latestMonth=months.at(-1)||'',previousMonth=months.at(-2)||'';
- const currentRows=latestMonth?list.filter(r=>String(r.sourceMonth||'')===latestMonth):list;
- const previousRows=previousMonth?list.filter(r=>String(r.sourceMonth||'')===previousMonth):[];
- const stageDates=re=>{
-  const current=currentRows.filter(r=>re.test(String(r.process||''))).map(r=>formatHfDate(r.date)).filter(v=>v!=='미정').sort();
-  if(current.length)return current;
-  return previousRows.filter(r=>re.test(String(r.process||''))).map(r=>formatHfDate(r.date)).filter(v=>v!=='미정').sort();
+ const lifecycleMonths=months.slice(-12);
+ const lifecycleRows=lifecycleMonths.length?list.filter(r=>lifecycleMonths.includes(String(r.sourceMonth||''))):list;
+ const latestMonth=months.at(-1)||'';
+ const stageRows=re=>{
+  const matchingMonths=lifecycleMonths.slice().reverse().filter(m=>lifecycleRows.some(r=>String(r.sourceMonth||'')===m&&re.test(String(r.process||''))));
+  const chosen=matchingMonths[0]||'';
+  const rows=chosen?lifecycleRows.filter(r=>String(r.sourceMonth||'')===chosen&&re.test(String(r.process||''))):lifecycleRows.filter(r=>re.test(String(r.process||'')));
+  return rows.map(r=>formatHfDate(r.date)).filter(v=>v!=='미정').sort();
  };
- const first=re=>stageDates(re)[0]||'',last=re=>stageDates(re).at(-1)||'';
- const timeline=[...previousRows,...currentRows]
-  .filter((r,i,a)=>a.findIndex(v=>String(v.date)===String(r.date)&&String(v.process)===String(r.process))===i)
-  .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+ const first=re=>stageRows(re)[0]||'',last=re=>stageRows(re).at(-1)||'';
+ const timeline=lifecycleRows
+  .filter((r,i,a)=>a.findIndex(v=>String(v.date)===String(r.date)&&String(v.process)===String(r.process)&&String(v.sourceMonth||'')===String(r.sourceMonth||''))===i)
+  .sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.process).localeCompare(String(b.process)));
  return {
   planAssembly:first(/조립/),
   planElectrical:first(/전장|전기/),
@@ -567,10 +568,11 @@ function summarizePlanRecords(records){
   planInspection:last(/검수|테스트|시험|FAT/),
   planDelivery:last(/출고|납품/),
   planSourceMonth:latestMonth,
-  planPreviousMonth:previousMonth,
+  planLifecycleMonths:lifecycleMonths,
   planTimeline:timeline.map(r=>({date:r.date,process:r.process,sourceMonth:r.sourceMonth||''}))
  };
 }
+
 function applyPlanOverview(byOrder){
  let changed=false;
  items=items.map((x,id)=>{
