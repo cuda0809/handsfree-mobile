@@ -12,23 +12,27 @@ dialog.addEventListener('close',()=>{stopVoice();if(returnFocus?.isConnected)ret
 function toast(text){clearTimeout(toast.timer);$('toast').hidden=true;let target=$('toast');if(dialog.open){target=$('dialogStatus');if(!target){target=document.createElement('p');target.id='dialogStatus';target.className='alert';target.setAttribute('role','status');$('sheetBody').appendChild(target);}}target.textContent=text;target.hidden=false;if(dialog.open)target.scrollIntoView({block:'nearest'});toast.timer=setTimeout(()=>target.hidden=true,4500);}
 function readStore(key,fallback){try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback;}catch{return fallback;}}
 function persist(key,value){localStorage.setItem(key,JSON.stringify(value));if(localStorage.getItem(key)!==JSON.stringify(value))throw Error('storage_failed');}
-const APP_ASSET_HASH_KEY='hf-app-flow-hash-v1';
-async function appFlowHash(){
+const APP_ASSET_HASH_KEY='hf-ui-assets-hash-v2';
+async function liveAssetHash(){
  try{
-  const r=await fetch('./app-flow.js?watch='+Date.now(),{cache:'no-store',credentials:'same-origin'});
-  if(!r.ok)return '';
-  const text=await r.text(),buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));
+  const stamp=Date.now(),paths=['./app-flow.js','./hybrid05.css','./mobile.js','./index.html'];
+  const parts=await Promise.all(paths.map(async path=>{
+   const r=await fetch(path+'?watch='+stamp,{cache:'no-store',credentials:'same-origin'});
+   if(!r.ok)throw Error('asset_fetch_failed');
+   return await r.text();
+  }));
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(parts.join('\n/*HF-ASSET*/\n')));
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
  }catch{return '';}
 }
 async function checkForLiveUpdate(){
  if(document.visibilityState==='hidden'||navigator.onLine===false)return;
- const hash=await appFlowHash();if(!hash)return;
+ const hash=await liveAssetHash();if(!hash)return;
  const prior=sessionStorage.getItem(APP_ASSET_HASH_KEY)||'';
  if(!prior){sessionStorage.setItem(APP_ASSET_HASH_KEY,hash);return;}
  if(prior!==hash){
   sessionStorage.setItem(APP_ASSET_HASH_KEY,hash);
-  toast('새 버전을 반영합니다…');
+  toast('새 화면 버전을 반영합니다…');
   setTimeout(()=>location.reload(),350);
  }
 }
