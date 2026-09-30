@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'android/**'
+      - 'kmt/icon.svg'
       - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
@@ -30,11 +31,11 @@ jobs:
         run: gradle assembleDebug --no-daemon
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk HandsFree-Mobile-Alpha3.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk "KMT-Production-Proto.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: HandsFree-Mobile-Alpha3-APK
-          path: HandsFree-Mobile-Alpha3.apk
+          name: KMT-Production-Proto-APK
+          path: KMT-Production-Proto.apk
           if-no-files-found: error

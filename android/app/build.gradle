@@ -8,6 +8,69 @@ def releaseKeyAlias = project.findProperty('HF_RELEASE_KEY_ALIAS')
 def releaseKeyPassword = project.findProperty('HF_RELEASE_KEY_PASSWORD')
 def hasReleaseSigning = releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword
 
+def logoSource = rootProject.file('../kmt/icon.svg')
+def launcherIconSizes = [
+    'mipmap-mdpi': 48,
+    'mipmap-hdpi': 72,
+    'mipmap-xhdpi': 96,
+    'mipmap-xxhdpi': 144,
+    'mipmap-xxxhdpi': 192
+]
+
+tasks.register('generateLauncherIcons') {
+    inputs.file(logoSource)
+    outputs.files(launcherIconSizes.collect { dirName, size ->
+        file("src/main/res/${dirName}/ic_launcher.png")
+    })
+
+    doLast {
+        def svg = logoSource.getText('UTF-8')
+        def matcher = (svg =~ /base64,([^"]+)/)
+        if (!matcher.find()) {
+            throw new GradleException('KMT logo image was not found in kmt/icon.svg')
+        }
+
+        byte[] logoBytes = java.util.Base64.decoder.decode(matcher.group(1).replaceAll(/\s/, ''))
+        def source = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(logoBytes))
+        if (source == null || source.width != 148 || source.height != 105) {
+            throw new GradleException("Unexpected KMT logo source size: ${source?.width}x${source?.height}")
+        }
+
+        // Approved in-app logo crop from kmt/AGENTS.md.
+        def cropped = source.getSubimage(32, 47, 94, 50)
+
+        launcherIconSizes.each { dirName, size ->
+            def outDir = file("src/main/res/${dirName}")
+            outDir.mkdirs()
+
+            def canvas = new java.awt.image.BufferedImage(size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+            def graphics = canvas.createGraphics()
+            try {
+                graphics.setRenderingHint(
+                    java.awt.RenderingHints.KEY_INTERPOLATION,
+                    java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC
+                )
+                graphics.setRenderingHint(
+                    java.awt.RenderingHints.KEY_RENDERING,
+                    java.awt.RenderingHints.VALUE_RENDER_QUALITY
+                )
+                graphics.setColor(java.awt.Color.WHITE)
+                graphics.fillRect(0, 0, size, size)
+
+                int targetWidth = (int) Math.round(size * 0.82d)
+                int targetHeight = (int) Math.round(targetWidth * (50d / 94d))
+                int x = (size - targetWidth) / 2
+                int y = (size - targetHeight) / 2
+                graphics.drawImage(cropped, x, y, targetWidth, targetHeight, null)
+            } finally {
+                graphics.dispose()
+            }
+
+            javax.imageio.ImageIO.write(canvas, 'png', new File(outDir, 'ic_launcher.png'))
+        }
+    }
+}
+
 android {
     namespace 'com.handsfree.mobile'
     compileSdk 35
@@ -16,8 +79,8 @@ android {
         applicationId 'com.handsfree.mobile.preview8'
         minSdk 26
         targetSdk 35
-        versionCode 1
-        versionName '2026.09.29.5-prod'
+        versionCode 2
+        versionName '2026.10.01.1-proto'
     }
 
     signingConfigs {
@@ -43,3 +106,5 @@ android {
         }
     }
 }
+
+preBuild.dependsOn generateLauncherIcons
