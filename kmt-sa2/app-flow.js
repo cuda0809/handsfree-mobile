@@ -32,9 +32,9 @@ function formatHfDate(v){
  return s;
 }
 function isCompletedOperational(x){
- const state=String(x?.state||''),delivery=String(x?.deliveryState||''),status=String(x?.issueStatus||'');
+ const state=String(x?.state||''),delivery=String(x?.deliveryState||'');
  const actual=formatHfDate(x?.actualDelivery);
- return actual!=='미정'||status==='CLOSED'||/출고\s*완료|납품\s*완료/.test(state+' '+delivery);
+ return actual!=='미정'||/출고\s*완료|납품\s*완료/.test(state+' '+delivery);
 }
 function operationalRows(includeCompleted=true){
  const meta=projectMetaCache()?.projects||appProjects||[];
