@@ -35,23 +35,23 @@ jobs:
         run: gradle assembleDebug --no-daemon
 
       - name: Rename APK
-        run: cp android-renewal/app/build/outputs/apk/debug/app-debug.apk HandsFree-Renewal-0.10-Preview.apk
+        run: cp android-renewal/app/build/outputs/apk/debug/app-debug.apk HandsFree-Renewal-0.11-Preview.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: HandsFree-Renewal-0.10-Preview-APK
-          path: HandsFree-Renewal-0.10-Preview.apk
+          name: HandsFree-Renewal-0.11-Preview-APK
+          path: HandsFree-Renewal-0.11-Preview.apk
           if-no-files-found: error
 
       - name: Publish branch download
         run: |
           mkdir -p downloads
-          cp HandsFree-Renewal-0.10-Preview.apk downloads/HandsFree-Renewal-0.10-Preview.apk
+          cp HandsFree-Renewal-0.11-Preview.apk downloads/HandsFree-Renewal-0.11-Preview.apk
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add downloads/HandsFree-Renewal-0.10-Preview.apk
-          git diff --cached --quiet || git commit -m "Publish Renewal 0.10 Preview APK [skip ci]"
+          git add downloads/HandsFree-Renewal-0.11-Preview.apk
+          git diff --cached --quiet || git commit -m "Publish Renewal 0.11 Preview APK [skip ci]"
           git push origin HEAD:${{ github.ref_name }}
 
-# Renewal 0.10 Preview build
+# Renewal 0.11 Preview build
