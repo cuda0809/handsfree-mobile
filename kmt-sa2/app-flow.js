@@ -514,9 +514,9 @@ function productionPlan(mode='plan',skipMeta=false){
  if(mode==='delivery'){
   main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">PRODUCTION CONTROL</div><h1>계획</h1></div></div>'+tabs+
   '<p class="hybrid-desc">납기는 운영DB의 고객 약속일, 실납기일은 실제 출고일만 표시합니다.</p><div id="deliveryList" class="hybrid-promise-list">'+
-  (selected.length?selected.map(x=>{const due=formatHfDate(x.due),actual=formatHfDate(x.actualDelivery),risk=x.priority===1;return '<button class="hybrid-promise-row delivery-v2" data-delivery-id="'+x.id+'"><div class="delivery-dates"><div><small>납기</small><strong>'+esc(due)+'</strong></div><div><small>실납기일</small><strong>'+esc(actual)+'</strong></div></div><div class="delivery-main"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><small class="delivery-job">JOB NO. '+esc(x.orderId||'미등록')+'</small><p><span>현재</span>'+esc(x.state||'미등록')+'</p><p><span>다음</span>'+esc(x.nextAction||'미정')+'</p></div>'+hybridStageFlow(x)+'</button>';}).join(''):'<p class="empty">현재 Core에 표시할 프로젝트가 없습니다.</p>')+
+  (selected.length?selected.map(x=>{const due=formatHfDate(x.due),actual=formatHfDate(x.actualDelivery),risk=x.priority===1;return '<button class="hybrid-promise-row delivery-v2" data-delivery-order="'+esc(x.orderId)+'"><div class="delivery-dates"><div><small>납기</small><strong>'+esc(due)+'</strong></div><div><small>실납기일</small><strong>'+esc(actual)+'</strong></div></div><div class="delivery-main"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><small class="delivery-job">JOB NO. '+esc(x.orderId||'미등록')+'</small><p><span>현재</span>'+esc(x.state||'미등록')+'</p><p><span>다음</span>'+esc(x.nextAction||'미정')+'</p></div>'+hybridStageFlow(x)+'</button>';}).join(''):'<p class="empty">현재 Core에 표시할 프로젝트가 없습니다.</p>')+
   '</div>';
-  const el=$('deliveryList');el?.querySelectorAll('[data-delivery-id]').forEach(b=>b.onclick=()=>openItem(Number(b.dataset.deliveryId)));
+  const el=$('deliveryList');el?.querySelectorAll('[data-delivery-order]').forEach(b=>b.onclick=()=>openProject(b.dataset.deliveryOrder));
   return;
  }
  const allStages=['조립','전장','프로그램','검수','출고'];
