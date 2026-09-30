@@ -19,7 +19,7 @@ const appCall=b=>api('/api/sa2-app',b,55000);
 function appError(e){if(!e.status&&!e.data)return '연결 실패 또는 응답 미확인입니다. 자동 재전송하지 않습니다.';const code=e.data?.error||e.message;return ({unauthorized:'로그인 상태를 확인할 수 없습니다. 개인 로그인을 다시 확인하세요.',invalid_identity:'개인 인증을 확인하지 못했습니다. 다시 로그인하세요.',identity_denied:'개인 인증 또는 허용 계정을 확인하세요.',invalid_origin:'앱 주소와 인증 출처 설정을 확인하세요.',personal_login_required:'사용자 등록이 필요합니다.',activation_required:'사용자 등록이 필요합니다.',forbidden:'이 계정의 권한을 확인하세요.',stale_record:'다른 변경이 있습니다. 최신 내용을 다시 열어 수정하세요.',project_mismatch:'프로젝트 연결을 확인하세요.',ambiguous_receipt:'같은 내용의 요청이 여러 건입니다. 요청 번호로 확인하세요.',invalid_reason:'변경 사유를 입력하세요.',invalid_next_action:'다음 행동을 입력하세요.',no_change:'변경한 내용이 없습니다.',edit_gate_closed:'수정 기능 연결을 확인 중입니다.'})[code]||scheduleErrors[code]||'연결 결과를 확인하지 못했습니다. 잠시 후 다시 확인하세요.';}
 function appFailure(el,e){if(el?.isConnected)el.innerHTML=esc(appError(e))+(e.status===401?' <a href="./login.html">사용자 등록</a>':'');}
 function appDay(v){if(/^\d{5}(?:\.\d+)?$/.test(String(v)))return new Date(Date.UTC(1899,11,30)+Math.floor(Number(v))*86400000).toISOString().slice(0,10);return String(v||'');}
-const PROJECT_META_KEY='hf-project-meta-v1';
+const PROJECT_META_KEY='hf-project-meta-v2';
 let projectMetaPending=null;
 function formatHfDate(v){
  const s=appDay(v).trim();
@@ -32,9 +32,9 @@ function formatHfDate(v){
  return s;
 }
 function isCompletedOperational(x){
- const state=String(x?.state||''),delivery=String(x?.deliveryState||'');
+ const state=String(x?.state||''),delivery=String(x?.deliveryState||''),masterState=String(x?.masterState||'').trim();
  const actual=formatHfDate(x?.actualDelivery);
- return actual!=='미정'||/출고\s*완료|납품\s*완료/.test(state+' '+delivery);
+ return actual!=='미정'||/출고\s*완료|납품\s*완료/.test(state+' '+delivery)||masterState==='완료';
 }
 function operationalRows(includeCompleted=true){
  const meta=projectMetaCache()?.projects||appProjects||[];
@@ -144,8 +144,9 @@ async function syncProjectMeta(force=false){
    const d=await appCall({action:'core'});
    const issueByOrder=new Map((Array.isArray(d.issues)?d.issues:[]).map(v=>[String(v.orderId||''),v]));
    const projects=(Array.isArray(d.projects)?d.projects:[]).map(p=>{
+    const masterState=String(p.masterState||p.state||'');
     const issue=issueByOrder.get(String(p.orderId||''));
-    return issue?{...p,issueStatus:String(issue.status||''),state:String(issue.state||p.state||'')}:{...p};
+    return issue?{...p,masterState,issueStatus:String(issue.status||''),state:String(issue.state||p.state||'')}:{...p,masterState};
    });
    const source=d.coreFallback?'catalog':'core';
    const cacheChanged=JSON.stringify(projects)!==JSON.stringify(cached?.projects||[]);
@@ -193,7 +194,7 @@ function renderAppReport(){
 }
 const appWorkBase=work;
 work=function(f='all',query=''){appWorkBase(f,query);main.insertAdjacentHTML('afterbegin','<button class="secondary" onclick="allProjects()">전체 프로젝트 · 계획 · 이력</button>');};
-async function getAppProjects(){const d=await appCall({action:'catalog'});if(!Array.isArray(d.projects))throw Error('invalid_catalog');appIssues=d.issues||[];const issueByOrder=new Map(appIssues.map(v=>[String(v.orderId||''),v]));appProjects=d.projects.map(p=>{const issue=issueByOrder.get(String(p.orderId||''));return issue?{...p,issueStatus:String(issue.status||''),state:String(issue.state||p.state||'')}:{...p};});return appProjects;}
+async function getAppProjects(){const d=await appCall({action:'catalog'});if(!Array.isArray(d.projects))throw Error('invalid_catalog');appIssues=d.issues||[];const issueByOrder=new Map(appIssues.map(v=>[String(v.orderId||''),v]));appProjects=d.projects.map(p=>{const masterState=String(p.masterState||p.state||'');const issue=issueByOrder.get(String(p.orderId||''));return issue?{...p,masterState,issueStatus:String(issue.status||''),state:String(issue.state||p.state||'')}:{...p,masterState};});return appProjects;}
 async function allProjects(prefix='',purpose='detail'){
  open(heading('프로젝트',prefix?'장비를 선택하세요':'전체 프로젝트','발주번호를 기준으로 일정과 이력을 연결합니다')+'<div id="projectResults">프로젝트를 불러오는 중…</div>');const el=$('projectResults');
  try{const rows=await getAppProjects();if(!el.isConnected)return;const selected=rows.filter(x=>!prefix||x.orderId.startsWith(prefix));
