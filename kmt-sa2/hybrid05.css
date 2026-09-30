@@ -136,3 +136,98 @@ main{padding:0 14px 84px!important}.date{font-size:11px!important}.lead{font-siz
 .lifecycle-row.legacy .lifecycle-type{background:#f3efe8;color:#8b6a45}
 .lifecycle-row.current .lifecycle-type{background:#e7f3ef;color:var(--hy-green)}
 .lifecycle-row.current b{color:var(--hy-green)}
+
+/* Delivery cards v2: separate promise/actual dates and prevent dense overlaps. */
+.hybrid-promise-row.delivery-v2{
+  display:block!important;
+  padding:15px 14px 14px!important;
+  text-align:left;
+}
+.delivery-dates{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-bottom:13px;
+}
+.delivery-dates>div{
+  min-width:0;
+  padding:9px 10px;
+  border-radius:10px;
+  background:#f6f8f9;
+  border:1px solid #edf0f1;
+}
+.delivery-dates small{
+  display:block;
+  margin-bottom:4px;
+  color:var(--hy-sub);
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:.04em;
+}
+.delivery-dates strong{
+  display:block;
+  font-size:12px;
+  line-height:1.35;
+  overflow-wrap:anywhere;
+}
+.delivery-main{
+  padding:0 1px;
+}
+.delivery-main>b{
+  display:block;
+  font-size:13px;
+  line-height:1.4;
+  margin-bottom:3px;
+}
+.delivery-job{
+  display:block;
+  color:var(--hy-sub);
+  font-size:8px;
+  margin-bottom:9px;
+}
+.delivery-main p{
+  display:grid!important;
+  grid-template-columns:44px 1fr;
+  gap:7px;
+  margin:4px 0!important;
+  color:var(--hy-ink)!important;
+  font-size:10px!important;
+  line-height:1.45!important;
+}
+.delivery-main p span{
+  color:var(--hy-sub);
+  font-size:8px;
+  font-weight:900;
+}
+.delivery-v2 .hybrid-flow{
+  margin-top:14px!important;
+}
+.delivery-v2 .hybrid-flow-now{
+  margin-top:8px!important;
+}
+.project-date-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin:10px 0 12px;
+}
+.project-date-grid>div{
+  padding:9px 10px;
+  border-radius:9px;
+  background:#f7f9fa;
+}
+.project-date-grid small{
+  display:block;
+  color:var(--hy-sub);
+  font-size:8px;
+  margin-bottom:3px;
+}
+.project-date-grid b{
+  display:block;
+  font-size:11px;
+  line-height:1.35;
+  overflow-wrap:anywhere;
+}
+@media(max-width:360px){
+  .delivery-dates,.project-date-grid{grid-template-columns:1fr}
+}
