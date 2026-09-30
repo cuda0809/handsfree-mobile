@@ -78,15 +78,34 @@ function planStagesOnDay(x,day){
   return p;
  }).filter(Boolean))];
 }
+function dueUrgency(x){
+ if(isCompletedOperational(x))return {level:'none',days:null,label:''};
+ const due=formatHfDate(x?.due);
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(due))return {level:'none',days:null,label:''};
+ const today=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
+ const dueMs=ymdTime(due),todayMs=ymdTime(today);
+ if(!Number.isFinite(dueMs)||!Number.isFinite(todayMs))return {level:'none',days:null,label:''};
+ const days=Math.round((dueMs-todayMs)/86400000);
+ if(days<0)return {level:'overdue',days,label:'납기 '+Math.abs(days)+'일 경과'};
+ if(days<=3)return {level:'critical',days,label:days===0?'오늘 납기':'납기 D-'+days};
+ if(days<=7)return {level:'soon',days,label:'납기 임박 D-'+days};
+ return {level:'none',days,label:''};
+}
+function hfDueAlert(x){
+ const d=dueUrgency(x);if(d.level==='none')return '';
+ return '<div class="hf-due-alert '+d.level+'"><span>납기</span><b>'+esc(d.label)+'</b><small>'+esc(formatHfDate(x.due))+'</small></div>';
+}
 function hfCardTone(x,kind='active'){
+ let base='';
  if(kind==='completed'){
   const perf=typeof deliveryPerformance==='function'?deliveryPerformance(x):{tone:'ontime'};
-  return perf.tone==='late'?'tone-delay':perf.tone==='unknown'?'tone-neutral':'tone-complete';
- }
- if(Number(x?.priority||2)===1)return 'tone-urgent';
- if(kind==='plan')return 'tone-plan';
- if(kind==='issue')return 'tone-issue';
- return 'tone-active';
+  base=perf.tone==='late'?'tone-delay':perf.tone==='unknown'?'tone-neutral':'tone-complete';
+ }else if(Number(x?.priority||2)===1)base='tone-urgent';
+ else if(kind==='plan')base='tone-plan';
+ else if(kind==='issue')base='tone-issue';
+ else base='tone-active';
+ const d=dueUrgency(x);
+ return base+(d.level!=='none'?' due-'+d.level:'');
 }
 function hfCardIdentity(x,badge=''){
  return '<div class="hf-card-head"><div><small class="hf-card-job">JOB NO. '+esc(x.orderId||'미등록')+'</small><b class="hf-card-title">'+esc(x.customer||'고객 미등록')+' · '+esc(x.model||'모델 미등록')+'</b></div>'+(badge?'<span class="hf-card-badge">'+esc(badge)+'</span>':'')+'</div>';
@@ -105,13 +124,13 @@ function renderUnifiedHome(){
  const top=urgent[0]||null,done=all.filter(isCompletedOperational);
  const planCards=plannedToday.map(x=>{
   const stages=planStagesOnDay(x,today);
-  return '<button class="hf-card '+hfCardTone(x,'plan')+'" data-home-order="'+esc(x.orderId)+'">'+hfCardIdentity(x,stages.join(' · '))+
+  return '<button class="hf-card '+hfCardTone(x,'plan')+'" data-home-order="'+esc(x.orderId)+'">'+hfCardIdentity(x,stages.join(' · '))+hfDueAlert(x)+
    '<div class="hf-card-meta"><div><small>오늘 계획</small><b>'+esc(stages.join(' · '))+'</b></div><div><small>납기</small><b>'+esc(formatHfDate(x.due))+'</b></div></div>'+
    '<div class="hf-card-line"><span>현재</span><b>'+esc(x.state||'계획')+'</b></div>'+
    '<div class="hf-card-next"><span>다음</span>'+esc(x.nextAction||'미정')+'</div></button>';
  }).join('');
  const issueCards=issueActive.sort((a,b)=>(a.priority||9)-(b.priority||9)).map(x=>
-  '<button class="hf-card '+hfCardTone(x,'issue')+'" data-home-order="'+esc(x.orderId)+'">'+hfCardIdentity(x,x.priority===1?'P1':'진행')+
+  '<button class="hf-card '+hfCardTone(x,'issue')+'" data-home-order="'+esc(x.orderId)+'">'+hfCardIdentity(x,x.priority===1?'P1':'진행')+hfDueAlert(x)+
   '<div class="hf-card-meta"><div><small>현재 상태</small><b>'+esc(x.state||'미등록')+'</b></div><div><small>납기</small><b>'+esc(formatHfDate(x.due))+'</b></div></div>'+
   '<div class="hf-card-next"><span>다음</span>'+esc(x.nextAction||'확인 필요')+'</div></button>'
  ).join('');
@@ -120,7 +139,7 @@ function renderUnifiedHome(){
  '<h1 class="hybrid-title">오늘 확인할 일<br>'+attention.length+'건이 있습니다</h1>'+
  '<p class="hybrid-desc">생산계획과 현장 이슈를 같은 카드 규칙으로 보여줍니다.</p>'+
  '<div class="hf-stat-grid"><button class="hf-stat-card tone-active" onclick="productionPlan()"><small>관리중</small><b>'+activeRows.length+'</b><span>통합 운영</span></button><button class="hf-stat-card tone-urgent" onclick="projects(\'active\')"><small>우선순위 1</small><b>'+urgent.length+'</b><span>먼저 확인</span></button><button class="hf-stat-card tone-complete" onclick="projects(\'completed\')"><small>완료</small><b>'+done.length+'</b><span>이력 보존</span></button></div>'+
- (top?'<div class="hybrid-section"><b>우선 확인 이슈</b><span>P1</span></div><button class="hf-card hf-feature-card '+hfCardTone(top,'issue')+'" data-home-order="'+esc(top.orderId)+'">'+hfCardIdentity(top,'우선 확인')+'<div class="hf-card-meta"><div><small>현재 상태</small><b>'+esc(top.state||'미등록')+'</b></div><div><small>납기</small><b>'+esc(formatHfDate(top.due))+'</b></div></div><div class="hf-card-next"><span>다음</span>'+esc(top.nextAction||'확인 필요')+'</div></button>':'')+
+ (top?'<div class="hybrid-section"><b>우선 확인 이슈</b><span>P1</span></div><button class="hf-card hf-feature-card '+hfCardTone(top,'issue')+'" data-home-order="'+esc(top.orderId)+'">'+hfCardIdentity(top,'우선 확인')+hfDueAlert(top)+'<div class="hf-card-meta"><div><small>현재 상태</small><b>'+esc(top.state||'미등록')+'</b></div><div><small>납기</small><b>'+esc(formatHfDate(top.due))+'</b></div></div><div class="hf-card-next"><span>다음</span>'+esc(top.nextAction||'확인 필요')+'</div></button>':'')+
  '<div class="hybrid-section"><b>오늘 생산계획</b><span>'+plannedToday.length+'대</span></div>'+
  '<div class="hf-card-list">'+(planCards||'<div class="empty">오늘로 잡힌 생산계획이 없습니다.</div>')+'</div>'+
  '<div class="hybrid-section"><b>현장 이슈</b><span>'+issueActive.length+'대</span></div>'+
@@ -643,7 +662,7 @@ function productionPlan(mode='plan',skipMeta=false){
  if(mode==='delivery'){
   main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">PRODUCTION CONTROL</div><h1>계획</h1></div></div>'+tabs+
   '<p class="hybrid-desc">납기는 운영DB의 고객 약속일, 실납기일은 실제 출고일만 표시합니다.</p><div id="deliveryList" class="hybrid-promise-list">'+
-  (selected.length?selected.map(x=>{const due=formatHfDate(x.due),actual=formatHfDate(x.actualDelivery),risk=x.priority===1;return '<button class="hybrid-promise-row delivery-v2 hf-card '+hfCardTone(x,'active')+'" data-delivery-order="'+esc(x.orderId)+'"><div class="delivery-dates"><div><small>납기</small><strong>'+esc(due)+'</strong></div><div><small>실납기일</small><strong>'+esc(actual)+'</strong></div></div><div class="delivery-main"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><small class="delivery-job">JOB NO. '+esc(x.orderId||'미등록')+'</small><p><span>현재</span>'+esc(x.state||'미등록')+'</p><p><span>다음</span>'+esc(x.nextAction||'미정')+'</p></div>'+hybridStageFlow(x)+'</button>';}).join(''):'<p class="empty">현재 Core에 표시할 프로젝트가 없습니다.</p>')+
+  (selected.length?selected.map(x=>{const due=formatHfDate(x.due),actual=formatHfDate(x.actualDelivery),risk=x.priority===1;return '<button class="hybrid-promise-row delivery-v2 hf-card '+hfCardTone(x,'active')+'" data-delivery-order="'+esc(x.orderId)+'"><div class="delivery-dates"><div><small>납기</small><strong>'+esc(due)+'</strong></div><div><small>실납기일</small><strong>'+esc(actual)+'</strong></div></div>'+hfDueAlert(x)+'<div class="delivery-main"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><small class="delivery-job">JOB NO. '+esc(x.orderId||'미등록')+'</small><p><span>현재</span>'+esc(x.state||'미등록')+'</p><p><span>다음</span>'+esc(x.nextAction||'미정')+'</p></div>'+hybridStageFlow(x)+'</button>';}).join(''):'<p class="empty">현재 Core에 표시할 프로젝트가 없습니다.</p>')+
   '</div>';
   const el=$('deliveryList');el?.querySelectorAll('[data-delivery-order]').forEach(b=>b.onclick=()=>openProject(b.dataset.deliveryOrder));
   return;
@@ -659,7 +678,7 @@ function productionPlan(mode='plan',skipMeta=false){
  '<div class="production-plan-list hf-card-list">'+
  (selected.length?selected.map(x=>{
    const planned=allStages.some(s=>formatHfDate(planValue(x,s))!=='미정');
-   return '<button class="production-plan-card hf-card '+hfCardTone(x,'plan')+'" data-plan-order="'+esc(x.orderId)+'"><div class="production-plan-head"><div><small>JOB NO. '+esc(x.orderId||'미등록')+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b></div><span class="'+(planned?'set':'unset')+'">'+(planned?'일정 있음':'제작일정 미정')+'</span></div>'+
+   return '<button class="production-plan-card hf-card '+hfCardTone(x,'plan')+'" data-plan-order="'+esc(x.orderId)+'"><div class="production-plan-head"><div><small>JOB NO. '+esc(x.orderId||'미등록')+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b></div><span class="'+(planned?'set':'unset')+'">'+(planned?'일정 있음':'제작일정 미정')+'</span></div>'+hfDueAlert(x)+
    '<div class="production-plan-meta"><div><small>납기</small><b>'+esc(formatHfDate(x.due))+'</b></div><div><small>현재</small><b>'+esc(x.state||'미등록')+'</b></div></div>'+
    '<div class="production-plan-stages">'+allStages.map(name=>'<div><small>'+name+'</small><b>'+esc(formatHfDate(planValue(x,name)))+'</b></div>').join('')+'</div>'+
    '<p class="production-plan-next"><span>다음 행동</span>'+esc(x.nextAction||'미정')+'</p></button>';
