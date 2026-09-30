@@ -142,11 +142,16 @@ async function syncProjectMeta(force=false){
  projectMetaPending=(async()=>{
   try{
    const d=await appCall({action:'core'});
-   const projects=Array.isArray(d.projects)?d.projects:[];
+   const issueByOrder=new Map((Array.isArray(d.issues)?d.issues:[]).map(v=>[String(v.orderId||''),v]));
+   const projects=(Array.isArray(d.projects)?d.projects:[]).map(p=>{
+    const issue=issueByOrder.get(String(p.orderId||''));
+    return issue?{...p,issueStatus:String(issue.status||''),state:String(issue.state||p.state||'')}:{...p};
+   });
    const source=d.coreFallback?'catalog':'core';
+   const cacheChanged=JSON.stringify(projects)!==JSON.stringify(cached?.projects||[]);
    persist(PROJECT_META_KEY,{cachedAt:new Date().toISOString(),source,projects});
    const changed=applyProjectMeta(projects,source);
-   if(changed){
+   if(changed||cacheChanged){
     if(screen==='home')home();
     if(screen==='plan')productionPlan(productionPlanMode,true);
     if(screen==='projects')projects(filter,true);
@@ -188,7 +193,7 @@ function renderAppReport(){
 }
 const appWorkBase=work;
 work=function(f='all',query=''){appWorkBase(f,query);main.insertAdjacentHTML('afterbegin','<button class="secondary" onclick="allProjects()">전체 프로젝트 · 계획 · 이력</button>');};
-async function getAppProjects(){const d=await appCall({action:'catalog'});if(!Array.isArray(d.projects))throw Error('invalid_catalog');appIssues=d.issues||[];appProjects=d.projects;return appProjects;}
+async function getAppProjects(){const d=await appCall({action:'catalog'});if(!Array.isArray(d.projects))throw Error('invalid_catalog');appIssues=d.issues||[];const issueByOrder=new Map(appIssues.map(v=>[String(v.orderId||''),v]));appProjects=d.projects.map(p=>{const issue=issueByOrder.get(String(p.orderId||''));return issue?{...p,issueStatus:String(issue.status||''),state:String(issue.state||p.state||'')}:{...p};});return appProjects;}
 async function allProjects(prefix='',purpose='detail'){
  open(heading('프로젝트',prefix?'장비를 선택하세요':'전체 프로젝트','발주번호를 기준으로 일정과 이력을 연결합니다')+'<div id="projectResults">프로젝트를 불러오는 중…</div>');const el=$('projectResults');
  try{const rows=await getAppProjects();if(!el.isConnected)return;const selected=rows.filter(x=>!prefix||x.orderId.startsWith(prefix));
@@ -554,12 +559,13 @@ async function syncPlanOverview(force=false){
     byOrder[x.orderId]=summarizePlanRecords(records);
    });
   }
+  const cacheChanged=JSON.stringify(byOrder)!==JSON.stringify(cached?.byOrder||{});
   persist(PLAN_OVERVIEW_KEY,{cachedAt:new Date().toISOString(),byOrder,candidateCount:targets.length});
   const changed=applyPlanOverview(byOrder);
-  if(changed&&screen==='home')home();
+  if((changed||cacheChanged)&&screen==='home')home();
   if(screen==='plan')productionPlan(productionPlanMode,true);
-  if(changed&&screen==='projects')projects(filter,true);
-  return {byOrder,candidateCount:targets.length,changed};
+  if((changed||cacheChanged)&&screen==='projects')projects(filter,true);
+  return {byOrder,candidateCount:targets.length,changed,cacheChanged};
  })().finally(()=>{planOverviewPending=null;});
  return planOverviewPending;
 }
