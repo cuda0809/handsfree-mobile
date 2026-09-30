@@ -712,3 +712,46 @@ main{padding:0 14px 84px!important}.date{font-size:11px!important}.lead{font-siz
  color:#315e9e!important;
  border:1px solid #cbdcf1!important;
 }
+
+/* Project detail schedule aligned with production-plan cards */
+.project-plan-grid{
+ display:grid;
+ grid-template-columns:repeat(5,minmax(0,1fr));
+ gap:6px;
+ margin:10px 0 12px;
+}
+.project-plan-cell{
+ min-width:0;
+ padding:10px 6px;
+ border:1px solid #e4eaf0;
+ border-radius:10px;
+ background:#fafcfd;
+ text-align:center;
+ font-family:var(--hf-card-font)!important;
+}
+.project-plan-cell small{
+ display:block;
+ margin-bottom:4px;
+ color:#758294;
+ font-size:9px;
+ font-weight:700;
+}
+.project-plan-cell b{
+ display:block;
+ color:#2b4055;
+ font-size:10px;
+ line-height:1.3;
+ font-weight:850;
+ overflow-wrap:anywhere;
+}
+.project-plan-cell.now{
+ border:2px solid var(--hf-blue);
+ background:#f1f6fd;
+}
+.project-plan-cell.done{
+ border-color:#bcd8c8;
+ background:#f0f8f3;
+}
+@media(max-width:380px){
+ .project-plan-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
