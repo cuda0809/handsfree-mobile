@@ -94,16 +94,42 @@ export default async function handler(req,res){
       return !!(String(s.state||'').trim()||String(s.nextAction||'').trim());
     });
     const old=new Map((Array.isArray(legacy?.currentStatus)?legacy.currentStatus:[]).map(x=>[String(x.issueId||''),x]));
+    const projects=Array.isArray(catalog.projects)?catalog.projects:[];
+    const projectFor=orderId=>{
+      const id=String(orderId||'');
+      const exact=projects.find(p=>String(p.orderId||'')===id);
+      if(exact)return exact;
+      if(id.includes('*')){
+        const prefix=id.replace(/\*.*$/,'');
+        return projects.find(p=>String(p.orderId||'').startsWith(prefix))||null;
+      }
+      return null;
+    };
+    const parseDue=value=>{
+      const s=String(value||'').trim();
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return null;
+      const t=Date.parse(s+'T00:00:00+09:00');
+      return Number.isFinite(t)?t:null;
+    };
+    const priorityFor=(s,state,nextAction)=>{
+      if(/^(출고완료|납품완료|완료)$/.test(state))return {priority:3,reason:'완료 상태'};
+      const text=state+' '+nextAction;
+      if(/불량|문제|고장|지연|점검|재작업|수정중|에러|오류|멈춤/.test(text))return {priority:1,reason:'문제·점검 필요'};
+      const project=projectFor(s.orderId),due=parseDue(project?.due);
+      if(/대기|보류/.test(text)&&due!==null&&due<Date.now())return {priority:1,reason:'납기 경과 대기'};
+      if(/대기|보류/.test(text))return {priority:2,reason:'일반 대기'};
+      return {priority:2,reason:'정상 진행'};
+    };
 
     const currentStatus=snapshots.map(s=>{
       const prior=old.get(String(s.issueId||''))||{};
       const state=String(s.state||'확인중'),nextAction=String(s.nextAction||'');
-      const priority=Number(prior.priority)||(/지연|대기|문제|불량|점검/.test(state+' '+nextAction)?1:2);
+      const ranked=priorityFor(s,state,nextAction);
       return {
         issueId:String(s.issueId||''),orderId:String(s.orderId||''),customer:String(s.customer||prior.customer||''),
         model:String(s.model||prior.model||''),process:String(prior.process||'현재상태'),state,
         since:String(prior.since||''),days:Number(prior.days||0),cause:String(prior.cause||''),
-        nextAction,tone:String(prior.tone||'warn'),priority,issueStatus:String(s.status||''),
+        nextAction,tone:String(prior.tone||'warn'),priority:ranked.priority,priorityReason:ranked.reason,issueStatus:String(s.status||''),
         type:String(prior.type||''),sourceLatestUpdate:String(prior.sourceLatestUpdate||'')
       };
     });
