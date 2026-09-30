@@ -1,16 +1,15 @@
 'use strict';
-const BUILD='2026.09.30.RENEWAL.0.6', KEY='handsfree-renewal-notes-v1', DRAFT='handsfree-renewal-draft-v1';
+const BUILD='2026.09.30.RENEWAL.0.7', KEY='handsfree-renewal-notes-v1', DRAFT='handsfree-renewal-draft-v1';
 const main=document.getElementById('main'),dialog=document.getElementById('detail');
 let items=[],live=false,personalConnected=false,readPending=null,sourceDate='',lastRead='',screen='home',filter='all',returnFocus=null,readMessage='현재 상태를 불러오는 중…',recognition=null,installPrompt=null;
 const $=id=>document.getElementById(id);
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function norm(s){return String(s||'').toLowerCase().replace(/[\s\-‐‑–—]/g,'');}
 function closeDetail(){document.getElementById('detail')?.close();}
-function heading(k,t,sub=''){return `<div class="sheet-head"><div><div class="eyebrow">${esc(k)}</div><h2>${esc(t)}</h2></div><button class="icon" aria-label="상세 닫기" data-close-detail>×</button></div><div class="sub">${esc(sub)}</div>`;}
+function heading(k,t,sub=''){return `<div class="sheet-head"><div><div class="eyebrow">${esc(k)}</div><h2>${esc(t)}</h2></div><button class="icon" aria-label="상세 닫기" onclick="document.getElementById('detail').close()">×</button></div><div class="sub">${esc(sub)}</div>`;}
 function open(html){stopVoice();if(!dialog.open)returnFocus=document.activeElement;$('sheetBody').innerHTML=html;if(!dialog.open)dialog.showModal();dialog.scrollTop=0;}
 dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});
 dialog.addEventListener('close',()=>{stopVoice();if(returnFocus?.isConnected)returnFocus.focus();});
-document.addEventListener('click',e=>{const target=e.target instanceof Element?e.target:null;if(!target)return;const closeButton=target.closest('[data-close-detail]');if(closeButton){closeDetail();return;}const progressButton=target.closest('[data-progress-id]');if(progressButton){const id=progressButton.dataset.progressId;progressInput(id===''?undefined:Number(id));return;}if(target.closest('[data-progress-open]'))progressInput();});
 function toast(text){clearTimeout(toast.timer);$('toast').hidden=true;let target=$('toast');if(dialog.open){target=$('dialogStatus');if(!target){target=document.createElement('p');target.id='dialogStatus';target.className='alert';target.setAttribute('role','status');$('sheetBody').appendChild(target);}}target.textContent=text;target.hidden=false;if(dialog.open)target.scrollIntoView({block:'nearest'});toast.timer=setTimeout(()=>target.hidden=true,4500);}
 function readStore(key,fallback){try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback;}catch{return fallback;}}
 function persist(key,value){localStorage.setItem(key,JSON.stringify(value));if(localStorage.getItem(key)!==JSON.stringify(value))throw Error('storage_failed');}
@@ -29,7 +28,7 @@ function delivery(){active('delivery');const rows=items.slice().sort((a,b)=>Stri
 function records(){active('records');showInbox();}
 function renderList(){const q=norm($('search').value),a=items.filter(x=>(filter!=='waiting'||/대기|보류|지연/.test(x.state))&&(filter!=='urgent'||x.priority===1)&&norm([x.customer,x.model,x.state,x.cause,x.orderId].join(' ')).includes(q));$('list').innerHTML=a.length?a.map(card).join(''):`<div class="empty">${live?'일치하는 업무가 없습니다.':esc(readMessage)}</div>`;}
 function openItem(id){const x=items[id];if(!x)return toast('최신 상태를 다시 불러오세요.');open(heading(x.process,x.customer,x.model)+`<h4>최근 진행내용</h4><div class="action-box">${esc(x.state||'미등록')}</div><h4>진행 시작 · 지속</h4><p>${esc(x.since||'미등록')} · ${Number.isFinite(x.days)?x.days+'일째':'기간 미확인'}</p><h4>기존 원인 / 이슈</h4><p>${esc(x.cause||'미등록')}</p><h4>다음 행동</h4><p>${esc(x.nextAction||'미등록')}</p><p class="note">${esc(x.issueId)} · ${esc(x.issueStatus)} · 원본 최신 ${esc(x.sourceLatestUpdate||sourceDate)}</p><button class="primary" data-progress-id="${id}">이 업무에 진행 내용 입력</button><button class="secondary" onclick="scheduleReport(${id})">계획일정 확인</button>`);}
-function unavailable(title,description){open(heading('연결 상태',title,'실제 데이터 연결이 필요합니다')+`<div class="alert">${esc(description)}</div><p>값을 0 또는 완료로 대신 표시하지 않습니다.</p><button class="secondary" data-close-detail>닫기</button>`);}
+function unavailable(title,description){open(heading('연결 상태',title,'실제 데이터 연결이 필요합니다')+`<div class="alert">${esc(description)}</div><p>값을 0 또는 완료로 대신 표시하지 않습니다.</p><button class="secondary" onclick="document.getElementById('detail').close()">닫기</button>`);}
 function productionReport(mode){unavailable(mode==='month'?'월간생산량':'연간생산량','현재 조회 서비스에 생산 완료일·완료 수량이 없어 실적을 집계할 수 없습니다.');}
 function supportReport(){unavailable('타부서지원 누적 집계표','현재 조회 서비스에 지원 부서·지원 시간·기준일이 연결되지 않았습니다.');}
 let planRequest=0;
@@ -84,4 +83,4 @@ document.addEventListener('visibilitychange',resumeRead);
 dialog.addEventListener('close',()=>{if(resumeReadNeeded)resumeRead();});
 window.addEventListener('online',()=>{toast('연결이 복구되었습니다. 보관한 입력은 처리함에서 확인하세요.');resumeRead();});
 window.addEventListener('offline',()=>{items=[];live=false;readMessage='오프라인 · 초안 보관 가능';banner();if(screen==='home')home();if(screen==='work')work(filter);});
-if('serviceWorker' in navigator){let reloadingForUpdate=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloadingForUpdate)return;reloadingForUpdate=true;location.reload();});navigator.serviceWorker.register('./sw.js?v=renewal06',{scope:'./',updateViaCache:'none'}).then(r=>r.update()).catch(()=>toast('오프라인 앱 준비에 실패했습니다. 온라인으로 사용할 수 있습니다.'));}
+if('serviceWorker' in navigator){let reloadingForUpdate=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloadingForUpdate)return;reloadingForUpdate=true;location.reload();});navigator.serviceWorker.register('./sw.js?v=renewal07',{scope:'./',updateViaCache:'none'}).then(r=>r.update()).catch(()=>toast('오프라인 앱 준비에 실패했습니다. 온라인으로 사용할 수 있습니다.'));}

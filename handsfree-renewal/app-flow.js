@@ -60,8 +60,13 @@ const appScheduleBase=scheduleReport;
 scheduleReport=function(id){if(!personalConnected)return login();const x=typeof id==='object'?id:items[id];if(x?.orderId?.includes('*'))return allProjects(x.orderId.replace(/\*.*$/,''),'schedule');return appScheduleBase(id);};
 const appInputBase=progressInput;
 progressInput=function(id){if(!personalConnected)return login();const x=typeof id==='object'?id:items[id];if(x?.orderId?.includes('*'))return allProjects(x.orderId.replace(/\*.*$/,''),'input');editingNoteId=null;return appInputBase(id);};
+function bindProgressButtons(scope=document){scope.querySelectorAll('[data-progress-id]').forEach(button=>{button.onclick=()=>{const id=button.dataset.progressId;progressInput(id===''?undefined:Number(id));};});scope.querySelectorAll('[data-progress-open]').forEach(button=>{button.onclick=()=>progressInput();});}
+const appHomeBase=home;
+home=function(){appHomeBase();bindProgressButtons(main);};
 const appItemBase=openItem;
-openItem=function(id){appItemBase(id);const x=items[id];if(!x)return;const box=$('sheetBody');box.insertAdjacentHTML('beforeend','<button id="issueHistoryButton" class="secondary">전체 조립일정 · 진행이력</button>');$('issueHistoryButton').onclick=()=>openProject(x.orderId);};
+openItem=function(id){appItemBase(id);const x=items[id];if(!x)return;const box=$('sheetBody');bindProgressButtons(box);box.insertAdjacentHTML('beforeend','<button id="issueHistoryButton" class="secondary">전체 조립일정 · 진행이력</button>');$('issueHistoryButton').onclick=()=>openProject(x.orderId);};
+const appGrowBase=grow;
+grow=function(){appGrowBase();bindProgressButtons($('sheetBody'));};
 async function projectHistory(orderId){open(heading('Event · 변경이력',orderId)+'<div id="historyResult">서버 기록을 불러오는 중…</div>');const el=$('historyResult');try{const d=await appCall({action:'history',orderId});if(!el.isConnected)return;
  el.innerHTML='<h3>변경이력</h3>'+d.changes.map(r=>'<article class="item"><b>'+esc(r.kind==='schedule'?'일정 변경':'현재 상태 변경')+'</b><p>'+esc(r.kind==='schedule'?appDay(r.before[3])+' → '+appDay(r.after[3]):r.before[16]+' → '+r.after[16])+'</p><p>'+esc(r.reason)+'</p><small>'+esc(r.at)+' · '+esc(r.actor)+'<br>'+esc(r.id)+'</small></article>').join('')+(!d.changes.length?'<p>기록된 변경이력이 없습니다.</p>':'')+'<h3>Event</h3>'+d.events.map(r=>'<article class="item"><b>'+esc(r.type)+' · '+esc(r.status)+'</b><p>'+esc(r.raw)+'</p><small>'+esc(r.at)+' · '+esc(r.actor||'과거 기록: 입력자 직접 기록 없음')+'<br>'+esc(r.requestId)+'</small></article>').join('')+(!d.events.length?'<p>연결된 Event 기록이 없습니다.</p>':'');
  }catch(e){appFailure(el,e);}}
