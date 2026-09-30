@@ -318,29 +318,49 @@ function applyLatestHistoryState(orderId,history){
  if(typeof coreCacheSave==='function')coreCacheSave();
  return true;
 }
+async function openProjectPlan(orderId,fallback={}){
+ open(heading('계획일정',fallback.customer||orderId,fallback.model||'')+'<div id="projectDirectPlan">원본 계획을 불러오는 중…</div>');
+ const el=$('projectDirectPlan');
+ try{
+  const d=await api('/api/sa2-lifecycle',{action:'plans',orderId},30000);
+  if(!el?.isConnected)return;
+  const records=Array.isArray(d.records)?d.records:Array.isArray(d.plans)?d.plans:[];
+  const rows=records.map(r=>Array.isArray(r)?{date:r[3],process:r[10],status:r[11]}:r)
+   .filter(r=>r&&r.date&&r.process)
+   .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  el.innerHTML='<div class="job-number"><small>JOB NO.</small><b>'+esc(orderId)+'</b></div>'+
+   (rows.length?'<div class="timeline">'+rows.map(r=>'<p><b>'+esc(formatHfDate(r.date))+' · '+esc(r.process)+'</b>'+(r.status?'<small>'+esc(r.status)+'</small>':'')+'</p>').join('')+'</div>':'<p class="empty">연결된 원본 계획이 없습니다.</p>');
+ }catch(e){if(el?.isConnected)el.textContent=appError(e);}
+}
 async function openProject(orderId,purpose='detail'){
- let p=appProjects.find(x=>x.orderId===orderId)||items.find(x=>x.orderId===orderId);if(!p)return toast('최신 프로젝트 목록을 다시 불러오세요.');
+ let p=operationalRows(true).find(x=>x.orderId===orderId)||appProjects.find(x=>x.orderId===orderId)||items.find(x=>x.orderId===orderId);
+ if(!p){
+  try{await getAppProjects();}catch{}
+  p=operationalRows(true).find(x=>x.orderId===orderId)||appProjects.find(x=>x.orderId===orderId)||items.find(x=>x.orderId===orderId);
+ }
+ if(!p)return toast('프로젝트 원장을 불러오지 못했습니다.');
  if(purpose==='input')return input(p);
  open(heading('프로젝트',p.customer,p.model)+'<div id="projectOverview"></div>');const el=$('projectOverview');
- let linked=items.find(x=>x.orderId===p.orderId)||p;
+ let linked=operationalRows(true).find(x=>x.orderId===p.orderId)||p;
  const local=lifecycleCacheGet(p.orderId);
  let shownHistory=projectHistoryCache.get(p.orderId)||local?.history||null;
  let historyState=shownHistory?(local?.cachedAt?'최근 정상값':'앱 캐시'):'동기화 중';
 
  const render=()=>{
   if(!el?.isConnected)return;
-  linked=items.find(x=>x.orderId===p.orderId)||linked||p;
+  linked=operationalRows(true).find(x=>x.orderId===p.orderId)||linked||p;
   const currentState=linked.state||p.state||'미등록';
   const stageNames=['자재','조립','전장','검수','출고'];
-  const closed=linked.issueStatus==='CLOSED'||linked.priority===3||/^(출고완료|납품완료|완료)$/.test(String(currentState||''));
+  const closed=isCompletedOperational(linked);
   const currentStage=closed?4:hybridStageIndex({state:currentState,nextAction:linked.nextAction||'',process:linked.process||''});
-  const currentDate=appDay(linked.since)||appDay(linked.sourceLatestUpdate)||new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
+  const actualDay=formatHfDate(linked.actualDelivery||p.actualDelivery);
+  const currentDate=closed&&actualDay!=='미정'?actualDay:(appDay(linked.since)||appDay(linked.sourceLatestUpdate)||new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'}));
   const planByStage={자재:'',조립:linked.planAssembly||'',전장:linked.planElectrical||linked.planProgram||'',검수:linked.planInspection||'',출고:linked.planDelivery||''};
   const scheduleBlock='<div class="hybrid-timeline">'+stageNames.map((name,i)=>{const cls=closed||i<currentStage?'done':i===currentStage?'now':'';const label=closed||i<currentStage?'종료':i===currentStage?currentDate:formatHfDate(planByStage[name]);return '<div class="hybrid-step '+cls+'"><i></i><b>'+name+'</b><small>'+esc(label)+'</small></div>';}).join('')+'</div><div class="project-schedule-status '+(closed?'closed':'active')+'">'+(closed?'<b>제작 종료</b><span>'+esc(currentDate)+'</span>':'<b>진행중</b><span>'+esc(currentDate)+' · '+esc(currentState)+'</span>')+'</div>';
-  el.innerHTML='<div class="hybrid-project-card"><small>JOB NO. '+esc(p.orderId)+' · PM '+esc(p.pm||'미등록')+'</small><h2>'+esc(p.customer)+' · '+esc(p.model)+'</h2><div class="project-date-grid"><div><small>납기</small><b>'+esc(formatHfDate(linked.due||p.due))+'</b></div><div><small>실납기일</small><b>'+esc(formatHfDate(linked.actualDelivery||p.actualDelivery))+'</b></div></div><div class="hybrid-state"><span>현재 상태 · '+esc(currentState)+'</span><span>'+esc(linked.priority===1?'우선 확인':linked.priority===3?'완료':'진행')+'</span></div></div><div class="hybrid-section"><b>전체 제작 일정</b><span>현장 기준</span></div>'+scheduleBlock+'<div class="hybrid-section"><b>최근 라이프사이클</b><span>'+esc(historyState)+'</span></div><div class="lifecycle-preview">'+(shownHistory?lifecyclePreview(shownHistory,4,linked):lifecyclePreview({events:[],changes:[]},4,linked))+'</div><button id="projectLifecycleButton" class="primary">전체 라이프사이클 보기</button><button id="projectHistoryButton" class="secondary">변경 근거 · RAW 이력</button><button id="projectPlanButton" class="secondary">원본 계획일정 확인</button>';
+  el.innerHTML='<div class="hybrid-project-card"><small>JOB NO. '+esc(p.orderId)+' · PM '+esc(p.pm||'미등록')+'</small><h2>'+esc(p.customer)+' · '+esc(p.model)+'</h2><div class="project-date-grid"><div><small>납기</small><b>'+esc(formatHfDate(linked.due||p.due))+'</b></div><div><small>실납기일</small><b>'+esc(formatHfDate(linked.actualDelivery||p.actualDelivery))+'</b></div></div><div class="hybrid-state"><span>현재 상태 · '+esc(currentState)+'</span><span>'+esc(closed?'완료':linked.priority===1?'우선 확인':'진행')+'</span></div></div><div class="hybrid-section"><b>전체 제작 일정</b><span>현장 기준</span></div>'+scheduleBlock+'<div class="hybrid-section"><b>최근 라이프사이클</b><span>'+esc(historyState)+'</span></div><div class="lifecycle-preview">'+(shownHistory?lifecyclePreview(shownHistory,4,linked):lifecyclePreview({events:[],changes:[]},4,linked))+'</div><button id="projectLifecycleButton" class="primary">전체 라이프사이클 보기</button><button id="projectHistoryButton" class="secondary">변경 근거 · RAW 이력</button><button id="projectPlanButton" class="secondary">원본 계획일정 확인</button>';
   $('projectLifecycleButton').onclick=()=>projectLifecycle(p.orderId);
   $('projectHistoryButton').onclick=()=>projectHistory(p.orderId);
-  $('projectPlanButton').onclick=()=>scheduleReport(linked);
+  $('projectPlanButton').onclick=()=>openProjectPlan(p.orderId,linked);
  };
  render();
 
@@ -363,7 +383,7 @@ async function openProject(orderId,purpose='detail'){
   if(!el?.isConnected)return;
   projectHistoryCache.set(p.orderId,history);lifecycleCacheSet(p.orderId,history);
   applyLatestHistoryState(p.orderId,history);
-  linked=items.find(x=>x.orderId===p.orderId)||linked;
+  linked=operationalRows(true).find(x=>x.orderId===p.orderId)||linked;
   shownHistory=history;historyState='최신 동기화';render();
  }).catch(()=>{if(shownHistory){historyState='동기화 지연 · 최근 정상값';render();}else{historyState='이력 연결 지연';render();}});
 }
