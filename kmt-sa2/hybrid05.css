@@ -92,3 +92,7 @@ main{padding:0 14px 84px!important}.date{font-size:11px!important}.lead{font-siz
 .today-issue-actions{display:grid;grid-template-columns:90px 1fr;gap:8px;align-items:end}
 .today-issue-actions .chip,.today-issue-actions .primary{margin-top:8px!important;min-height:42px}
 .today-issue-actions .primary{padding:10px!important}
+
+.job-number{margin:10px 0 18px;padding:10px 12px;border:1px solid var(--hy-line);border-radius:10px;background:#f7f9fa}
+.job-number small{display:block;margin-bottom:3px;color:var(--hy-sub);font-size:8px;font-weight:900;letter-spacing:.08em}
+.job-number b{display:block;color:var(--hy-ink);font-size:14px;letter-spacing:.02em}
