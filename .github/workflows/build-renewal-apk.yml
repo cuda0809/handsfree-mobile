@@ -38,3 +38,6 @@ jobs:
           name: HandsFree-Renewal-0.10-Preview-APK
           path: HandsFree-Renewal-0.10-Preview.apk
           if-no-files-found: error
+
+# Renewal 0.10 Preview build
+
