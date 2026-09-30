@@ -134,7 +134,7 @@ export default async function handler(req,res){
       };
     });
     const mismatches=currentStatus.flatMap(x=>{
-      const p=old.get(x.issueId);if(!p)return [];
+      const p=legacyByIssue.get(x.issueId);if(!p)return [];
       const fields=[];
       if(String(p.state||'')!==x.state)fields.push('state');
       if(String(p.nextAction||'')!==x.nextAction)fields.push('nextAction');
