@@ -1,14 +1,17 @@
 /* Completes existing Light v1 screens using personal, signed server requests. */
-let appIssues=[],appProjects=[],appReport=null,appIssue=null,editingNoteId=null;
+let appIssues=[],appProjects=[],appReport=null,appReportData=null,appReportAt=0,appReportPending=null,appCatalogPending=null,appIssue=null,editingNoteId=null;
 const appCall=b=>api('/api/sa2-app',b,55000);
-function appError(e){if(!e.status&&!e.data)return '연결 실패 또는 응답 미확인입니다. 자동 재전송하지 않습니다.';const code=e.data?.error||e.message;return ({unauthorized:'로그인 상태를 확인할 수 없습니다. 개인 로그인을 다시 확인하세요.',invalid_identity:'개인 인증을 확인하지 못했습니다. 다시 로그인하세요.',identity_denied:'개인 인증 또는 허용 계정을 확인하세요.',invalid_origin:'앱 주소와 인증 출처 설정을 확인하세요.',personal_login_required:'사용자 등록이 필요합니다.',activation_required:'사용자 등록이 필요합니다.',forbidden:'이 계정의 권한을 확인하세요.',stale_record:'다른 변경이 있습니다. 최신 내용을 다시 열어 수정하세요.',project_mismatch:'프로젝트 연결을 확인하세요.',ambiguous_receipt:'같은 내용의 요청이 여러 건입니다. 요청 번호로 확인하세요.',invalid_reason:'변경 사유를 입력하세요.',invalid_next_action:'다음 행동을 입력하세요.',no_change:'변경한 내용이 없습니다.',edit_gate_closed:'수정 기능 연결을 확인 중입니다.'})[code]||scheduleErrors[code]||'연결 결과를 확인하지 못했습니다. 잠시 후 다시 확인하세요.';}
+function appError(e){if(e.timeout)return '서버 응답 시간이 초과됐습니다. 요청을 다시 보내지 말고 처리함에서 결과를 확인하세요.';if(!e.status&&!e.data)return '연결 실패 또는 응답 미확인입니다. 자동 재전송하지 않습니다.';const code=e.data?.error||e.message;return ({unauthorized:'로그인 상태를 확인할 수 없습니다. 개인 로그인을 다시 확인하세요.',invalid_identity:'개인 인증을 확인하지 못했습니다. 다시 로그인하세요.',identity_denied:'개인 인증 또는 허용 계정을 확인하세요.',invalid_origin:'앱 주소와 인증 출처 설정을 확인하세요.',personal_login_required:'사용자 등록이 필요합니다.',activation_required:'사용자 등록이 필요합니다.',forbidden:'이 계정의 권한을 확인하세요.',stale_record:'다른 변경이 있습니다. 최신 내용을 다시 열어 수정하세요.',project_mismatch:'프로젝트 연결을 확인하세요.',ambiguous_receipt:'같은 내용의 요청이 여러 건입니다. 요청 번호로 확인하세요.',invalid_reason:'변경 사유를 입력하세요.',invalid_next_action:'다음 행동을 입력하세요.',no_change:'변경한 내용이 없습니다.',edit_gate_closed:'수정 기능 연결을 확인 중입니다.'})[code]||scheduleErrors[code]||'연결 결과를 확인하지 못했습니다. 잠시 후 다시 확인하세요.';}
 function appFailure(el,e){if(el?.isConnected)el.innerHTML=esc(appError(e))+(e.status===401?' <a href="./login.html">사용자 등록</a>':'');}
 function appDay(v){if(/^\d{5}(?:\.\d+)?$/.test(String(v)))return new Date(Date.UTC(1899,11,30)+Math.floor(Number(v))*86400000).toISOString().slice(0,10);return String(v||'');}
 function appQuantity(v){const n=Number(String(v).replaceAll(',',''));if(!String(v).trim()||!Number.isFinite(n)||n<0)throw Error('invalid_report');return n;}
 reports=function(){return '<section><div class="section-title"><h2>생산 · 지원 집계</h2></div><div class="report-links compact"><button onclick="productionReport()">▥ 생산 실적<small>월별 누적 · 과거 연도 합계 ›</small></button><button onclick="supportReport()">⇄ 타부서 지원<small>월별 인원 · 연간 합계 ›</small></button></div></section>';};
 productionReport=async function(){await loadAppReport('production');};
 supportReport=async function(){await loadAppReport('support');};
-async function loadAppReport(mode){if(!personalConnected)return login();const title=mode==='support'?'타부서 지원':'생산 실적';open(heading('생산 · 지원 집계',title)+'<div id="appReportResult">원본 집계를 불러오는 중…</div>');const el=$('appReportResult');try{const d=await appCall({action:'reports'});if(!el.isConnected)return;appReport={mode,data:d};renderAppReport();}catch(e){appFailure(el,e);}}
+function loadingClock(el,label){const started=Date.now(),timer=setInterval(()=>{if(!el.isConnected)return clearInterval(timer);el.textContent=label+' · '+Math.max(1,Math.round((Date.now()-started)/1000))+'초';},1000);return ()=>clearInterval(timer);}
+async function getAppReports(force=false){if(!force&&appReportData&&Date.now()-appReportAt<300000)return appReportData;if(appReportPending)return appReportPending;appReportPending=appCall({action:'reports'}).then(d=>{appReportData=d;appReportAt=Date.now();return d;}).finally(()=>{appReportPending=null;});return appReportPending;}
+function warmAppData(){getAppReports().catch(()=>{});getAppProjects().catch(()=>{});}
+async function loadAppReport(mode){if(!personalConnected)return login();const title=mode==='support'?'타부서 지원':'생산 실적';open(heading('생산 · 지원 집계',title)+'<div id="appReportResult">원본 집계를 연결하는 중…</div>');const el=$('appReportResult'),stop=loadingClock(el,'원본 집계를 연결하는 중');try{const d=await getAppReports();if(!el.isConnected)return;appReport={mode,data:d};renderAppReport();}catch(e){appFailure(el,e);}finally{stop();}}
 function renderAppReport(){
  const el=$('appReportResult');if(!el||!appReport)return;const {mode,data}=appReport;
  try{
@@ -33,13 +36,13 @@ function renderAppReport(){
 }
 const appWorkBase=work;
 work=function(f='all',query=''){appWorkBase(f,query);main.insertAdjacentHTML('afterbegin','<button class="secondary" onclick="allProjects()">전체 프로젝트 · 계획 · 이력</button>');};
-async function getAppProjects(){const d=await appCall({action:'catalog'});if(!Array.isArray(d.projects))throw Error('invalid_catalog');appIssues=d.issues||[];appProjects=d.projects;return appProjects;}
+async function getAppProjects(force=false){if(!force&&appProjects.length)return appProjects;if(appCatalogPending)return appCatalogPending;appCatalogPending=appCall({action:'catalog'}).then(d=>{if(!Array.isArray(d.projects))throw Error('invalid_catalog');appIssues=d.issues||[];appProjects=d.projects;return appProjects;}).finally(()=>{appCatalogPending=null;});return appCatalogPending;}
 async function allProjects(prefix='',purpose='detail'){
- open(heading('프로젝트',prefix?'장비를 선택하세요':'전체 프로젝트','발주번호를 기준으로 일정과 이력을 연결합니다')+'<div id="projectResults">프로젝트를 불러오는 중…</div>');const el=$('projectResults');
+ open(heading('프로젝트',prefix?'장비를 선택하세요':'전체 프로젝트','발주번호를 기준으로 일정과 이력을 연결합니다')+'<div id="projectResults">프로젝트를 연결하는 중…</div>');const el=$('projectResults'),stop=loadingClock(el,'프로젝트를 연결하는 중');
  try{const rows=await getAppProjects();if(!el.isConnected)return;const selected=rows.filter(x=>!prefix||x.orderId.startsWith(prefix));
   el.innerHTML=selected.map(x=>'<button class="item" data-project="'+esc(x.orderId)+'" data-purpose="'+esc(purpose)+'"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(x.orderId)+'</p><small>'+esc(x.state)+' · PM '+esc(x.pm||'미등록')+'</small></button>').join('')||'<p>연결된 프로젝트가 없습니다.</p>';
   el.querySelectorAll('[data-project]').forEach(button=>button.onclick=()=>openProject(button.dataset.project,button.dataset.purpose));
- }catch(e){appFailure(el,e);}
+ }catch(e){appFailure(el,e);}finally{stop();}
 }
 function groupProjectPlans(rows){const sorted=rows.slice().sort((a,b)=>appDay(a[3]).localeCompare(appDay(b[3]))),groups=[];for(const row of sorted){const date=appDay(row[3]),process=String(row[10]||'공정 미등록'),last=groups.at(-1),next=last&&new Date(last.end+'T00:00:00Z').getTime()+86400000===new Date(date+'T00:00:00Z').getTime();if(last&&last.process===process&&next){last.end=date;last.status=String(row[11]||last.status);}else groups.push({start:date,end:date,process,status:String(row[11]||'상태 미등록')});}return groups;}
 async function openProject(orderId,purpose='detail'){
