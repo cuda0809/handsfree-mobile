@@ -43,6 +43,7 @@ assert.match(flow,/function loadingClock\(/);
 assert.match(css,/\.top-tabs button\.selected/);
 assert.match(css,/\.quick-action/);
 assert.match(flow,/function renderDelivery\(/);
+assert.match(flow,/function lifecycleRecords\(/);
 assert.match(flow,/function renderProjectCatalog\(/);
 assert.match(flow,/업무이력 저장과 서버 원문 재조회가 일치합니다/);
 assert.doesNotMatch(flow,/if\(r\.issueId\)return await syncProgressIssue\(id\)/);
