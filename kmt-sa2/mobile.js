@@ -12,6 +12,29 @@ dialog.addEventListener('close',()=>{stopVoice();if(returnFocus?.isConnected)ret
 function toast(text){clearTimeout(toast.timer);$('toast').hidden=true;let target=$('toast');if(dialog.open){target=$('dialogStatus');if(!target){target=document.createElement('p');target.id='dialogStatus';target.className='alert';target.setAttribute('role','status');$('sheetBody').appendChild(target);}}target.textContent=text;target.hidden=false;if(dialog.open)target.scrollIntoView({block:'nearest'});toast.timer=setTimeout(()=>target.hidden=true,4500);}
 function readStore(key,fallback){try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback;}catch{return fallback;}}
 function persist(key,value){localStorage.setItem(key,JSON.stringify(value));if(localStorage.getItem(key)!==JSON.stringify(value))throw Error('storage_failed');}
+const APP_ASSET_HASH_KEY='hf-app-flow-hash-v1';
+async function appFlowHash(){
+ try{
+  const r=await fetch('./app-flow.js?watch='+Date.now(),{cache:'no-store',credentials:'same-origin'});
+  if(!r.ok)return '';
+  const text=await r.text(),buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+ }catch{return '';}
+}
+async function checkForLiveUpdate(){
+ if(document.visibilityState==='hidden'||navigator.onLine===false)return;
+ const hash=await appFlowHash();if(!hash)return;
+ const prior=sessionStorage.getItem(APP_ASSET_HASH_KEY)||'';
+ if(!prior){sessionStorage.setItem(APP_ASSET_HASH_KEY,hash);return;}
+ if(prior!==hash){
+  sessionStorage.setItem(APP_ASSET_HASH_KEY,hash);
+  toast('새 버전을 반영합니다…');
+  setTimeout(()=>location.reload(),350);
+ }
+}
+setTimeout(checkForLiveUpdate,2500);
+setInterval(checkForLiveUpdate,60000);
+window.addEventListener('focus',()=>setTimeout(checkForLiveUpdate,300));
 function coreCacheRead(){const v=readStore(CORE_CACHE_KEY,null);return v&&Array.isArray(v.items)&&v.items.length?v:null;}
 function coreCacheSave(){
  try{persist(CORE_CACHE_KEY,{cachedAt:new Date().toISOString(),sourceDate,items:items.map(({id,...x})=>x)});}catch{}
