@@ -58,7 +58,9 @@ function normalize(x){
     priorityReason:'',
     issueStatus:String(x.issueStatus||''),
     type:String(x.type||''),
-    sourceLatestUpdate:String(x.sourceLatestUpdate||'')
+    sourceLatestUpdate:String(x.sourceLatestUpdate||''),
+    due:String(x.due||''),
+    pm:String(x.pm||'')
   };
 }
 function isLiveItem(x){
