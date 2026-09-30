@@ -84,7 +84,15 @@ export default async function handler(req,res){
     const catalog=await appCall(upstream,token,user,'catalog');
     const active=(Array.isArray(catalog.issues)?catalog.issues:[])
       .filter(x=>x?.issueId&&/^(OPEN|MONITOR)$/.test(String(x.status||'')));
-    const snapshots=await Promise.all(active.map(x=>appCall(upstream,token,user,'issue',{issueId:String(x.issueId)})));
+    const snapshotAll=await Promise.all(active.map(x=>appCall(upstream,token,user,'issue',{issueId:String(x.issueId)})));
+    // MONITOR alone does not mean "currently managed". Historical monitor rows with no current
+    // state/next action are kept in the ledger but must not appear on the live app board.
+    const snapshots=snapshotAll.filter(s=>{
+      const issueStatus=String(s.status||'');
+      if(issueStatus==='OPEN')return true;
+      if(issueStatus!=='MONITOR')return false;
+      return !!(String(s.state||'').trim()||String(s.nextAction||'').trim());
+    });
     const old=new Map((Array.isArray(legacy?.currentStatus)?legacy.currentStatus:[]).map(x=>[String(x.issueId||''),x]));
 
     const currentStatus=snapshots.map(s=>{
@@ -113,7 +121,7 @@ export default async function handler(req,res){
       timezone:String(legacy?.timezone||'Asia/Seoul'),today:String(legacy?.today||''),
       generatedAt:new Date().toISOString(),sourceLatestDate:String(legacy?.sourceLatestDate||''),
       currentStatus,counts:{currentStatus:currentStatus.length},
-      diagnostics:{coreIssues:active.length,legacyMatched:currentStatus.filter(x=>old.has(x.issueId)).length,mismatches}
+      diagnostics:{coreIssues:snapshots.length,candidateIssues:active.length,legacyMatched:currentStatus.filter(x=>old.has(x.issueId)).length,mismatches}
     });
   }catch(err){
     console.error('[sa2-real-status-core]',String(err?.message||err));
