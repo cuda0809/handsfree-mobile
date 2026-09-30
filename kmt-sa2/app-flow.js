@@ -152,31 +152,47 @@ async function openProject(orderId,purpose='detail'){
  let p=appProjects.find(x=>x.orderId===orderId)||items.find(x=>x.orderId===orderId);if(!p)return toast('최신 프로젝트 목록을 다시 불러오세요.');
  if(purpose==='input')return input(p);
  open(heading('프로젝트',p.customer,p.model)+'<div id="projectOverview"></div>');const el=$('projectOverview');
- const linked=items.find(x=>x.orderId===p.orderId)||p;
- const currentState=linked.state||p.state||'미등록';
- const stageNames=['자재','조립','전장','검수','출고'];
- const closed=linked.issueStatus==='CLOSED'||linked.priority===3||/^(출고완료|납품완료|완료)$/.test(String(currentState||''));
- const currentStage=closed?4:hybridStageIndex({state:currentState,nextAction:linked.nextAction||'',process:linked.process||''});
- const currentDate=appDay(linked.since)||appDay(linked.sourceLatestUpdate)||new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
- const scheduleBlock='<div class="hybrid-timeline">'+stageNames.map((name,i)=>{const cls=closed||i<currentStage?'done':i===currentStage?'now':'';const label=closed||i<currentStage?'종료':i===currentStage?currentDate:'예정';return '<div class="hybrid-step '+cls+'"><i></i><b>'+name+'</b><small>'+esc(label)+'</small></div>';}).join('')+'</div><div class="project-schedule-status '+(closed?'closed':'active')+'">'+(closed?'<b>제작 종료</b><span>'+esc(currentDate)+'</span>':'<b>진행중</b><span>'+esc(currentDate)+' · '+esc(currentState)+'</span>')+'</div>';
- const local=lifecycleCacheGet(p.orderId),cached=projectHistoryCache.get(p.orderId)||local?.history||null;
- const render=(history,historyState)=>{
+ let linked=items.find(x=>x.orderId===p.orderId)||p;
+ const local=lifecycleCacheGet(p.orderId);
+ let shownHistory=projectHistoryCache.get(p.orderId)||local?.history||null;
+ let historyState=shownHistory?(local?.cachedAt?'최근 정상값':'앱 캐시'):'동기화 중';
+
+ const render=()=>{
   if(!el?.isConnected)return;
-  el.innerHTML='<div class="hybrid-project-card"><small>JOB NO. '+esc(p.orderId)+' · PM '+esc(p.pm||'미등록')+'</small><h2>'+esc(p.customer)+' · '+esc(p.model)+'</h2><p>납기 '+esc(p.due||'미등록')+' · Core 현재상태</p><div class="hybrid-state"><span>현재 상태 · '+esc(currentState)+'</span><span>'+esc(linked.priority===1?'우선 확인':linked.priority===3?'완료':'진행')+'</span></div></div><div class="hybrid-section"><b>전체 제작 일정</b><span>현장 기준</span></div>'+scheduleBlock+'<div class="hybrid-write"><small>지금 하는 일</small><h3>'+esc(currentState)+'</h3><p>진행·이슈·사유를 한 곳에 입력하면 Event와 현재상태에 연결됩니다.</p><button id="projectInput">🎙 오늘 이슈 입력 <span style="float:right">＋</span></button></div><div class="hybrid-section"><b>최근 라이프사이클</b><span>'+esc(historyState)+'</span></div><div class="lifecycle-preview">'+(history?lifecyclePreview(history,4,linked):lifecyclePreview({events:[],changes:[]},4,linked))+'</div><button id="projectLifecycleButton" class="primary">전체 라이프사이클 보기</button><button id="projectHistoryButton" class="secondary">변경 근거 · RAW 이력</button><button id="projectPlanButton" class="secondary">원본 계획일정 확인</button>';
+  linked=items.find(x=>x.orderId===p.orderId)||linked||p;
+  const currentState=linked.state||p.state||'미등록';
+  const stageNames=['자재','조립','전장','검수','출고'];
+  const closed=linked.issueStatus==='CLOSED'||linked.priority===3||/^(출고완료|납품완료|완료)$/.test(String(currentState||''));
+  const currentStage=closed?4:hybridStageIndex({state:currentState,nextAction:linked.nextAction||'',process:linked.process||''});
+  const currentDate=appDay(linked.since)||appDay(linked.sourceLatestUpdate)||new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
+  const scheduleBlock='<div class="hybrid-timeline">'+stageNames.map((name,i)=>{const cls=closed||i<currentStage?'done':i===currentStage?'now':'';const label=closed||i<currentStage?'종료':i===currentStage?currentDate:'예정';return '<div class="hybrid-step '+cls+'"><i></i><b>'+name+'</b><small>'+esc(label)+'</small></div>';}).join('')+'</div><div class="project-schedule-status '+(closed?'closed':'active')+'">'+(closed?'<b>제작 종료</b><span>'+esc(currentDate)+'</span>':'<b>진행중</b><span>'+esc(currentDate)+' · '+esc(currentState)+'</span>')+'</div>';
+  el.innerHTML='<div class="hybrid-project-card"><small>JOB NO. '+esc(p.orderId)+' · PM '+esc(p.pm||'미등록')+'</small><h2>'+esc(p.customer)+' · '+esc(p.model)+'</h2><p>납기 '+esc(p.due||'미등록')+' · Core 현재상태</p><div class="hybrid-state"><span>현재 상태 · '+esc(currentState)+'</span><span>'+esc(linked.priority===1?'우선 확인':linked.priority===3?'완료':'진행')+'</span></div></div><div class="hybrid-section"><b>전체 제작 일정</b><span>현장 기준</span></div>'+scheduleBlock+'<div class="hybrid-write"><small>지금 하는 일</small><h3>'+esc(currentState)+'</h3><p>진행·이슈·사유를 한 곳에 입력하면 Event와 현재상태에 연결됩니다.</p><button id="projectInput">🎙 오늘 이슈 입력 <span style="float:right">＋</span></button></div><div class="hybrid-section"><b>최근 라이프사이클</b><span>'+esc(historyState)+'</span></div><div class="lifecycle-preview">'+(shownHistory?lifecyclePreview(shownHistory,4,linked):lifecyclePreview({events:[],changes:[]},4,linked))+'</div><button id="projectLifecycleButton" class="primary">전체 라이프사이클 보기</button><button id="projectHistoryButton" class="secondary">변경 근거 · RAW 이력</button><button id="projectPlanButton" class="secondary">원본 계획일정 확인</button>';
   $('projectInput').onclick=()=>linked.issueId?openUnifiedEvent(linked.issueId):toast('현재 활성 이슈가 없는 프로젝트입니다.');
   $('projectLifecycleButton').onclick=()=>projectLifecycle(p.orderId);
   $('projectHistoryButton').onclick=()=>projectHistory(p.orderId);
   $('projectPlanButton').onclick=()=>scheduleReport(linked);
  };
- render(cached,cached?(local?.cachedAt?'최근 정상값':'앱 캐시'):'동기화 중');
- try{
-  const history=await appCall({action:'history',orderId:p.orderId});
-  projectHistoryCache.set(p.orderId,history);lifecycleCacheSet(p.orderId,history);
-  render(history,'최신 동기화');
- }catch(e){
-  if(cached)render(cached,'동기화 지연 · 최근 정상값');
-  else render(null,'이력 연결 지연');
+ render();
+
+ // Always refresh just this JOB NO. in the background. No manual refresh is required.
+ if(linked.issueId){
+  appCall({action:'issue',issueId:linked.issueId}).then(fresh=>{
+   if(!el?.isConnected||fresh.orderId!==p.orderId)return;
+   const idx=items.findIndex(x=>x.issueId===fresh.issueId);
+   const previous=idx>=0?items[idx]:linked;
+   const state=String(fresh.state||previous.state||''),next=String(fresh.nextAction||previous.nextAction||''),status=String(fresh.status||previous.issueStatus||'');
+   const updated={...previous,state,nextAction:next,issueStatus:status,orderId:String(fresh.orderId||previous.orderId),customer:String(fresh.customer||previous.customer),model:String(fresh.model||previous.model),process:coreProcessFromState(state,next,previous.process),priority:corePriorityFromState(state,next,status,previous.priority),since:state!==previous.state?new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'}):previous.since,sourceLatestUpdate:state!==previous.state?new Date().toISOString():previous.sourceLatestUpdate};
+   if(idx>=0)items[idx]=updated;else items.push(updated);
+   items=items.map((x,id)=>({...x,id}));linked=items.find(x=>x.issueId===fresh.issueId)||updated;
+   if(typeof coreCacheSave==='function')coreCacheSave();
+   render();
+  }).catch(()=>{});
  }
+
+ appCall({action:'history',orderId:p.orderId}).then(history=>{
+  if(!el?.isConnected)return;
+  projectHistoryCache.set(p.orderId,history);lifecycleCacheSet(p.orderId,history);shownHistory=history;historyState='최신 동기화';render();
+ }).catch(()=>{if(shownHistory){historyState='동기화 지연 · 최근 정상값';render();}else{historyState='이력 연결 지연';render();}});
 }
 
 const appScheduleBase=scheduleReport;
@@ -410,6 +426,7 @@ async function syncUnifiedStateBackground(noteId,x,classification,bodyText){
    projectHistoryCache.delete(x.orderId);
    toast(impact.preserveStage?'현재공정 유지 · 다음행동 '+applied.nextAction:'현재상태 자동반영 완료 · '+applied.state);
    if(screen==='issues')todayIssues();
+   else if(dialog.open&&$('unifiedDialogText'))setTimeout(()=>openProject(x.orderId),0);
  }catch(e){
    try{updateNote(noteId,{status:'partial',verifiedAt:'',ack:'Event 기록은 완료됐지만 현재상태 자동반영은 확인하지 못했습니다. 자동 재전송하지 않습니다.'});}catch{}
    toast('Event는 저장됐고 상태 자동반영은 확인이 필요합니다.');
