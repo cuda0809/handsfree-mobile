@@ -163,11 +163,28 @@ async function verifyIssueReceipt(d){
 
 function hybridProjectMatch(orderId){const id=String(orderId||''),exact=items.find(x=>x.orderId===id);if(exact)return exact;return items.find(x=>x.orderId?.includes('*')&&id.startsWith(x.orderId.replace(/\*.*$/,'')))||null;}
 function hybridDueKey(v){const d=appDay(v);return /^\d{4}-\d{2}-\d{2}$/.test(d)?d:'9999-12-31';}
+const HYBRID_FLOW_STAGES=['자재','조립','전장','검수','출고'];
+function hybridStageIndex(x){
+ const text=norm([x.process,x.state,x.nextAction].join(' '));
+ if(/출고완료|납품완료|출고대기|출고|포장/.test(text))return 4;
+ if(/검수|점검|테스트|시험/.test(text))return 3;
+ if(/갭세팅|마감조립|조립|본체|기구|프레임/.test(text))return 1;
+ if(/전장|배선|전기|프로그램|프로그램밍|셋업/.test(text))return 2;
+ if(/자재|입고|구매|발주/.test(text))return 0;
+ return /조립/.test(norm(x.process))?1:/전장/.test(norm(x.process))?2:/검수/.test(norm(x.process))?3:/출고/.test(norm(x.process))?4:0;
+}
+function hybridStageFlow(x){
+ const current=hybridStageIndex(x),complete=x.priority===3||/출고완료|납품완료/.test(String(x.state||''));
+ return '<div class="hybrid-flow">'+HYBRID_FLOW_STAGES.map((name,i)=>{
+   const cls=complete||i<current?'done':i===current?'now':'future';
+   return '<div class="hybrid-stage '+cls+'"><i></i><b>'+name+'</b></div>';
+ }).join('')+'</div><div class="hybrid-flow-now">현재 공정 · <b>'+HYBRID_FLOW_STAGES[current]+'</b>'+(complete?' · 완료':'')+'</div>';
+}
 function delivery(){
  active('delivery');screen='delivery';
  const selected=items.slice().sort((a,b)=>hybridDueKey(a.due).localeCompare(hybridDueKey(b.due))||(a.priority||9)-(b.priority||9));
  main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">CUSTOMER PROMISES</div><h1>출고 약속</h1></div><button class="chip" onclick="refresh()">Core 새로고침</button></div><p class="hybrid-desc">이 화면은 현재 Core 데이터만 사용합니다. 탭을 여는 것만으로 추가 서버 조회를 하지 않습니다.</p><div id="deliveryList" class="hybrid-promise-list">'+
- (selected.length?selected.map(x=>{const due=appDay(x.due)||'납기 확인 필요',risk=x.priority===1;return '<button class="hybrid-promise-row" data-delivery-id="'+x.id+'"><span class="hybrid-promise-date">'+esc(due)+'<small>'+(risk?'우선 확인':x.priority===3?'완료':'진행')+'</small></span><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(x.state||'미등록')+(x.nextAction?' · 다음 '+esc(x.nextAction):'')+'</p><div class="hybrid-bar"><i class="'+(risk?'warn':'')+'" style="width:'+(x.priority===3?'100':x.priority===1?'45':'70')+'%"></i></div></button>';}).join(''):'<p class="empty">현재 Core에 표시할 프로젝트가 없습니다.</p>')+
+ (selected.length?selected.map(x=>{const due=appDay(x.due)||'납기 확인 필요',risk=x.priority===1;return '<button class="hybrid-promise-row" data-delivery-id="'+x.id+'"><span class="hybrid-promise-date">'+esc(due)+'<small>'+(risk?'우선 확인':x.priority===3?'완료':'진행')+'</small></span><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(x.state||'미등록')+(x.nextAction?' · 다음 '+esc(x.nextAction):'')+'</p>'+hybridStageFlow(x)+'</button>';}).join(''):'<p class="empty">현재 Core에 표시할 프로젝트가 없습니다.</p>')+
  '</div><button class="secondary" onclick="allProjects()">전체 프로젝트 원장 불러오기</button>';
  const el=$('deliveryList');el?.querySelectorAll('[data-delivery-id]').forEach(b=>b.onclick=()=>openItem(Number(b.dataset.deliveryId)));
 }
