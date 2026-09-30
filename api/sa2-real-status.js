@@ -81,30 +81,28 @@ export default async function handler(req,res){
       return res.status(200).json(mapLegacy(legacy));
     }
 
+    // Keep the live read cheap: one catalog read + one REAL read.
+    // Do not fan out one signed Apps Script request per active issue.
     const catalog=await appCall(upstream,token,user,'catalog');
-    const active=(Array.isArray(catalog.issues)?catalog.issues:[])
-      .filter(x=>x?.issueId&&/^(OPEN|MONITOR)$/.test(String(x.status||'')));
-    const snapshotAll=await Promise.all(active.map(x=>appCall(upstream,token,user,'issue',{issueId:String(x.issueId)})));
-    // MONITOR alone does not mean "currently managed". Historical monitor rows with no current
-    // state/next action are kept in the ledger but must not appear on the live app board.
-    const snapshots=snapshotAll.filter(s=>{
-      const issueStatus=String(s.status||'');
-      if(issueStatus==='OPEN')return true;
-      if(issueStatus!=='MONITOR')return false;
-      return !!(String(s.state||'').trim()||String(s.nextAction||'').trim());
-    });
-    const old=new Map((Array.isArray(legacy?.currentStatus)?legacy.currentStatus:[]).map(x=>[String(x.issueId||''),x]));
     const projects=Array.isArray(catalog.projects)?catalog.projects:[];
     const projectFor=orderId=>{
       const id=String(orderId||'');
       const exact=projects.find(p=>String(p.orderId||'')===id);
       if(exact)return exact;
-      if(id.includes('*')){
-        const prefix=id.replace(/\*.*$/,'');
-        return projects.find(p=>String(p.orderId||'').startsWith(prefix))||null;
-      }
-      return null;
+      const prefix=id.includes('*')?id.replace(/\*.*$/,''):id;
+      return projects.find(p=>String(p.orderId||'').startsWith(prefix))||null;
     };
+    const legacyByIssue=new Map((Array.isArray(legacy?.currentStatus)?legacy.currentStatus:[]).map(x=>[String(x.issueId||''),x]));
+    const active=(Array.isArray(catalog.issues)?catalog.issues:[])
+      .filter(x=>{
+        if(!x?.issueId)return false;
+        const st=String(x.status||'');
+        if(st==='OPEN')return true;
+        if(st!=='MONITOR')return false;
+        // Historical MONITOR rows remain in the ledger, but blank current state means
+        // they are not part of the live board.
+        return !!String(x.state||'').trim();
+      });
     const parseDue=value=>{
       const s=String(value||'').trim();
       if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return null;
@@ -121,16 +119,18 @@ export default async function handler(req,res){
       return {priority:2,reason:'정상 진행'};
     };
 
-    const currentStatus=snapshots.map(s=>{
-      const prior=old.get(String(s.issueId||''))||{};
-      const state=String(s.state||'확인중'),nextAction=String(s.nextAction||'');
+    const currentStatus=active.map(s=>{
+      const prior=legacyByIssue.get(String(s.issueId||''))||{};
+      const project=projectFor(s.orderId)||{};
+      const state=String(s.state||prior.state||'확인중');
+      const nextAction=String(prior.nextAction||'');
       const ranked=priorityFor(s,state,nextAction);
       return {
-        issueId:String(s.issueId||''),orderId:String(s.orderId||''),customer:String(s.customer||prior.customer||''),
-        model:String(s.model||prior.model||''),process:String(prior.process||'현재상태'),state,
+        issueId:String(s.issueId||''),orderId:String(s.orderId||''),customer:String(prior.customer||project.customer||''),
+        model:String(prior.model||project.model||''),process:String(prior.process||'현재상태'),state,
         since:String(prior.since||''),days:Number(prior.days||0),cause:String(prior.cause||''),
         nextAction,tone:String(prior.tone||'warn'),priority:ranked.priority,priorityReason:ranked.reason,issueStatus:String(s.status||''),
-        type:String(prior.type||''),sourceLatestUpdate:String(prior.sourceLatestUpdate||'')
+        type:String(prior.type||''),sourceLatestUpdate:String(prior.sourceLatestUpdate||legacy?.sourceLatestDate||'')
       };
     });
     const mismatches=currentStatus.flatMap(x=>{
@@ -147,7 +147,7 @@ export default async function handler(req,res){
       timezone:String(legacy?.timezone||'Asia/Seoul'),today:String(legacy?.today||''),
       generatedAt:new Date().toISOString(),sourceLatestDate:String(legacy?.sourceLatestDate||''),
       currentStatus,counts:{currentStatus:currentStatus.length},
-      diagnostics:{coreIssues:snapshots.length,candidateIssues:active.length,legacyMatched:currentStatus.filter(x=>old.has(x.issueId)).length,mismatches}
+      diagnostics:{coreIssues:active.length,candidateIssues:active.length,legacyMatched:currentStatus.filter(x=>legacyByIssue.has(x.issueId)).length,mismatches,fanoutIssueReads:0}
     });
   }catch(err){
     console.error('[sa2-real-status-core]',String(err?.message||err));
