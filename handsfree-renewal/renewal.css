@@ -177,3 +177,44 @@ dialog { border-radius: 18px; }
   .quick-actions { grid-template-columns: 1fr; }
   .voice-action { min-height: 44px; }
 }
+@media (min-width: 900px) {
+  html.operations-mode body { padding: 18px; background: #dfe5e8; }
+  html.operations-mode .app {
+    max-width: 1180px;
+    min-height: calc(100dvh - 36px);
+    margin: 0 auto;
+    padding: 0;
+    display: grid;
+    grid-template-columns: 220px minmax(0,1fr);
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas: "top top" "demo main" "tabs main";
+    align-items: start;
+    overflow: hidden;
+    border: 1px solid #cbd4db;
+    border-radius: 18px;
+    box-shadow: 0 24px 70px #172a3c1a;
+  }
+  html.operations-mode .top { grid-area: top; min-height: 78px; padding: 13px 22px; }
+  html.operations-mode .demo { grid-area: demo; min-height: 66px; padding: 18px 17px; display: block; border-right: 1px solid var(--line); }
+  html.operations-mode .demo b, html.operations-mode .demo span { display: block; }
+  html.operations-mode .demo span { margin-top: 6px; color: var(--muted); }
+  html.operations-mode .top-tabs {
+    grid-area: tabs;
+    position: sticky;
+    top: 0;
+    min-height: 260px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    border-right: 1px solid var(--line);
+    border-bottom: 0;
+    background: #f1f4f6;
+  }
+  html.operations-mode .top-tabs button { min-height: 50px; padding: 0 15px; text-align: left; font-size: 13px; }
+  html.operations-mode main { grid-area: main; width: 100%; max-width: 920px; min-width: 0; padding: 24px 30px 50px; }
+  html.operations-mode .metrics { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  html.operations-mode .report-links { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  html.operations-mode .desktop-note { display: none; }
+  html.operations-mode dialog { max-width: 760px; }
+}
