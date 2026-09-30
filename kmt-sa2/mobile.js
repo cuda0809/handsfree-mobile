@@ -1,7 +1,7 @@
 'use strict';
-const BUILD='2026.09.29.SA2.8.3-CORE', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1';
+const BUILD='2026.09.29.SA2.8.3-CORE', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
 const main=document.getElementById('main'),dialog=document.getElementById('detail');
-let items=[],live=false,readPending=null,sourceDate='',lastRead='',screen='home',filter='all',returnFocus=null,readMessage='현재 상태를 불러오는 중…',recognition=null,installPrompt=null,readStale=false,lastReadErrorStatus=0;
+let items=[],live=false,readPending=null,sourceDate='',lastRead='',screen='home',filter='all',returnFocus=null,readMessage='현재 상태를 불러오는 중…',recognition=null,installPrompt=null,readStale=false,lastReadErrorStatus=0,lastCoreAttempt=0;
 const $=id=>document.getElementById(id);
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function norm(s){return String(s||'').toLowerCase().replace(/[\s\-‐‑–—]/g,'');}
@@ -12,12 +12,23 @@ dialog.addEventListener('close',()=>{stopVoice();if(returnFocus?.isConnected)ret
 function toast(text){clearTimeout(toast.timer);$('toast').hidden=true;let target=$('toast');if(dialog.open){target=$('dialogStatus');if(!target){target=document.createElement('p');target.id='dialogStatus';target.className='alert';target.setAttribute('role','status');$('sheetBody').appendChild(target);}}target.textContent=text;target.hidden=false;if(dialog.open)target.scrollIntoView({block:'nearest'});toast.timer=setTimeout(()=>target.hidden=true,4500);}
 function readStore(key,fallback){try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback;}catch{return fallback;}}
 function persist(key,value){localStorage.setItem(key,JSON.stringify(value));if(localStorage.getItem(key)!==JSON.stringify(value))throw Error('storage_failed');}
+function coreCacheRead(){const v=readStore(CORE_CACHE_KEY,null);return v&&Array.isArray(v.items)&&v.items.length?v:null;}
+function coreCacheSave(){
+ try{persist(CORE_CACHE_KEY,{cachedAt:new Date().toISOString(),sourceDate,items:items.map(({id,...x})=>x)});}catch{}
+}
+function coreCacheRestore(){
+ const c=coreCacheRead();if(!c)return false;
+ items=c.items.map((x,id)=>({...x,id}));sourceDate=String(c.sourceDate||'');lastRead=c.cachedAt?new Date(c.cachedAt).toLocaleString('ko-KR'):'';
+ live=true;readStale=true;readMessage='최근 정상값 · 최신 동기화 대기';
+ return true;
+}
+coreCacheRestore();
 function notes(){const a=readStore(KEY,[]);return Array.isArray(a)?a:[];}
 function updateNote(id,patch){const a=notes(),r=a.find(r=>r.id===id);if(!r)throw Error('missing_note');Object.assign(r,patch);persist(KEY,a);return r;}
 async function api(path,body,timeout=25000){const c=new AbortController(),timer=setTimeout(()=>c.abort(),timeout);try{const r=await fetch(path,{credentials:'same-origin',cache:'no-store',signal:c.signal,...(body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});let d;try{d=await r.json();}catch{throw Error('invalid_response');}if(!r.ok||d.ok!==true){const e=Error(d.error||'request_failed');e.status=r.status;e.data=d;throw e;}return d;}finally{clearTimeout(timer);}}
 function active(name){screen=name;document.querySelectorAll('.bottom button').forEach(b=>b.classList.toggle('selected',b.dataset.page===name));}
 function banner(){document.querySelector('.demo').innerHTML=`<b>${BUILD} · HYBRID 0.5</b><span>${live?'연결됨 · ':''}${esc(readMessage)}</span>`;}
-async function refresh(){if(readPending)return readPending;readMessage='현재 상태를 불러오는 중…';banner();readPending=(async()=>{try{const d=await api('/api/sa2-real-status');if(d.live!==true||!Array.isArray(d.currentStatus))throw Error('invalid_response');items=d.currentStatus.map((x,id)=>({...x,id}));live=true;readStale=false;lastReadErrorStatus=0;sourceDate=d.sourceLatestDate||'';lastRead=new Date().toLocaleString('ko-KR');readMessage=(d.test?'검증 데이터 · 운영 아님 · ':'')+(d.coreRead?'CORE · ':'')+`${items.length}건 · ${sourceDate||'기준일 미등록'}`;return true;}catch(e){lastReadErrorStatus=e.status||0;if(e.status===401){items=[];live=false;readStale=false;readMessage='사용자 등록 · 연결이 필요합니다';}else{readStale=true;if(items.length){live=true;readMessage='일시적 연결 지연 · 최근 정상값 유지';}else{live=false;readMessage='현재 상태를 불러오지 못했습니다.';}}return false;}finally{readPending=null;banner();if(screen==='home')home();if(screen==='work')work(filter,$('search')?.value||'');if(screen==='delivery'&&typeof delivery==='function')delivery();if(screen==='projects'&&typeof projects==='function')projects();if(screen==='issues'&&typeof todayIssues==='function')todayIssues();}})();return readPending;}
+async function refresh(force=true){if(readPending)return readPending;if(!force&&Date.now()-lastCoreAttempt<60000)return items.length;lastCoreAttempt=Date.now();if(!items.length)readMessage='현재 상태를 불러오는 중…';else readMessage='최근 정상값 표시 · 최신값 확인 중…';banner();readPending=(async()=>{try{const d=await api('/api/sa2-real-status');if(d.live!==true||!Array.isArray(d.currentStatus))throw Error('invalid_response');items=d.currentStatus.map((x,id)=>({...x,id}));live=true;readStale=false;lastReadErrorStatus=0;sourceDate=d.sourceLatestDate||'';lastRead=new Date().toLocaleString('ko-KR');readMessage=(d.test?'검증 데이터 · 운영 아님 · ':'')+(d.coreRead?'CORE · ':'')+`${items.length}건 · ${sourceDate||'기준일 미등록'}`;coreCacheSave();return true;}catch(e){lastReadErrorStatus=e.status||0;if(e.status===401){items=[];live=false;readStale=false;readMessage='사용자 등록 · 연결이 필요합니다';}else{readStale=true;const cached=items.length||coreCacheRestore();if(cached){live=true;readMessage='동기화 지연 · 최근 정상값 유지';}else{live=false;readMessage='현재 상태를 불러오지 못했습니다.';}}return false;}finally{readPending=null;banner();if(screen==='home')home();if(screen==='work')work(filter,$('search')?.value||'');if(screen==='delivery'&&typeof delivery==='function')delivery();if(screen==='projects'&&typeof projects==='function')projects();if(screen==='issues'&&typeof todayIssues==='function')todayIssues();}})();return readPending;}
 function card(x){return `<article class="item"><div class="item-top"><div class="item-status"><span class="tag">현재 진행</span><button class="schedule-button" onclick="scheduleReport(${x.id})">계획일정 ↗</button></div><span class="category">${esc(x.process)}</span></div><button class="item-detail" aria-label="${esc(x.customer)} ${esc(x.model)} 업무 상세" onclick="openItem(${x.id})"><h3>${esc(x.customer)}<small>${esc(x.model)}</small></h3><p class="issue">${esc(x.state||'진행내용 미등록')}</p><div class="next"><span>다음 행동 · ${esc(x.nextAction||'확인 필요')}</span><span>›</span></div></button></article>`;}
 function reports(){return `<section><div class="section-title"><h2>생산 · 지원 집계</h2></div><div class="report-links"><button onclick="productionReport('month')">▥ 월간생산량<small>집계 연결 확인 ›</small></button><button onclick="productionReport('year')">▤ 연간생산량<small>집계 연결 확인 ›</small></button><button onclick="supportReport()">⇄ 타부서지원<small>누적 집계표 ›</small></button></div></section>`;}
 function home(){active('home');const urgent=items.filter(x=>x.priority===1),done=items.filter(x=>x.priority===3),top=urgent[0],sorted=items.slice().sort((a,b)=>(a.priority||9)-(b.priority||9));main.innerHTML=`
@@ -79,12 +90,12 @@ let resumeReadNeeded=false,lastResumeRead=0;
 function resumeRead(){
  if(document.visibilityState==='hidden'||navigator.onLine===false)return;
  if(dialog.open){resumeReadNeeded=true;return;}
- if(Date.now()-lastResumeRead<3000)return;
- resumeReadNeeded=false;lastResumeRead=Date.now();refresh();
+ if(Date.now()-lastResumeRead<60000)return;
+ resumeReadNeeded=false;lastResumeRead=Date.now();refresh(false);
 }
 window.addEventListener('focus',resumeRead);
 document.addEventListener('visibilitychange',resumeRead);
 dialog.addEventListener('close',()=>{if(resumeReadNeeded)resumeRead();});
-window.addEventListener('online',()=>{toast('연결이 복구되었습니다. 보관한 입력은 처리함에서 확인하세요.');resumeRead();});
-window.addEventListener('offline',()=>{items=[];live=false;readMessage='오프라인 · 초안 보관 가능';banner();if(screen==='home')home();if(screen==='work')work(filter);if(screen==='delivery'&&typeof delivery==='function')delivery();if(screen==='projects'&&typeof projects==='function')projects();if(screen==='issues'&&typeof todayIssues==='function')todayIssues();});
+window.addEventListener('online',()=>{toast('연결이 복구되었습니다. 최신 상태를 확인합니다.');lastResumeRead=0;refresh(true);});
+window.addEventListener('offline',()=>{if(!items.length)coreCacheRestore();live=!!items.length;readStale=true;readMessage=items.length?'오프라인 · 최근 정상값 유지':'오프라인 · 초안 보관 가능';banner();if(screen==='home')home();if(screen==='work')work(filter);if(screen==='delivery'&&typeof delivery==='function')delivery();if(screen==='projects'&&typeof projects==='function')projects();if(screen==='issues'&&typeof todayIssues==='function')todayIssues();});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(()=>toast('오프라인 앱 준비에 실패했습니다. 온라인으로 사용할 수 있습니다.'));
