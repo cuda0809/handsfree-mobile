@@ -117,3 +117,7 @@ main{padding:0 14px 84px!important}.date{font-size:11px!important}.lead{font-siz
 .project-schedule-status.active b,.project-schedule-status.active span{color:var(--hy-orange)}
 .project-schedule-status.closed b,.project-schedule-status.closed span{color:var(--hy-green)}
 .project-schedule-status span{text-align:right;font-weight:850}
+
+.lifecycle-row.legacy .lifecycle-type{background:#f3efe8;color:#8b6a45}
+.lifecycle-row.current .lifecycle-type{background:#e7f3ef;color:var(--hy-green)}
+.lifecycle-row.current b{color:var(--hy-green)}
