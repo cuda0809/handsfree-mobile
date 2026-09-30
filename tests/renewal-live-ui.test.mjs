@@ -1,0 +1,23 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+
+const html=fs.readFileSync(new URL('../handsfree-renewal/index.html',import.meta.url),'utf8');
+const mobile=fs.readFileSync(new URL('../handsfree-renewal/mobile.js',import.meta.url),'utf8');
+const flow=fs.readFileSync(new URL('../handsfree-renewal/app-flow.js',import.meta.url),'utf8');
+const css=fs.readFileSync(new URL('../handsfree-renewal/renewal.css',import.meta.url),'utf8');
+
+assert.match(html,/class="top-tabs"/);
+for(const label of ['오늘','납기','프로젝트','내 기록'])assert.match(html,new RegExp('>'+label+'<'));
+assert.doesNotMatch(html,/class="bottom"/);
+assert.match(html,/kmt-mobile-logo\.png/);
+assert.match(mobile,/function previewProgress\(id\)/);
+assert.match(mobile,/pendingNoteId:id/);
+assert.match(mobile,/restoreProgressPreview\(id\)/);
+assert.match(mobile,/if\(!canSendNote\(r\)\)return;previewProgress\(id\)/);
+assert.doesNotMatch(mobile,/querySelector\('\.bottom'\)/);
+assert.match(mobile,/function voiceInput\(id\)/);
+assert.match(flow,/eventReceiptDelays=\[1200,2500,5000\]/);
+assert.match(flow,/applyIssueReceiptLocal\(d\)/);
+assert.match(css,/\.top-tabs button\.selected/);
+assert.match(css,/\.quick-action/);
+console.log('PASS Renewal uses Hybrid 0.4 structure, top navigation, exact mobile logo and immediate progress preview with bounded receipt polling');

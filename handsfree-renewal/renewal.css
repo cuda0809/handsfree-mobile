@@ -9,9 +9,10 @@
 }
 
 body { background: var(--bg); }
-.app { max-width: 560px; background: #f7f8f8; }
+.app { max-width: 520px; min-height: 100dvh; padding-bottom: 24px; background: #f7f8f8; }
 .top {
-  padding: 18px 20px 15px;
+  min-height: 68px;
+  padding: 10px 15px;
   border-top: 0;
   border-bottom: 1px solid var(--line);
   background: #fff;
@@ -21,9 +22,31 @@ body { background: var(--bg); }
 .renewal-brand small { margin-left: 7px; color: #8c9b92; font-size: 10px; letter-spacing: 0; }
 .top .eyebrow { color: #7d898f; font-size: 9px; letter-spacing: 1.4px; }
 .version-badge { color: var(--green); border-color: #cfe3dc; }
-.demo { margin: 0; padding: 10px 20px; background: #eaf2ef; }
+.demo { margin: 0; padding: 8px 15px; background: #eaf2ef; }
 .demo b { color: var(--green); }
-main { padding: 18px 20px 30px; }
+main { padding: 15px 14px 30px; }
+.top-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,.96);
+  backdrop-filter: blur(12px);
+}
+.top-tabs button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #68757d;
+  font-size: 12px;
+  font-weight: 850;
+}
+.top-tabs button.selected { background: var(--navy); color: #fff; }
 h1 { margin-top: 7px; font-size: 28px; color: var(--ink); }
 h1 span { color: var(--ink); font-weight: 850; }
 .lead { margin-bottom: 17px; }
@@ -38,6 +61,7 @@ h1 span { color: var(--ink); font-weight: 850; }
 .brief h2 { margin: 10px 0 12px; font-size: 19px; }
 .brief h2 em { color: #ff8b58; }
 .brief button { padding-top: 11px; color: #d9e2e7; }
+.brief p { margin: 0; color: #b8c4cb; font-size: 11px; }
 .metrics {
   margin: 11px 0 21px;
   padding: 0;
@@ -56,22 +80,42 @@ h1 span { color: var(--ink); font-weight: 850; }
 .item:hover { transform: none; }
 .tag { background: #fff0ea; color: #b9471c; }
 .next { color: var(--green); }
+.quick-actions { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; margin: 0 0 21px; }
+.quick-action {
+  width: 100%;
+  min-height: 54px;
+  margin: 0;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--orange);
+  color: #fff;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 900;
+}
+.quick-action small { font-size: 9px; font-weight: 650; opacity: .85; }
+.voice-action {
+  min-width: 88px;
+  border: 1px solid #d7e0dd;
+  border-radius: 11px;
+  background: #fff;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 900;
+}
+.delivery-date { margin-bottom: 7px; color: var(--orange); font-size: 12px; font-weight: 900; }
+.pending-update { border-color: #f2a17c; background: #fff9f6; }
+.pending-update .tag { background: var(--orange); color: #fff; }
 .primary { background: var(--orange); border-radius: 11px; }
 .secondary, .sheet input, .sheet textarea, .sheet select { border-radius: 10px; }
 .action-box { background: #eef5f2; }
 .alert { background: #fff1e9; color: #874421; }
-.bottom { grid-template-columns: repeat(5, 1fr) !important; }
-.bottom button.selected { color: var(--green); }
-.bottom .new .nav-icon {
-  width: 34px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--green);
-  color: #fff;
-  font-size: 17px;
-}
+.bottom { display: none !important; }
 .voice-help {
   margin: 10px 0 0;
   padding: 10px 12px;
@@ -85,5 +129,9 @@ dialog { border-radius: 18px; }
 
 @media (min-width: 760px) {
   .app { border-radius: 18px; }
-  .bottom { border-radius: 0 0 18px 18px; }
+  .top-tabs { top: 0; }
+}
+@media (max-width: 360px) {
+  .quick-actions { grid-template-columns: 1fr; }
+  .voice-action { min-height: 44px; }
 }
