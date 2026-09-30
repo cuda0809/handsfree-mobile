@@ -1,3 +1,4 @@
+/* HandsFree UI live-update marker */
 /* Completes existing Light v1 screens using personal, signed server requests. */
 let appIssues=[],appProjects=[],appReport=null,appIssue=null,editingNoteId=null;const projectHistoryCache=new Map();
 const LIFECYCLE_CACHE_KEY='hf-project-lifecycle-v1';
