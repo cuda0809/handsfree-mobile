@@ -231,3 +231,33 @@ main{padding:0 14px 84px!important}.date{font-size:11px!important}.lead{font-siz
 @media(max-width:360px){
   .delivery-dates,.project-date-grid{grid-template-columns:1fr}
 }
+
+/* Production planning */
+.plan-switch{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:12px 0 14px;padding:4px;background:#eef2f3;border-radius:12px}
+.plan-switch button{border:0;border-radius:9px;background:transparent;min-height:38px;font-size:11px;font-weight:850;color:var(--hy-sub)}
+.plan-switch button.active{background:#fff;color:var(--hy-ink);box-shadow:0 2px 8px rgba(22,43,56,.06)}
+.plan-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 14px}
+.plan-summary>div{padding:12px;border:1px solid var(--hy-line);border-radius:12px;background:#fff}
+.plan-summary small{display:block;color:var(--hy-sub);font-size:8px;margin-bottom:4px}
+.plan-summary b{font-size:20px}
+.production-plan-list{display:grid;gap:12px}
+.production-plan-card{display:block;width:100%;text-align:left;border:1px solid var(--hy-line);border-radius:15px;background:#fff;padding:14px}
+.production-plan-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.production-plan-head>div{min-width:0}
+.production-plan-head small{display:block;color:var(--hy-sub);font-size:8px;margin-bottom:4px}
+.production-plan-head b{display:block;font-size:13px;line-height:1.4;overflow-wrap:anywhere}
+.production-plan-head>span{flex:0 0 auto;padding:5px 7px;border-radius:999px;font-size:8px;font-weight:900}
+.production-plan-head>span.set{background:#e7f3ef;color:var(--hy-green)}
+.production-plan-head>span.unset{background:#fff0e9;color:var(--hy-orange)}
+.production-plan-meta{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:11px 0}
+.production-plan-meta>div{padding:8px 9px;border-radius:9px;background:#f7f9fa;min-width:0}
+.production-plan-meta small,.production-plan-stages small{display:block;color:var(--hy-sub);font-size:8px;margin-bottom:3px}
+.production-plan-meta b{display:block;font-size:10px;line-height:1.35;overflow-wrap:anywhere}
+.production-plan-stages{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin-top:9px}
+.production-plan-stages>div{padding:8px 4px;border:1px solid #edf0f1;border-radius:8px;text-align:center;min-width:0}
+.production-plan-stages b{display:block;font-size:8px;line-height:1.3;overflow-wrap:anywhere}
+.production-plan-next{display:grid!important;grid-template-columns:52px 1fr;gap:7px;margin:10px 0 0!important;padding-top:9px;border-top:1px solid #edf0f1;color:var(--hy-ink)!important;font-size:10px!important;line-height:1.4!important}
+.production-plan-next span{color:var(--hy-sub);font-size:8px;font-weight:900}
+@media(max-width:380px){
+ .production-plan-stages{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
