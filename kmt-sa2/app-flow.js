@@ -228,6 +228,7 @@ function previewUnifiedEvent(issueId,scope=document){
 async function submitUnifiedEvent(issueId,text,statusEl){
  const x=items.find(v=>v.issueId===issueId);
  if(!x)return {ok:false,error:'missing_issue'};
+ if(/-\*$/.test(String(x.orderId||'')))return {ok:false,error:'grouped_target'};
  const bodyText=String(text||'').trim();
  if(!bodyText)return {ok:false,error:'empty'};
  if(navigator.onLine===false)return {ok:false,error:'offline'};
@@ -321,7 +322,7 @@ async function saveTodayIssue(issueId){
  }else if(result.partial){
    if(statusEl)statusEl.textContent=result.eventSaved?'Event는 저장됐지만 상태 자동반영은 확인하지 못했습니다. 중복 입력하지 말고 이력을 확인하세요.':'서버 접수 결과를 확인해야 합니다.';
  }else{
-   const messages={offline:'오프라인입니다. 네트워크 연결 후 기록하세요.',local_store:'기기 기록 보관에 실패해 전송하지 않았습니다.',rejected:'요청이 거절됐습니다. 연결과 권한을 확인하세요.',unknown:'응답을 확정하지 못했습니다. 자동 재전송하지 않습니다.'};
+   const messages={grouped_target:'이 장비는 발주번호가 묶여 있습니다. 01/02 개별 장비 선택 기능을 먼저 연결해야 합니다.',offline:'오프라인입니다. 네트워크 연결 후 기록하세요.',local_store:'기기 기록 보관에 실패해 전송하지 않았습니다.',rejected:'요청이 거절됐습니다. 연결과 권한을 확인하세요.',unknown:'응답을 확정하지 못했습니다. 자동 재전송하지 않습니다.'};
    if(statusEl)statusEl.textContent=messages[result.error]||'기록하지 못했습니다.';
  }
  if(saveButton)saveButton.disabled=false;
