@@ -19,6 +19,56 @@ const appCall=b=>api('/api/sa2-app',b,55000);
 function appError(e){if(!e.status&&!e.data)return '연결 실패 또는 응답 미확인입니다. 자동 재전송하지 않습니다.';const code=e.data?.error||e.message;return ({unauthorized:'로그인 상태를 확인할 수 없습니다. 개인 로그인을 다시 확인하세요.',invalid_identity:'개인 인증을 확인하지 못했습니다. 다시 로그인하세요.',identity_denied:'개인 인증 또는 허용 계정을 확인하세요.',invalid_origin:'앱 주소와 인증 출처 설정을 확인하세요.',personal_login_required:'사용자 등록이 필요합니다.',activation_required:'사용자 등록이 필요합니다.',forbidden:'이 계정의 권한을 확인하세요.',stale_record:'다른 변경이 있습니다. 최신 내용을 다시 열어 수정하세요.',project_mismatch:'프로젝트 연결을 확인하세요.',ambiguous_receipt:'같은 내용의 요청이 여러 건입니다. 요청 번호로 확인하세요.',invalid_reason:'변경 사유를 입력하세요.',invalid_next_action:'다음 행동을 입력하세요.',no_change:'변경한 내용이 없습니다.',edit_gate_closed:'수정 기능 연결을 확인 중입니다.'})[code]||scheduleErrors[code]||'연결 결과를 확인하지 못했습니다. 잠시 후 다시 확인하세요.';}
 function appFailure(el,e){if(el?.isConnected)el.innerHTML=esc(appError(e))+(e.status===401?' <a href="./login.html">사용자 등록</a>':'');}
 function appDay(v){if(/^\d{5}(?:\.\d+)?$/.test(String(v)))return new Date(Date.UTC(1899,11,30)+Math.floor(Number(v))*86400000).toISOString().slice(0,10);return String(v||'');}
+const PROJECT_META_KEY='hf-project-meta-v1';
+let projectMetaPending=null;
+function formatHfDate(v){
+ const s=appDay(v).trim();
+ if(!s)return '미정';
+ let m=s.match(/^(20\d{2})[-/.]\s*(\d{1,2})[-/.]\s*(\d{1,2})$/);
+ if(m)return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+ m=s.match(/^(\d{2})[-/.]\s*(\d{1,2})[-/.]\s*(\d{1,2})$/);
+ if(m)return '20'+m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+ if(/미정|연기|협의|확인/.test(s))return '미정';
+ return s;
+}
+function projectMetaCache(){
+ const c=readStore(PROJECT_META_KEY,null);
+ return c&&Array.isArray(c.projects)?c:null;
+}
+function applyProjectMeta(projects){
+ const map=new Map((projects||[]).map(p=>[String(p.orderId||''),p]));
+ let changed=false;
+ items=items.map((x,id)=>{
+   const p=map.get(String(x.orderId||''));if(!p)return {...x,id};
+   const due=String(p.due||x.due||''),pm=String(p.pm||x.pm||''),actualDelivery=String(p.actualDelivery||x.actualDelivery||'');
+   if(due!==String(x.due||'')||pm!==String(x.pm||'')||actualDelivery!==String(x.actualDelivery||''))changed=true;
+   return {...x,due,pm,actualDelivery,id};
+ });
+ return changed;
+}
+async function syncProjectMeta(force=false){
+ const cached=projectMetaCache();
+ if(cached)applyProjectMeta(cached.projects);
+ const freshEnough=cached&&Date.now()-Date.parse(cached.cachedAt||0)<15*60*1000;
+ if(!force&&freshEnough)return cached;
+ if(projectMetaPending)return projectMetaPending;
+ projectMetaPending=(async()=>{
+  try{
+   const d=await appCall({action:'catalog'});
+   const projects=Array.isArray(d.projects)?d.projects:[];
+   persist(PROJECT_META_KEY,{cachedAt:new Date().toISOString(),projects});
+   const changed=applyProjectMeta(projects);
+   if(changed){
+    if(screen==='delivery')delivery(true);
+    if(screen==='projects')projects(filter,true);
+   }
+   return {projects};
+  }catch{return cached||{projects:[]};}
+  finally{projectMetaPending=null;}
+ })();
+ return projectMetaPending;
+}
+function scheduleText(v){return formatHfDate(v)==='미정'?'미정':formatHfDate(v);}
 function appQuantity(v){const n=Number(String(v).replaceAll(',',''));if(!String(v).trim()||!Number.isFinite(n)||n<0)throw Error('invalid_report');return n;}
 reports=function(){return '<section><div class="section-title"><h2>생산 · 지원 집계</h2></div><div class="report-links compact"><button onclick="productionReport()">▥ 생산 실적<small>월별 누적 · 과거 연도 합계 ›</small></button><button onclick="supportReport()">⇄ 타부서 지원<small>월별 인원 · 연간 합계 ›</small></button></div></section>';};
 productionReport=async function(){await loadAppReport('production');};
@@ -189,7 +239,7 @@ async function openProject(orderId,purpose='detail'){
   const closed=linked.issueStatus==='CLOSED'||linked.priority===3||/^(출고완료|납품완료|완료)$/.test(String(currentState||''));
   const currentStage=closed?4:hybridStageIndex({state:currentState,nextAction:linked.nextAction||'',process:linked.process||''});
   const currentDate=appDay(linked.since)||appDay(linked.sourceLatestUpdate)||new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
-  const scheduleBlock='<div class="hybrid-timeline">'+stageNames.map((name,i)=>{const cls=closed||i<currentStage?'done':i===currentStage?'now':'';const label=closed||i<currentStage?'종료':i===currentStage?currentDate:'예정';return '<div class="hybrid-step '+cls+'"><i></i><b>'+name+'</b><small>'+esc(label)+'</small></div>';}).join('')+'</div><div class="project-schedule-status '+(closed?'closed':'active')+'">'+(closed?'<b>제작 종료</b><span>'+esc(currentDate)+'</span>':'<b>진행중</b><span>'+esc(currentDate)+' · '+esc(currentState)+'</span>')+'</div>';
+  const scheduleBlock='<div class="hybrid-timeline">'+stageNames.map((name,i)=>{const cls=closed||i<currentStage?'done':i===currentStage?'now':'';const label=closed||i<currentStage?'종료':i===currentStage?currentDate:'미정';return '<div class="hybrid-step '+cls+'"><i></i><b>'+name+'</b><small>'+esc(label)+'</small></div>';}).join('')+'</div><div class="project-schedule-status '+(closed?'closed':'active')+'">'+(closed?'<b>제작 종료</b><span>'+esc(currentDate)+'</span>':'<b>진행중</b><span>'+esc(currentDate)+' · '+esc(currentState)+'</span>')+'</div>';
   el.innerHTML='<div class="hybrid-project-card"><small>JOB NO. '+esc(p.orderId)+' · PM '+esc(p.pm||'미등록')+'</small><h2>'+esc(p.customer)+' · '+esc(p.model)+'</h2><p>납기 '+esc(p.due||'미등록')+' · Core 현재상태</p><div class="hybrid-state"><span>현재 상태 · '+esc(currentState)+'</span><span>'+esc(linked.priority===1?'우선 확인':linked.priority===3?'완료':'진행')+'</span></div></div><div class="hybrid-section"><b>전체 제작 일정</b><span>현장 기준</span></div>'+scheduleBlock+'<div class="hybrid-section"><b>최근 라이프사이클</b><span>'+esc(historyState)+'</span></div><div class="lifecycle-preview">'+(shownHistory?lifecyclePreview(shownHistory,4,linked):lifecyclePreview({events:[],changes:[]},4,linked))+'</div><button id="projectLifecycleButton" class="primary">전체 라이프사이클 보기</button><button id="projectHistoryButton" class="secondary">변경 근거 · RAW 이력</button><button id="projectPlanButton" class="secondary">원본 계획일정 확인</button>';
   $('projectLifecycleButton').onclick=()=>projectLifecycle(p.orderId);
   $('projectHistoryButton').onclick=()=>projectHistory(p.orderId);
@@ -348,20 +398,21 @@ function hybridStageFlow(x){
    return '<div class="hybrid-stage '+cls+'"><i></i><b>'+name+'</b></div>';
  }).join('')+'</div><div class="hybrid-flow-now">현재 공정 · <b>'+HYBRID_FLOW_STAGES[current]+'</b>'+(complete?' · 완료':'')+'</div>';
 }
-function delivery(){
+function delivery(skipMeta=false){
  active('delivery');screen='delivery';
+ if(!skipMeta)setTimeout(()=>syncProjectMeta(false),0);
  const selected=items.slice().sort((a,b)=>hybridDueKey(a.due).localeCompare(hybridDueKey(b.due))||(a.priority||9)-(b.priority||9));
- main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">CUSTOMER PROMISES</div><h1>출고 약속</h1></div><button class="chip" onclick="refresh()">Core 새로고침</button></div><p class="hybrid-desc">이 화면은 현재 Core 데이터만 사용합니다. 탭을 여는 것만으로 추가 서버 조회를 하지 않습니다.</p><div id="deliveryList" class="hybrid-promise-list">'+
- (selected.length?selected.map(x=>{const due=appDay(x.due)||'납기 확인 필요',risk=x.priority===1;return '<button class="hybrid-promise-row" data-delivery-id="'+x.id+'"><span class="hybrid-promise-date">'+esc(due)+'<small>'+(risk?'우선 확인':x.priority===3?'완료':'진행')+'</small></span><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(x.state||'미등록')+(x.nextAction?' · 다음 '+esc(x.nextAction):'')+'</p>'+hybridStageFlow(x)+'</button>';}).join(''):'<p class="empty">현재 Core에 표시할 프로젝트가 없습니다.</p>')+
+ main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">CUSTOMER PROMISES</div><h1>출고 약속</h1></div></div><p class="hybrid-desc">납기와 실제 출고일, 현재 공정 위치를 장비별로 봅니다.</p><div id="deliveryList" class="hybrid-promise-list">'+
+ (selected.length?selected.map(x=>{const due=formatHfDate(x.due),actual=formatHfDate(x.actualDelivery),risk=x.priority===1;return '<button class="hybrid-promise-row delivery-v2" data-delivery-id="'+x.id+'"><div class="delivery-dates"><div><small>납기</small><strong>'+esc(due)+'</strong></div><div><small>실납기일</small><strong>'+esc(actual)+'</strong></div></div><div class="delivery-main"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><small class="delivery-job">JOB NO. '+esc(x.orderId||'미등록')+'</small><p><span>현재</span>'+esc(x.state||'미등록')+'</p><p><span>다음</span>'+esc(x.nextAction||'미정')+'</p></div>'+hybridStageFlow(x)+'</button>';}).join(''):'<p class="empty">현재 Core에 표시할 프로젝트가 없습니다.</p>')+
  '</div><button class="secondary" onclick="allProjects()">전체 프로젝트 원장 불러오기</button>';
  const el=$('deliveryList');el?.querySelectorAll('[data-delivery-id]').forEach(b=>b.onclick=()=>openItem(Number(b.dataset.deliveryId)));
 }
-function projects(mode='all'){
- active('projects');screen='projects';filter=mode;
+function projects(mode='all',skipMeta=false){
+ active('projects');screen='projects';filter=mode;if(!skipMeta)setTimeout(()=>syncProjectMeta(false),0);
  main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">PROJECT LIFECYCLE</div><h1>프로젝트</h1></div><button class="chip" onclick="refresh()">Core 새로고침</button></div><p class="hybrid-desc">현재 관리 중인 Core 프로젝트는 추가 서버 조회 없이 바로 표시합니다.</p><input id="hybridProjectSearch" class="hybrid-search" placeholder="고객명 · 장비명 · 발주번호" oninput="renderHybridProjects()"><div class="tabs"><button class="chip '+(mode==='all'?'active':'')+'" onclick="projects(\'all\')">전체</button><button class="chip '+(mode==='urgent'?'active':'')+'" onclick="projects(\'urgent\')">우선순위 1</button></div><div id="hybridProjectList" class="hybrid-project-list"></div><button class="secondary" onclick="allProjects()">전체 프로젝트 원장 불러오기</button>';
  renderHybridProjects();
 }
-function renderHybridProjects(){const el=$('hybridProjectList');if(!el)return;const q=norm($('hybridProjectSearch')?.value||''),rows=items.filter(x=>{if(filter==='urgent'&&x.priority!==1)return false;return !q||norm([x.orderId,x.customer,x.model,x.state,x.pm].join(' ')).includes(q);});el.innerHTML=rows.map(x=>'<button class="hybrid-project-row" data-project-id="'+x.id+'"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(x.orderId)+' · '+esc(x.state||'상태 미등록')+(x.due?' · 납기 '+esc(appDay(x.due)):'')+'</p></button>').join('')||'<p class="empty">일치하는 현재 프로젝트가 없습니다.</p>';el.querySelectorAll('[data-project-id]').forEach(b=>b.onclick=()=>openItem(Number(b.dataset.projectId)));}
+function renderHybridProjects(){const el=$('hybridProjectList');if(!el)return;const q=norm($('hybridProjectSearch')?.value||''),rows=items.filter(x=>{if(filter==='urgent'&&x.priority!==1)return false;return !q||norm([x.orderId,x.customer,x.model,x.state,x.pm].join(' ')).includes(q);});el.innerHTML=rows.map(x=>'<button class="hybrid-project-row" data-project-id="'+x.id+'"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(x.orderId)+' · '+esc(x.state||'상태 미등록')+' · 납기 '+esc(formatHfDate(x.due))+'</p></button>').join('')||'<p class="empty">일치하는 현재 프로젝트가 없습니다.</p>';el.querySelectorAll('[data-project-id]').forEach(b=>b.onclick=()=>openItem(Number(b.dataset.projectId)));}
 
 function classifyUnifiedEvent(raw){
  const text=String(raw||'').trim(),n=norm(text);
@@ -571,3 +622,5 @@ function openUnifiedEvent(issueId){
 const eventRefreshBase=refresh;
 refresh=async function(){const ok=await eventRefreshBase();if(screen==='issues')todayIssues();return ok;};
 home();
+
+applyProjectMeta(projectMetaCache()?.projects||[]);setTimeout(()=>syncProjectMeta(false),300);
