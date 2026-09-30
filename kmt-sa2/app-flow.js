@@ -31,6 +31,80 @@ function formatHfDate(v){
  if(/미정|연기|협의|확인/.test(s))return '미정';
  return s;
 }
+function isCompletedOperational(x){
+ const state=String(x?.state||''),delivery=String(x?.deliveryState||''),status=String(x?.issueStatus||'');
+ const actual=formatHfDate(x?.actualDelivery);
+ return actual!=='미정'||status==='CLOSED'||/출고\s*완료|납품\s*완료/.test(state+' '+delivery);
+}
+function operationalRows(includeCompleted=true){
+ const meta=projectMetaCache()?.projects||appProjects||[];
+ const plans=planOverviewCache()?.byOrder||{};
+ const live=new Map(items.map(x=>[String(x.orderId||''),x]));
+ const map=new Map();
+ for(const p of meta){
+  const orderId=String(p.orderId||'').trim();if(!orderId)continue;
+  map.set(orderId,{...p,...(plans[orderId]||{}),...(live.get(orderId)||{}),orderId});
+ }
+ for(const x of items){
+  const orderId=String(x.orderId||'').trim();if(!orderId)continue;
+  map.set(orderId,{...(map.get(orderId)||{}),...(plans[orderId]||{}),...x,orderId});
+ }
+ for(const [orderId,p] of Object.entries(plans)){
+  if(map.has(orderId))continue;
+  map.set(orderId,{orderId,...p,state:'계획',priority:2});
+ }
+ const rows=[...map.values()].map(x=>({
+  ...x,
+  customer:String(x.customer||''),
+  model:String(x.model||''),
+  due:String(x.due||''),
+  state:String(x.state||'계획'),
+  nextAction:String(x.nextAction||''),
+  priority:Number(x.priority||2)
+ }));
+ return (includeCompleted?rows:rows.filter(x=>!isCompletedOperational(x)))
+   .sort((a,b)=>hybridDueKey(a.due).localeCompare(hybridDueKey(b.due))||(a.priority||9)-(b.priority||9));
+}
+function planStagesOnDay(x,day){
+ const rows=Array.isArray(x?.planTimeline)?x.planTimeline:[];
+ return [...new Set(rows.filter(r=>formatHfDate(r.date)===day).map(r=>{
+  const p=String(r.process||'');
+  if(/출고|납품/.test(p))return '출고';
+  if(/검수|테스트|시험|FAT/.test(p))return '검수';
+  if(/프로그램/.test(p))return '프로그램';
+  if(/전장|전기/.test(p))return '전장';
+  if(/조립/.test(p))return '조립';
+  if(/자재/.test(p))return '자재';
+  return p;
+ }).filter(Boolean))];
+}
+function renderUnifiedHome(){
+ active('home');screen='home';
+ setTimeout(()=>syncProjectMeta(false),0);setTimeout(()=>syncPlanOverview(false),80);
+ const all=operationalRows(true),activeRows=all.filter(x=>!isCompletedOperational(x));
+ const today=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
+ const plannedToday=activeRows.filter(x=>planStagesOnDay(x,today).length);
+ const urgent=activeRows.filter(x=>x.priority===1);
+ const issueActive=activeRows.filter(x=>x.issueId&&x.priority!==3);
+ const attentionMap=new Map();
+ urgent.forEach(x=>attentionMap.set(x.orderId,x));plannedToday.forEach(x=>attentionMap.set(x.orderId,x));
+ const attention=[...attentionMap.values()].sort((a,b)=>(a.priority||9)-(b.priority||9)||hybridDueKey(a.due).localeCompare(hybridDueKey(b.due)));
+ const top=attention[0],done=all.filter(isCompletedOperational);
+ main.innerHTML=
+ '<div class="hybrid-eyebrow">'+esc(new Date().toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',weekday:'long'}))+'</div>'+
+ '<h1 class="hybrid-title">오늘 확인할 일<br>'+attention.length+'건이 있습니다</h1>'+
+ '<p class="hybrid-desc">생산계획과 현장 이슈를 같은 운영데이터에서 함께 보여줍니다.</p>'+
+ (top?'<section class="hybrid-decision"><div class="hybrid-decision-top"><span>가장 먼저 볼 항목</span><span>'+(top.priority===1?'P1 · 현장 확인':'오늘 계획')+'</span></div><h2>'+esc(top.customer)+' · '+esc(top.model)+'<br><span>'+esc(top.state||'계획')+'</span></h2><p>'+(planStagesOnDay(top,today).length?'오늘 계획 · '+esc(planStagesOnDay(top,today).join(' · ')):'다음 행동 · '+esc(top.nextAction||'확인 필요'))+'</p><button data-home-order="'+esc(top.orderId)+'"><span>프로젝트 상세 보기</span><span>›</span></button></section>':'<section class="hybrid-decision"><h2>오늘 우선 확인할 항목이 없습니다.</h2><p>현재 등록된 계획과 이슈 기준입니다.</p></section>')+
+ '<div class="hybrid-numbers"><button class="hybrid-number" onclick="productionPlan()"><small>관리중</small><b>'+activeRows.length+'</b><em>통합 운영</em></button><button class="hybrid-number risk" onclick="projects(\'urgent\')"><small>우선순위 1</small><b>'+urgent.length+'</b><em>먼저 확인</em></button><button class="hybrid-number" onclick="allProjects()"><small>완료 상태</small><b>'+done.length+'</b><em>이력 보존</em></button></div>'+
+ '<div class="hybrid-section"><b>오늘 생산계획</b><span>'+plannedToday.length+'대</span></div>'+
+ '<div class="hybrid-floor">'+(plannedToday.length?plannedToday.map(x=>'<button class="hybrid-floor-row p2" data-home-order="'+esc(x.orderId)+'"><span class="hybrid-code">계획</span><span><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><small>'+esc(planStagesOnDay(x,today).join(' · '))+' · 납기 '+esc(formatHfDate(x.due))+'</small></span><span class="hybrid-priority">오늘</span></button>').join(''):'<div class="empty">오늘로 잡힌 생산계획이 없습니다.</div>')+'</div>'+
+ '<div class="hybrid-section"><b>현장 이슈</b><span>'+issueActive.length+'대</span></div>'+
+ '<div class="hybrid-floor">'+(issueActive.length?issueActive.sort((a,b)=>(a.priority||9)-(b.priority||9)).map(x=>'<button class="hybrid-floor-row p'+esc(x.priority||2)+'" data-home-order="'+esc(x.orderId)+'"><span class="hybrid-code">'+(x.priority===1?'P1':'P2')+'</span><span><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><small>'+esc(x.state||'미등록')+' · 다음 '+esc(x.nextAction||'확인 필요')+'</small></span><span class="hybrid-priority">'+(x.priority===1?'확인':'진행')+'</span></button>').join(''):'<div class="empty">현재 진행 이슈가 없습니다.</div>')+'</div>'+
+ '<button class="hybrid-quick" onclick="todayIssues()"><span>🎙 오늘 이슈 입력</span><span>＋</span></button>'+
+ '<p class="source">통합 운영 · 계획 + 현재상태 · 조회 '+esc(lastRead||new Date().toLocaleString('ko-KR'))+'</p>';
+ main.querySelectorAll('[data-home-order]').forEach(b=>b.onclick=()=>openProject(b.dataset.homeOrder));
+ banner();
+}
 function projectMetaCache(){
  const c=readStore(PROJECT_META_KEY,null);
  return c&&Array.isArray(c.projects)?c:null;
@@ -73,8 +147,10 @@ async function syncProjectMeta(force=false){
    persist(PROJECT_META_KEY,{cachedAt:new Date().toISOString(),source,projects});
    const changed=applyProjectMeta(projects,source);
    if(changed){
+    if(screen==='home')home();
     if(screen==='plan')productionPlan(productionPlanMode,true);
     if(screen==='projects')projects(filter,true);
+    if(screen==='issues')todayIssues();
    }
    return {projects,source};
   }catch{return cached||{projects:[],source:'catalog'};}
@@ -430,7 +506,8 @@ function summarizePlanRecords(records){
   planProgram:first(/프로그램/),
   planInspection:last(/검수|테스트|시험|FAT/),
   planDelivery:last(/출고|납품/),
-  planSourceMonth:latestMonth
+  planSourceMonth:latestMonth,
+  planTimeline:rows.map(r=>({date:r.date,process:r.process}))
  };
 }
 function applyPlanOverview(byOrder){
@@ -479,30 +556,18 @@ async function syncPlanOverview(force=false){
   }
   persist(PLAN_OVERVIEW_KEY,{cachedAt:new Date().toISOString(),byOrder,candidateCount:targets.length});
   const changed=applyPlanOverview(byOrder);
+  if(changed&&screen==='home')home();
   if(screen==='plan')productionPlan(productionPlanMode,true);
+  if(changed&&screen==='projects')projects(filter,true);
   return {byOrder,candidateCount:targets.length,changed};
  })().finally(()=>{planOverviewPending=null;});
  return planOverviewPending;
 }
 function productionPlanRows(){
- const meta=projectMetaCache()?.projects||appProjects||[];
- const current=new Map(items.map(x=>[String(x.orderId||''),x]));
- const plans=planOverviewCache()?.byOrder||{};
- const rows=[];
- for(const p of meta){
-  const orderId=String(p.orderId||'').trim(),plan=plans[orderId]||{};
-  const hasPlan=['planAssembly','planElectrical','planProgram','planInspection','planDelivery'].some(k=>formatHfDate(plan[k])!=='미정');
-  if(!hasPlan)continue;
-  const live=current.get(orderId)||{};
-  rows.push({...p,...plan,...live,orderId,customer:live.customer||p.customer||'',model:live.model||p.model||'',due:live.due||p.due||'',pm:live.pm||p.pm||'',state:live.state||p.state||'계획',nextAction:live.nextAction||'',priority:live.priority||2,actualDelivery:live.actualDelivery||p.actualDelivery||''});
- }
- for(const x of items){
-  if(rows.some(r=>r.orderId===x.orderId))continue;
-  const plan=plans[x.orderId]||{};
-  const hasPlan=['planAssembly','planElectrical','planProgram','planInspection','planDelivery'].some(k=>formatHfDate(plan[k])!=='미정');
-  if(hasPlan)rows.push({...x,...plan});
- }
- return rows.sort((a,b)=>hybridDueKey(a.due).localeCompare(hybridDueKey(b.due))||(a.priority||9)-(b.priority||9));
+ return operationalRows(false).filter(x=>
+  ['planAssembly','planElectrical','planProgram','planInspection','planDelivery']
+   .some(k=>formatHfDate(x[k])!=='미정')
+ );
 }
 
 let productionPlanMode='plan';
@@ -544,7 +609,7 @@ function projects(mode='all',skipMeta=false){
  main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">PROJECT LIFECYCLE</div><h1>프로젝트</h1></div><button class="chip" onclick="refresh()">Core 새로고침</button></div><p class="hybrid-desc">현재 관리 중인 Core 프로젝트는 추가 서버 조회 없이 바로 표시합니다.</p><input id="hybridProjectSearch" class="hybrid-search" placeholder="고객명 · 장비명 · 발주번호" oninput="renderHybridProjects()"><div class="tabs"><button class="chip '+(mode==='all'?'active':'')+'" onclick="projects(\'all\')">전체</button><button class="chip '+(mode==='urgent'?'active':'')+'" onclick="projects(\'urgent\')">우선순위 1</button></div><div id="hybridProjectList" class="hybrid-project-list"></div><button class="secondary" onclick="allProjects()">전체 프로젝트 원장 불러오기</button>';
  renderHybridProjects();
 }
-function renderHybridProjects(){const el=$('hybridProjectList');if(!el)return;const q=norm($('hybridProjectSearch')?.value||''),rows=items.filter(x=>{if(filter==='urgent'&&x.priority!==1)return false;return !q||norm([x.orderId,x.customer,x.model,x.state,x.pm].join(' ')).includes(q);});el.innerHTML=rows.map(x=>'<button class="hybrid-project-row" data-project-id="'+x.id+'"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(x.orderId)+' · '+esc(x.state||'상태 미등록')+' · 납기 '+esc(formatHfDate(x.due))+'</p></button>').join('')||'<p class="empty">일치하는 현재 프로젝트가 없습니다.</p>';el.querySelectorAll('[data-project-id]').forEach(b=>b.onclick=()=>openItem(Number(b.dataset.projectId)));}
+function renderHybridProjects(){const el=$('hybridProjectList');if(!el)return;const q=norm($('hybridProjectSearch')?.value||''),rows=operationalRows(false).filter(x=>{if(filter==='urgent'&&x.priority!==1)return false;return !q||norm([x.orderId,x.customer,x.model,x.state,x.pm].join(' ')).includes(q);});el.innerHTML=rows.map(x=>'<button class="hybrid-project-row" data-project-order="'+esc(x.orderId)+'"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(x.orderId)+' · '+esc(x.state||'상태 미등록')+' · 납기 '+esc(formatHfDate(x.due))+'</p></button>').join('')||'<p class="empty">일치하는 현재 프로젝트가 없습니다.</p>';el.querySelectorAll('[data-project-order]').forEach(b=>b.onclick=()=>openProject(b.dataset.projectOrder));}
 
 function classifyUnifiedEvent(raw){
  const text=String(raw||'').trim(),n=norm(text);
@@ -681,7 +746,7 @@ function toggleTodayIssue(issueId){
 }
 function todayIssues(){
  active('issues');screen='issues';
- const activeRows=items.filter(x=>x.priority!==3&&!/^(출고완료|납품완료|완료)$/.test(String(x.state||''))).sort((a,b)=>(a.priority||9)-(b.priority||9));
+ const activeRows=items.filter(x=>!isCompletedOperational(x)&&x.priority!==3).sort((a,b)=>(a.priority||9)-(b.priority||9));
  const todayKey=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
  const todayLocal=notes().filter(r=>{try{return new Date(r.createdAt).toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'})===todayKey&&(r.eventType||r.eventOnly);}catch{return false;}});
  main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">TODAY ISSUES</div><h1>오늘 이슈</h1></div></div>'+
