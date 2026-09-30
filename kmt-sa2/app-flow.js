@@ -95,7 +95,7 @@ function renderUnifiedHome(){
  '<h1 class="hybrid-title">오늘 확인할 일<br>'+attention.length+'건이 있습니다</h1>'+
  '<p class="hybrid-desc">생산계획과 현장 이슈를 같은 운영데이터에서 함께 보여줍니다.</p>'+
  (top?'<section class="hybrid-decision"><div class="hybrid-decision-top"><span>가장 먼저 볼 항목</span><span>'+(top.priority===1?'P1 · 현장 확인':'오늘 계획')+'</span></div><h2>'+esc(top.customer)+' · '+esc(top.model)+'<br><span>'+esc(top.state||'계획')+'</span></h2><p>'+(planStagesOnDay(top,today).length?'오늘 계획 · '+esc(planStagesOnDay(top,today).join(' · ')):'다음 행동 · '+esc(top.nextAction||'확인 필요'))+'</p><button data-home-order="'+esc(top.orderId)+'"><span>프로젝트 상세 보기</span><span>›</span></button></section>':'<section class="hybrid-decision"><h2>오늘 우선 확인할 항목이 없습니다.</h2><p>현재 등록된 계획과 이슈 기준입니다.</p></section>')+
- '<div class="hybrid-numbers"><button class="hybrid-number" onclick="productionPlan()"><small>관리중</small><b>'+activeRows.length+'</b><em>통합 운영</em></button><button class="hybrid-number risk" onclick="projects(\'urgent\')"><small>우선순위 1</small><b>'+urgent.length+'</b><em>먼저 확인</em></button><button class="hybrid-number" onclick="allProjects()"><small>완료 상태</small><b>'+done.length+'</b><em>이력 보존</em></button></div>'+
+ '<div class="hybrid-numbers"><button class="hybrid-number" onclick="productionPlan()"><small>관리중</small><b>'+activeRows.length+'</b><em>통합 운영</em></button><button class="hybrid-number risk" onclick="projects(\'active\')"><small>우선순위 1</small><b>'+urgent.length+'</b><em>먼저 확인</em></button><button class="hybrid-number" onclick="projects(\'completed\')"><small>완료 상태</small><b>'+done.length+'</b><em>이력 보존</em></button></div>'+
  '<div class="hybrid-section"><b>오늘 생산계획</b><span>'+plannedToday.length+'대</span></div>'+
  '<div class="hybrid-floor">'+(plannedToday.length?plannedToday.map(x=>'<button class="hybrid-floor-row p2" data-home-order="'+esc(x.orderId)+'"><span class="hybrid-code">계획</span><span><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><small>'+esc(planStagesOnDay(x,today).join(' · '))+' · 납기 '+esc(formatHfDate(x.due))+'</small></span><span class="hybrid-priority">오늘</span></button>').join(''):'<div class="empty">오늘로 잡힌 생산계획이 없습니다.</div>')+'</div>'+
  '<div class="hybrid-section"><b>현장 이슈</b><span>'+issueActive.length+'대</span></div>'+
@@ -610,12 +610,32 @@ function productionPlan(mode='plan',skipMeta=false){
  main.querySelectorAll('[data-plan-order]').forEach(b=>b.onclick=()=>openProject(b.dataset.planOrder));
 }
 function delivery(skipMeta=false){return productionPlan('delivery',skipMeta);}
-function projects(mode='all',skipMeta=false){
- active('projects');screen='projects';filter=mode;if(!skipMeta)setTimeout(()=>syncProjectMeta(false),0);
- main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">PROJECT LIFECYCLE</div><h1>프로젝트</h1></div><button class="chip" onclick="refresh()">Core 새로고침</button></div><p class="hybrid-desc">현재 관리 중인 Core 프로젝트는 추가 서버 조회 없이 바로 표시합니다.</p><input id="hybridProjectSearch" class="hybrid-search" placeholder="고객명 · 장비명 · 발주번호" oninput="renderHybridProjects()"><div class="tabs"><button class="chip '+(mode==='all'?'active':'')+'" onclick="projects(\'all\')">전체</button><button class="chip '+(mode==='urgent'?'active':'')+'" onclick="projects(\'urgent\')">우선순위 1</button></div><div id="hybridProjectList" class="hybrid-project-list"></div><button class="secondary" onclick="allProjects()">전체 프로젝트 원장 불러오기</button>';
+function projects(mode='active',skipMeta=false){
+ if(mode!=='completed')mode='active';
+ active('projects');screen='projects';filter=mode;
+ if(!skipMeta){setTimeout(()=>syncProjectMeta(false),0);setTimeout(()=>syncPlanOverview(false),80);}
+ const all=operationalRows(true),activeCount=all.filter(x=>!isCompletedOperational(x)).length,completedCount=all.filter(isCompletedOperational).length;
+ main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">PROJECT LIFECYCLE</div><h1>프로젝트</h1></div></div>'+
+ '<p class="hybrid-desc">진행 중인 프로젝트를 기본으로 보고, 완료 프로젝트는 필요할 때만 열어봅니다.</p>'+
+ '<input id="hybridProjectSearch" class="hybrid-search" placeholder="고객명 · 장비명 · JOB NO." oninput="renderHybridProjects()">'+
+ '<div class="tabs project-state-tabs"><button class="chip '+(mode==='active'?'active':'')+'" onclick="projects(\'active\')">진행중 '+activeCount+'</button><button class="chip '+(mode==='completed'?'active':'')+'" onclick="projects(\'completed\')">완료 '+completedCount+'</button></div>'+
+ '<div id="hybridProjectList" class="hybrid-project-list"></div>';
  renderHybridProjects();
 }
-function renderHybridProjects(){const el=$('hybridProjectList');if(!el)return;const q=norm($('hybridProjectSearch')?.value||''),rows=operationalRows(false).filter(x=>{if(filter==='urgent'&&x.priority!==1)return false;return !q||norm([x.orderId,x.customer,x.model,x.state,x.pm].join(' ')).includes(q);});el.innerHTML=rows.map(x=>'<button class="hybrid-project-row" data-project-order="'+esc(x.orderId)+'"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(x.orderId)+' · '+esc(x.state||'상태 미등록')+' · 납기 '+esc(formatHfDate(x.due))+'</p></button>').join('')||'<p class="empty">일치하는 현재 프로젝트가 없습니다.</p>';el.querySelectorAll('[data-project-order]').forEach(b=>b.onclick=()=>openProject(b.dataset.projectOrder));}
+function renderHybridProjects(){
+ const el=$('hybridProjectList');if(!el)return;
+ const q=norm($('hybridProjectSearch')?.value||'');
+ let rows=operationalRows(true).filter(x=>(filter==='completed'?isCompletedOperational(x):!isCompletedOperational(x)));
+ if(q)rows=rows.filter(x=>norm([x.orderId,x.customer,x.model,x.state,x.pm,x.nextAction].join(' ')).includes(q));
+ if(filter==='completed')rows.sort((a,b)=>String(formatHfDate(b.actualDelivery)==='미정'?'':formatHfDate(b.actualDelivery)).localeCompare(String(formatHfDate(a.actualDelivery)==='미정'?'':formatHfDate(a.actualDelivery)))||hybridDueKey(b.due).localeCompare(hybridDueKey(a.due)));
+ el.innerHTML=rows.map(x=>{
+  if(filter==='completed'){
+   return '<button class="hybrid-project-row project-completed" data-project-order="'+esc(x.orderId)+'"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(x.orderId)+'</p><div class="project-row-dates"><span>납기 <b>'+esc(formatHfDate(x.due))+'</b></span><span>실납기일 <b>'+esc(formatHfDate(x.actualDelivery))+'</b></span></div></button>';
+  }
+  return '<button class="hybrid-project-row project-active" data-project-order="'+esc(x.orderId)+'"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(x.orderId)+' · 납기 '+esc(formatHfDate(x.due))+'</p><div class="project-row-state"><span>현재</span><b>'+esc(x.state||'상태 미등록')+'</b></div><div class="project-row-next"><span>다음</span>'+esc(x.nextAction||'미정')+'</div></button>';
+ }).join('')||'<p class="empty">'+(filter==='completed'?'완료 프로젝트가 없습니다.':'현재 진행 중인 프로젝트가 없습니다.')+'</p>';
+ el.querySelectorAll('[data-project-order]').forEach(b=>b.onclick=()=>openProject(b.dataset.projectOrder));
+}
 
 function classifyUnifiedEvent(raw){
  const text=String(raw||'').trim(),n=norm(text);
