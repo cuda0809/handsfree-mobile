@@ -1,0 +1,19 @@
+{
+  "id": "/handsfree-renewal/",
+  "name": "HandsFree Renewal",
+  "short_name": "Renewal",
+  "lang": "ko",
+  "start_url": "/handsfree-renewal/",
+  "scope": "/handsfree-renewal/",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#205bbb",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

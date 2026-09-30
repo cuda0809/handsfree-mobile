@@ -1,0 +1,89 @@
+:root {
+  --ink: #15232d;
+  --muted: #66737c;
+  --line: #d9dfe2;
+  --green: #128269;
+  --bg: #eef1f2;
+  --orange: #f15b24;
+  --navy: #152633;
+}
+
+body { background: var(--bg); }
+.app { max-width: 560px; background: #f7f8f8; }
+.top {
+  padding: 18px 20px 15px;
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+}
+.renewal-brand { font-size: 23px; font-weight: 900; letter-spacing: -1.2px; }
+.renewal-brand span { color: var(--green); }
+.renewal-brand small { margin-left: 7px; color: #8c9b92; font-size: 10px; letter-spacing: 0; }
+.top .eyebrow { color: #7d898f; font-size: 9px; letter-spacing: 1.4px; }
+.version-badge { color: var(--green); border-color: #cfe3dc; }
+.demo { margin: 0; padding: 10px 20px; background: #eaf2ef; }
+.demo b { color: var(--green); }
+main { padding: 18px 20px 30px; }
+h1 { margin-top: 7px; font-size: 28px; color: var(--ink); }
+h1 span { color: var(--ink); font-weight: 850; }
+.lead { margin-bottom: 17px; }
+.date { font-size: 11px; font-weight: 700; }
+.brief {
+  padding: 18px;
+  border-radius: 15px;
+  background: var(--navy);
+}
+.brief:after { display: none; }
+.brief-label { color: #a9bac4; font-size: 9px; font-weight: 850; }
+.brief h2 { margin: 10px 0 12px; font-size: 19px; }
+.brief h2 em { color: #ff8b58; }
+.brief button { padding-top: 11px; color: #d9e2e7; }
+.metrics {
+  margin: 11px 0 21px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+.metric, .metric:first-child, .metric:last-child { padding: 12px 10px; }
+.metric small { font-size: 9px; }
+.metric strong { font-size: 22px; }
+.section-title h2 { font-size: 15px; }
+.report-links { gap: 7px; }
+.report-links button { border-radius: 11px; box-shadow: none; }
+.item { border-radius: 12px; box-shadow: none; }
+.item:hover { transform: none; }
+.tag { background: #fff0ea; color: #b9471c; }
+.next { color: var(--green); }
+.primary { background: var(--orange); border-radius: 11px; }
+.secondary, .sheet input, .sheet textarea, .sheet select { border-radius: 10px; }
+.action-box { background: #eef5f2; }
+.alert { background: #fff1e9; color: #874421; }
+.bottom { grid-template-columns: repeat(5, 1fr) !important; }
+.bottom button.selected { color: var(--green); }
+.bottom .new .nav-icon {
+  width: 34px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--green);
+  color: #fff;
+  font-size: 17px;
+}
+.voice-help {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #cde1da;
+  border-radius: 10px;
+  background: #f2f8f6;
+  color: #40645a;
+  font-size: 11px;
+}
+dialog { border-radius: 18px; }
+
+@media (min-width: 760px) {
+  .app { border-radius: 18px; }
+  .bottom { border-radius: 0 0 18px 18px; }
+}
