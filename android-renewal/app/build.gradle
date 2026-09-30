@@ -7,7 +7,7 @@ def releaseStorePassword = project.findProperty('HF_RELEASE_STORE_PASSWORD')
 def releaseKeyAlias = project.findProperty('HF_RELEASE_KEY_ALIAS')
 def releaseKeyPassword = project.findProperty('HF_RELEASE_KEY_PASSWORD')
 def hasReleaseSigning = releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword
-def handsFreeAppUrl = project.findProperty('HF_APP_URL') ?: 'https://handsfree-mobile-alpha-02-git-codex-real-l-fbac1c-cuda0809-8210.vercel.app/handsfree-renewal/?app=renewal08'
+def handsFreeAppUrl = project.findProperty('HF_APP_URL') ?: 'https://handsfree-mobile-alpha-02-git-codex-real-l-fbac1c-cuda0809-8210.vercel.app/handsfree-renewal/?app=renewal09'
 
 android {
     namespace 'com.handsfree.renewal'
@@ -17,8 +17,8 @@ android {
         applicationId 'com.handsfree.renewal'
         minSdk 26
         targetSdk 35
-        versionCode 8
-        versionName '0.8.0'
+        versionCode 9
+        versionName '0.9.0'
         buildConfigField 'String', 'APP_URL', '"' + handsFreeAppUrl + '"'
         manifestPlaceholders = [appLabel: '핸즈프리 리뉴얼']
     }

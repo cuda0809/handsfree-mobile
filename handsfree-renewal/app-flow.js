@@ -44,6 +44,7 @@ async function allProjects(prefix='',purpose='detail'){
   el.querySelectorAll('[data-project]').forEach(button=>button.onclick=()=>openProject(button.dataset.project,button.dataset.purpose));
  }catch(e){appFailure(el,e);}finally{stop();}
 }
+window.openAllProjects=(prefix='',purpose='detail')=>allProjects(prefix,purpose);
 function groupProjectPlans(rows){const sorted=rows.slice().sort((a,b)=>appDay(a[3]).localeCompare(appDay(b[3]))),groups=[];for(const row of sorted){const date=appDay(row[3]),process=String(row[10]||'공정 미등록'),last=groups.at(-1),next=last&&new Date(last.end+'T00:00:00Z').getTime()+86400000===new Date(date+'T00:00:00Z').getTime();if(last&&last.process===process&&next){last.end=date;last.status=String(row[11]||last.status);}else groups.push({start:date,end:date,process,status:String(row[11]||'상태 미등록')});}return groups;}
 async function openProject(orderId,purpose='detail'){
  if(!personalConnected)return login();
