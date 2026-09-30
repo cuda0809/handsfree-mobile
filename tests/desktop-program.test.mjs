@@ -40,3 +40,9 @@ test('progress text derives the next action and closes completed work',()=>{
   assert.match(js,/\?'CLOSED':issue\.status/);
 });
 
+
+test('late history responses cannot overwrite a newly selected screen',()=>{
+  assert.match(js,/renderRun:0/);
+  assert.match(js,/state\.view!==['"]history['"]\|\|run!==state\.renderRun/);
+  assert.match(js,/const run=\+\+state\.renderRun/);
+});
