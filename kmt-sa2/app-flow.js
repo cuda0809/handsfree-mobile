@@ -413,10 +413,63 @@ function hybridStageFlow(x){
    return '<div class="hybrid-stage '+cls+'"><i></i><b>'+name+'</b></div>';
  }).join('')+'</div><div class="hybrid-flow-now">현재 공정 · <b>'+HYBRID_FLOW_STAGES[current]+'</b>'+(complete?' · 완료':'')+'</div>';
 }
+const PLAN_OVERVIEW_KEY='hf-production-plan-overview-v1';
+let planOverviewPending=null;
+function planOverviewCache(){const v=readStore(PLAN_OVERVIEW_KEY,null);return v&&v.byOrder? v:null;}
+function summarizePlanRecords(records){
+ const list=(records||[]).filter(r=>r&&r.date&&r.process);
+ if(!list.length)return {};
+ const months=list.map(r=>String(r.sourceMonth||'')).filter(Boolean).sort();
+ const latestMonth=months.at(-1)||'';
+ const rows=latestMonth?list.filter(r=>String(r.sourceMonth||'')===latestMonth):list;
+ const datesFor=re=>rows.filter(r=>re.test(String(r.process||''))).map(r=>formatHfDate(r.date)).filter(v=>v!=='미정').sort();
+ const first=re=>datesFor(re)[0]||'',last=re=>datesFor(re).at(-1)||'';
+ return {
+  planAssembly:first(/조립/),
+  planElectrical:first(/전장|전기/),
+  planProgram:first(/프로그램/),
+  planInspection:last(/검수|테스트|시험|FAT/),
+  planDelivery:last(/출고|납품/),
+  planSourceMonth:latestMonth
+ };
+}
+function applyPlanOverview(byOrder){
+ let changed=false;
+ items=items.map((x,id)=>{
+  const p=byOrder?.[x.orderId];if(!p)return {...x,id};
+  const patch={...p};
+  if(Object.keys(patch).some(k=>String(patch[k]||'')!==String(x[k]||'')))changed=true;
+  return {...x,...patch,id};
+ });
+ if(changed&&typeof coreCacheSave==='function')coreCacheSave();
+ return changed;
+}
+async function syncPlanOverview(force=false){
+ const cached=planOverviewCache();
+ if(cached)applyPlanOverview(cached.byOrder);
+ const fresh=cached&&Date.now()-Date.parse(cached.cachedAt||0)<15*60*1000;
+ if(!force&&fresh)return cached;
+ if(planOverviewPending)return planOverviewPending;
+ planOverviewPending=(async()=>{
+  const targets=items.filter(x=>x.orderId&&!/-\*$/.test(String(x.orderId))).slice(0,20);
+  const settled=await Promise.allSettled(targets.map(x=>api('/api/sa2-lifecycle',{action:'plans',orderId:x.orderId},30000)));
+  const byOrder={...(cached?.byOrder||{})};
+  targets.forEach((x,i)=>{
+   const s=settled[i];if(s.status!=='fulfilled')return;
+   const d=s.value,records=Array.isArray(d.records)?d.records:Array.isArray(d.plans)?d.plans:[];
+   byOrder[x.orderId]=summarizePlanRecords(records);
+  });
+  persist(PLAN_OVERVIEW_KEY,{cachedAt:new Date().toISOString(),byOrder});
+  const changed=applyPlanOverview(byOrder);
+  if(changed&&screen==='plan')productionPlan(productionPlanMode,true);
+  return {byOrder};
+ })().finally(()=>{planOverviewPending=null;});
+ return planOverviewPending;
+}
 let productionPlanMode='plan';
 function productionPlan(mode='plan',skipMeta=false){
  productionPlanMode=mode;active('plan');screen='plan';
- if(!skipMeta)setTimeout(()=>syncProjectMeta(false),0);
+ if(!skipMeta){setTimeout(()=>syncProjectMeta(false),0);setTimeout(()=>syncPlanOverview(false),80);}
  const selected=items.slice().sort((a,b)=>hybridDueKey(a.due).localeCompare(hybridDueKey(b.due))||(a.priority||9)-(b.priority||9));
  const tabs='<div class="plan-switch"><button class="'+(mode==='plan'?'active':'')+'" onclick="productionPlan(\'plan\')">생산계획</button><button class="'+(mode==='delivery'?'active':'')+'" onclick="productionPlan(\'delivery\')">납기 · 출고</button></div>';
  if(mode==='delivery'){
@@ -663,4 +716,4 @@ const eventRefreshBase=refresh;
 refresh=async function(){const ok=await eventRefreshBase();if(screen==='issues')todayIssues();return ok;};
 home();
 
-applyProjectMeta(projectMetaCache()?.projects||[],projectMetaCache()?.source||'catalog');setTimeout(()=>syncProjectMeta(true),300);
+applyProjectMeta(projectMetaCache()?.projects||[],projectMetaCache()?.source||'catalog');applyPlanOverview(planOverviewCache()?.byOrder||{});setTimeout(()=>syncProjectMeta(true),300);setTimeout(()=>syncPlanOverview(true),500);
