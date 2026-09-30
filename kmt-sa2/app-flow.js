@@ -405,6 +405,7 @@ function projectDetailRow(orderId,fallback={}){
 }
 async function openProject(orderId,purpose='detail',sourceSnapshot=null){
  if(sourceSnapshot?.orderId)rememberProjectDetail(sourceSnapshot);
+ const entrySnapshot=sourceSnapshot?.orderId===orderId?{...sourceSnapshot}:{...(PROJECT_DETAIL_SNAPSHOT.get(String(orderId))||{})};
  let p=projectDetailRow(orderId,sourceSnapshot||appProjects.find(x=>x.orderId===orderId)||items.find(x=>x.orderId===orderId)||{});
  if(!p.customer&&!p.model){
   try{await getAppProjects();}catch{}
@@ -422,6 +423,8 @@ async function openProject(orderId,purpose='detail',sourceSnapshot=null){
   if(!el?.isConnected)return;
   linked=projectDetailRow(p.orderId,linked||p);
   const currentState=linked.state||p.state||'미등록';
+  const summaryDue=formatHfDate(entrySnapshot.due||linked.due||p.due);
+  const summaryActual=formatHfDate(entrySnapshot.actualDelivery||linked.actualDelivery||p.actualDelivery);
   const stageNames=['자재','조립','전장','검수','출고'];
   const closed=isCompletedOperational(linked);
   const currentStage=closed?4:strictCurrentStageIndex({state:currentState,process:linked.process||''});
@@ -434,7 +437,7 @@ async function openProject(orderId,purpose='detail',sourceSnapshot=null){
    const label=closed||i<currentStage?'종료':i===currentStage?(planDate!=='미정'?planDate:currentDate):planDate;
    return '<div class="hybrid-step '+cls+'"><i></i><b>'+name+'</b><small>'+esc(label)+'</small></div>';
   }).join('')+'</div><div class="project-schedule-status '+(closed?'closed':'active')+'">'+(closed?'<b>제작 종료</b><span>실납기 '+esc(actualDay)+'</span>':'<b>진행중</b><span>'+esc(currentState)+' · 기준 '+esc(currentDate)+'</span>')+'</div>';
-  el.innerHTML='<div class="hybrid-project-card"><small>JOB NO. '+esc(p.orderId)+' · PM '+esc(p.pm||'미등록')+'</small><h2>'+esc(p.customer)+' · '+esc(p.model)+'</h2><div class="project-date-grid"><div><small>납기</small><b>'+esc(formatHfDate(linked.due))+'</b></div><div><small>실납기일</small><b>'+esc(formatHfDate(linked.actualDelivery))+'</b></div></div>'+(closed?'<div class="project-delivery-result '+deliveryPerformance(linked).tone+'">'+esc(deliveryPerformance(linked).label)+'</div>':'')+'<div class="hybrid-state"><span>현재 상태 · '+esc(currentState)+'</span><span>'+esc(closed?'완료':linked.priority===1?'우선 확인':'진행')+'</span></div></div><div class="hybrid-section"><b>전체 제작 일정</b><span>현장 기준</span></div>'+scheduleBlock+'<div class="hybrid-section"><b>최근 라이프사이클</b><span>'+esc(historyState)+'</span></div><div class="lifecycle-preview">'+(shownHistory?lifecyclePreview(shownHistory,4,linked):lifecyclePreview({events:[],changes:[]},4,linked))+'</div><button id="projectLifecycleButton" class="primary">전체 라이프사이클 보기</button><button id="projectHistoryButton" class="secondary">변경 근거 · RAW 이력</button><button id="projectPlanButton" class="secondary">원본 계획일정 확인</button>';
+  el.innerHTML='<div class="hybrid-project-card"><small>JOB NO. '+esc(p.orderId)+' · PM '+esc(p.pm||'미등록')+'</small><h2>'+esc(p.customer)+' · '+esc(p.model)+'</h2><div class="project-date-grid"><div><small>납기</small><b>'+esc(summaryDue)+'</b></div><div><small>실납기일</small><b>'+esc(summaryActual)+'</b></div></div>'+(closed?'<div class="project-delivery-result '+deliveryPerformance(linked).tone+'">'+esc(deliveryPerformance(linked).label)+'</div>':'')+'<div class="hybrid-state"><span>현재 상태 · '+esc(currentState)+'</span><span>'+esc(closed?'완료':linked.priority===1?'우선 확인':'진행')+'</span></div></div><div class="hybrid-section"><b>전체 제작 일정</b><span>현장 기준</span></div>'+scheduleBlock+'<div class="hybrid-section"><b>최근 라이프사이클</b><span>'+esc(historyState)+'</span></div><div class="lifecycle-preview">'+(shownHistory?lifecyclePreview(shownHistory,4,linked):lifecyclePreview({events:[],changes:[]},4,linked))+'</div><button id="projectLifecycleButton" class="primary">전체 라이프사이클 보기</button><button id="projectHistoryButton" class="secondary">변경 근거 · RAW 이력</button><button id="projectPlanButton" class="secondary">원본 계획일정 확인</button>';
   $('projectLifecycleButton').onclick=()=>projectLifecycle(p.orderId);
   $('projectHistoryButton').onclick=()=>projectHistory(p.orderId);
   $('projectPlanButton').onclick=()=>openProjectPlan(p.orderId,linked);
@@ -595,10 +598,10 @@ function strictCurrentStageIndex(x){
   if(/자재|입고|구매|발주/.test(v))return 0;
   return -1;
  };
- const byProcess=rank(x?.process);
- if(byProcess>=0)return byProcess;
  const byState=rank(x?.state);
  if(byState>=0)return byState;
+ const byProcess=rank(x?.process);
+ if(byProcess>=0)return byProcess;
  return 0;
 }
 function hybridStageIndex(x){
