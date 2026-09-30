@@ -26,9 +26,75 @@ coreCacheRestore();
 function notes(){const a=readStore(KEY,[]);return Array.isArray(a)?a:[];}
 function updateNote(id,patch){const a=notes(),r=a.find(r=>r.id===id);if(!r)throw Error('missing_note');Object.assign(r,patch);persist(KEY,a);return r;}
 async function api(path,body,timeout=25000){const c=new AbortController(),timer=setTimeout(()=>c.abort(),timeout);try{const r=await fetch(path,{credentials:'same-origin',cache:'no-store',signal:c.signal,...(body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});let d;try{d=await r.json();}catch{throw Error('invalid_response');}if(!r.ok||d.ok!==true){const e=Error(d.error||'request_failed');e.status=r.status;e.data=d;throw e;}return d;}finally{clearTimeout(timer);}}
+function coreProcessFromState(state,next,previous=''){
+ const t=norm([state,next].join(' '));
+ if(/출고|납품|포장/.test(t))return '출고';
+ if(/검수|점검|테스트|시험/.test(t))return '검수';
+ if(/전장|배선|전기|프로그램|프로그래밍/.test(t))return '전장';
+ if(/조립|기구|마감|갭세팅|프레임/.test(t))return '조립';
+ if(/자재|입고|구매|발주/.test(t))return '자재';
+ return previous;
+}
+function corePriorityFromState(state,next,status,previous=2){
+ const text=String(state||'')+' '+String(next||'');
+ if(status==='CLOSED'||/^(출고완료|납품완료|완료)$/.test(String(state||'')))return 3;
+ if(/불량|문제|고장|지연|점검|재작업|수정중|에러|오류|멈춤|출고대기/.test(text))return 1;
+ if(/대기|보류/.test(text))return 2;
+ return previous||2;
+}
+async function refreshCachedCore(){
+ const d=await api('/api/sa2-app',{action:'catalog'},18000);
+ if(!Array.isArray(d.issues))throw Error('invalid_catalog');
+ const byId=new Map(d.issues.map(v=>[String(v.issueId||''),v]));
+ const changed=[];
+ for(const x of items){
+   const v=byId.get(String(x.issueId||''));if(!v)continue;
+   if(String(v.state||'')!==String(x.state||'')||String(v.status||'')!==String(x.issueStatus||''))changed.push({x,v});
+ }
+ const details=await Promise.allSettled(changed.slice(0,8).map(({x})=>api('/api/sa2-app',{action:'issue',issueId:x.issueId},18000)));
+ changed.slice(0,8).forEach(({x,v},i)=>{
+   const detail=details[i]?.status==='fulfilled'?details[i].value:null;
+   const idx=items.findIndex(k=>k.issueId===x.issueId);if(idx<0)return;
+   const state=String(detail?.state??v.state??x.state),next=String(detail?.nextAction??x.nextAction??''),status=String(detail?.status??v.status??x.issueStatus);
+   items[idx]={...x,state,nextAction:next,issueStatus:status,orderId:String(detail?.orderId||x.orderId),customer:String(detail?.customer||x.customer),model:String(detail?.model||x.model),process:coreProcessFromState(state,next,x.process),priority:corePriorityFromState(state,next,status,x.priority),since:state!==x.state?new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'}):x.since,sourceLatestUpdate:state!==x.state?new Date().toISOString():x.sourceLatestUpdate};
+ });
+ items=items.map((x,id)=>({...x,id}));
+ if(changed.length){sourceDate=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});lastRead=new Date().toLocaleString('ko-KR');coreCacheSave();}
+ return {changed:changed.length};
+}
 function active(name){screen=name;document.querySelectorAll('.bottom button').forEach(b=>b.classList.toggle('selected',b.dataset.page===name));}
 function banner(){document.querySelector('.demo').innerHTML=`<b>${BUILD} · HYBRID 0.5</b><span>${live?'연결됨 · ':''}${esc(readMessage)}</span>`;}
-async function refresh(force=true){if(readPending)return readPending;if(!force&&Date.now()-lastCoreAttempt<60000)return items.length;lastCoreAttempt=Date.now();if(!items.length)readMessage='현재 상태를 불러오는 중…';else readMessage='최근 정상값 표시 · 최신값 확인 중…';banner();readPending=(async()=>{try{const d=await api('/api/sa2-real-status');if(d.live!==true||!Array.isArray(d.currentStatus))throw Error('invalid_response');items=d.currentStatus.map((x,id)=>({...x,id}));live=true;readStale=false;lastReadErrorStatus=0;sourceDate=d.sourceLatestDate||'';lastRead=new Date().toLocaleString('ko-KR');readMessage=(d.test?'검증 데이터 · 운영 아님 · ':'')+(d.coreRead?'CORE · ':'')+`${items.length}건 · ${sourceDate||'기준일 미등록'}`;coreCacheSave();return true;}catch(e){lastReadErrorStatus=e.status||0;if(e.status===401){items=[];live=false;readStale=false;readMessage='사용자 등록 · 연결이 필요합니다';}else{readStale=true;const cached=items.length||coreCacheRestore();if(cached){live=true;readMessage='동기화 지연 · 최근 정상값 유지';}else{live=false;readMessage='현재 상태를 불러오지 못했습니다.';}}return false;}finally{readPending=null;banner();if(screen==='home')home();if(screen==='work')work(filter,$('search')?.value||'');if(screen==='delivery'&&typeof delivery==='function')delivery();if(screen==='projects'&&typeof projects==='function')projects();if(screen==='issues'&&typeof todayIssues==='function')todayIssues();}})();return readPending;}
+async function refresh(force=true){
+ if(readPending)return readPending;
+ if(!force&&Date.now()-lastCoreAttempt<60000)return items.length;
+ lastCoreAttempt=Date.now();
+ readMessage=items.length?'최근 정상값 표시 · 최신값 확인 중…':'현재 상태를 불러오는 중…';banner();
+ readPending=(async()=>{
+  try{
+   if(items.length){
+    try{
+     const quick=await refreshCachedCore();
+     live=true;readStale=false;lastReadErrorStatus=0;
+     readMessage='CORE · '+items.length+'건 · '+(quick.changed?'변경 '+quick.changed+'건 반영':'최신 상태 확인');
+     return true;
+    }catch(_){}
+   }
+   const d=await api('/api/sa2-real-status',null,22000);
+   if(d.live!==true||!Array.isArray(d.currentStatus))throw Error('invalid_response');
+   items=d.currentStatus.map((x,id)=>({...x,id}));live=true;readStale=false;lastReadErrorStatus=0;sourceDate=d.sourceLatestDate||'';lastRead=new Date().toLocaleString('ko-KR');readMessage=(d.test?'검증 데이터 · 운영 아님 · ':'')+(d.coreRead?'CORE · ':'')+`${items.length}건 · ${sourceDate||'기준일 미등록'}`;coreCacheSave();return true;
+  }catch(e){
+   lastReadErrorStatus=e.status||0;
+   if(e.status===401){items=[];live=false;readStale=false;readMessage='사용자 등록 · 연결이 필요합니다';}
+   else{readStale=true;const cached=items.length||coreCacheRestore();if(cached){live=true;readMessage='동기화 지연 · 최근 정상값 유지';}else{live=false;readMessage='현재 상태를 불러오지 못했습니다.';}}
+   return false;
+  }finally{
+   readPending=null;banner();
+   if(screen==='home')home();if(screen==='work')work(filter,$('search')?.value||'');if(screen==='delivery'&&typeof delivery==='function')delivery();if(screen==='projects'&&typeof projects==='function')projects();if(screen==='issues'&&typeof todayIssues==='function')todayIssues();
+  }
+ })();
+ return readPending;
+}
+
 function card(x){return `<article class="item"><div class="item-top"><div class="item-status"><span class="tag">현재 진행</span><button class="schedule-button" onclick="scheduleReport(${x.id})">계획일정 ↗</button></div><span class="category">${esc(x.process)}</span></div><button class="item-detail" aria-label="${esc(x.customer)} ${esc(x.model)} 업무 상세" onclick="openItem(${x.id})"><h3>${esc(x.customer)}<small>${esc(x.model)}</small></h3><p class="issue">${esc(x.state||'진행내용 미등록')}</p><div class="next"><span>다음 행동 · ${esc(x.nextAction||'확인 필요')}</span><span>›</span></div></button></article>`;}
 function reports(){return `<section><div class="section-title"><h2>생산 · 지원 집계</h2></div><div class="report-links"><button onclick="productionReport('month')">▥ 월간생산량<small>집계 연결 확인 ›</small></button><button onclick="productionReport('year')">▤ 연간생산량<small>집계 연결 확인 ›</small></button><button onclick="supportReport()">⇄ 타부서지원<small>누적 집계표 ›</small></button></div></section>`;}
 function home(){active('home');const urgent=items.filter(x=>x.priority===1),done=items.filter(x=>x.priority===3),top=urgent[0],sorted=items.slice().sort((a,b)=>(a.priority||9)-(b.priority||9));main.innerHTML=`
