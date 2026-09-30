@@ -5,6 +5,8 @@ const html=fs.readFileSync(new URL('../handsfree-renewal/index.html',import.meta
 const mobile=fs.readFileSync(new URL('../handsfree-renewal/mobile.js',import.meta.url),'utf8');
 const flow=fs.readFileSync(new URL('../handsfree-renewal/app-flow.js',import.meta.url),'utf8');
 const css=fs.readFileSync(new URL('../handsfree-renewal/renewal.css',import.meta.url),'utf8');
+const login=fs.readFileSync(new URL('../handsfree-renewal/login.js',import.meta.url),'utf8');
+const manifest=fs.readFileSync(new URL('../handsfree-renewal/manifest.webmanifest',import.meta.url),'utf8');
 
 assert.match(html,/class="top-tabs"/);
 for(const label of ['오늘','납기','프로젝트','내 기록'])assert.match(html,new RegExp('>'+label+'<'));
@@ -16,6 +18,12 @@ assert.match(mobile,/restoreProgressPreview\(id\)/);
 assert.match(mobile,/if\(!canSendNote\(r\)\)return;previewProgress\(id\)/);
 assert.doesNotMatch(mobile,/querySelector\('\.bottom'\)/);
 assert.match(mobile,/function voiceInput\(id\)/);
+assert.match(mobile,/updateViaCache:'none'/);
+assert.match(mobile,/controllerchange/);
+assert.match(mobile,/request_timeout/);
+assert.match(login,/setTimeout\(\(\)=>c\.abort\(\),20000\)/);
+assert.match(login,/renewal04&connected=1/);
+assert.match(manifest,/renewal04/);
 assert.match(flow,/eventReceiptDelays=\[1200,2500,5000\]/);
 assert.match(flow,/applyIssueReceiptLocal\(d\)/);
 assert.match(css,/\.top-tabs button\.selected/);
