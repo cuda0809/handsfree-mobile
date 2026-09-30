@@ -93,6 +93,17 @@ async function verifyEventNote(id,receipt){
  try{
   const d=receipt||await appCall({action:'receipt',requestId:r.requestId||'',submissionId:r.submissionId||r.id});
   if(receiptState(d)!=='saved_unverified'){updateNote(id,{status:receiptState(d),verifiedAt:''});return false;}
+  // /api/sa2-write returns applied=true only after SAFE WRITE has finished and the
+  // normalized event is WRITTEN. On that known-success path, do not run a second
+  // receipt/history verification chain before moving to the current-state readback.
+  const directWriteAck=!!receipt&&d.applied===true&&d.status==='WRITTEN'&&!!d.requestId&&!Array.isArray(d.events);
+  if(directWriteAck){
+   updateNote(id,{status:'saved_unverified',requestId:d.requestId,eventVerifiedAt:new Date().toISOString(),ack:'업무이력 저장 완료. 현재 업무 카드 반영을 확인 중입니다.'});
+   if(r.issueId)return await syncProgressIssue(id);
+   if(readPending)await readPending;
+   if(!await refresh())throw Error('refresh_failed');
+   updateNote(id,{status:'applied',requestId:d.requestId,verifiedAt:new Date().toISOString(),ack:'업무이력 저장과 서버 재조회가 일치합니다.'});return true;
+  }
   if(!d.requestId||(r.requestId&&d.requestId!==r.requestId)||!Array.isArray(d.events)||!d.events.length||d.events.some(e=>e.status!=='WRITTEN'||!e.orderId))throw Error('receipt_unconfirmed');
   for(const orderId of new Set(d.events.map(e=>e.orderId))){
    const h=await appCall({action:'history',orderId});
