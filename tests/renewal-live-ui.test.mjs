@@ -22,6 +22,7 @@ assert.match(mobile,/function progressInput\(id\)/);
 assert.doesNotMatch(mobile,/onclick="input\(/);
 assert.match(mobile,/data-progress-id/);
 assert.match(mobile,/href="\.\/\?app=renewal11&progress=/);
+assert.match(mobile,/login\.html\?reason=required/);
 assert.match(mobile,/window\.openProgressInput=id=>progressInput\(id\)/);
 assert.match(mobile,/form method="dialog"/);
 assert.doesNotMatch(mobile,/onclick="dialog\.close\(\)"/);
@@ -49,3 +50,4 @@ assert.match(css,/\.delivery-calendar/);
 assert.match(css,/\.promise-row/);
 assert.match(css,/\.project-search-row/);
 console.log('PASS Renewal uses Hybrid 0.11 structure, top navigation, exact mobile logo and immediate progress preview with bounded receipt polling');
+
