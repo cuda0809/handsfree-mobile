@@ -35,8 +35,45 @@ main{padding:0 14px 84px!important}.date{font-size:11px!important}.lead{font-siz
 .hybrid-flow-now{grid-area:bar;margin-top:38px;padding-top:7px;border-top:1px solid #eef1f2;color:var(--hy-sub);font-size:9px}
 .hybrid-flow-now b{display:inline!important;color:var(--hy-ink);font-size:10px!important}
 
-/* Bottom navigation lift: keep bar anchored, move controls upward for thumb/gesture clearance. */
-.bottom{padding-top:7px!important;padding-bottom:max(16px,calc(env(safe-area-inset-bottom) + 8px))!important}
-.bottom button{transform:translateY(-6px)}
-.hybrid-voice-fab{bottom:92px!important}
-.app{padding-bottom:106px!important}
+/* Bottom navigation v2: separate icon/label lanes and float the whole dock slightly upward. */
+.bottom{
+  bottom:10px!important;
+  width:min(calc(100% - 20px),500px)!important;
+  min-height:72px!important;
+  padding:8px 10px max(8px,env(safe-area-inset-bottom))!important;
+  border:1px solid var(--hy-line)!important;
+  border-radius:18px!important;
+  box-shadow:0 10px 28px rgba(21,35,45,.10)!important;
+  overflow:visible!important;
+}
+.bottom button{
+  transform:none!important;
+  min-height:54px!important;
+  padding:4px 2px 2px!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:5px!important;
+  line-height:1!important;
+}
+.bottom .nav-icon{
+  flex:0 0 28px!important;
+  height:28px!important;
+  min-height:28px!important;
+  width:40px!important;
+  display:grid!important;
+  place-items:center!important;
+  font-size:20px!important;
+  line-height:1!important;
+  margin:0!important;
+}
+.bottom button.selected .nav-icon{
+  min-width:40px!important;
+  background:#fff0e9!important;
+}
+.hybrid-voice-fab{
+  bottom:101px!important;
+  right:16px!important;
+}
+.app{padding-bottom:124px!important}
