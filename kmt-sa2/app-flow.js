@@ -84,13 +84,29 @@ async function openProject(orderId,purpose='detail'){
  let p=appProjects.find(x=>x.orderId===orderId)||items.find(x=>x.orderId===orderId);if(!p)return toast('최신 프로젝트 목록을 다시 불러오세요.');
  if(purpose==='input')return input(p);
  open(heading('프로젝트',p.customer,p.model)+'<div id="projectOverview">전체 제작일정과 진행 기록을 불러오는 중…</div>');const el=$('projectOverview');
- try{const [plans,history]=await Promise.all([api('/api/sa2-lifecycle',{action:'plans',orderId:p.orderId}),appCall({action:'history',orderId:p.orderId})]);projectHistoryCache.set(p.orderId,history);if(!el.isConnected)return;const planRows=Array.isArray(plans.records)?plans.records:Array.isArray(plans.plans)?plans.plans:[];if(plans.orderId!==p.orderId||!Array.isArray(history.events))throw Error('invalid_project');
-  const stages=groupProjectPlans(planRows),events=history.events.slice().sort((a,b)=>String(a.at||'').localeCompare(String(b.at||''))),linked=items.find(x=>x.orderId===p.orderId)||p;
-  const currentState=linked.state||p.state||'미등록',activeStage=Math.max(0,Math.min(stages.length-1,stages.findIndex(s=>norm(currentState).includes(norm(s.process))))),shownStages=(stages.length?stages.slice(0,5):[{process:'자재',start:'-'},{process:'조립',start:'-'},{process:'전장',start:'-'},{process:'검수',start:'-'},{process:'출고',start:'-'}]);
-  el.innerHTML='<div class="hybrid-project-card"><small>'+esc(p.orderId)+' · PM '+esc(p.pm||'미등록')+'</small><h2>'+esc(p.customer)+' · '+esc(p.model)+'</h2><p>납기 '+esc(p.due||'미등록')+' · Core 원장 연결</p><div class="hybrid-state"><span>현재 상태 · '+esc(currentState)+'</span><span>'+esc(linked.priority===1?'우선 확인':linked.priority===3?'완료':'진행')+'</span></div></div><div class="hybrid-section"><b>전체 제작 일정</b><span>원본 계획</span></div><div class="hybrid-timeline">'+shownStages.map((s,i)=>'<div class="hybrid-step '+(i<activeStage?'done':i===activeStage?'now':'')+'"><i></i><b>'+esc(s.process)+'</b><small>'+esc(s.start)+(s.end&&s.end!==s.start?'~'+esc(s.end):'')+'</small></div>').join('')+'</div><div class="hybrid-write"><small>지금 하는 일</small><h3>'+esc(currentState)+'</h3><p>진행 내용만 간단히 남기면 현재 상태와 이력에 연결됩니다.</p><button id="projectInput">🎙 말하거나 직접 입력 <span style="float:right">＋</span></button></div><div class="hybrid-section"><b>최근 라이프사이클</b><span>JOB NO. 기준</span></div><div class="lifecycle-preview">'+lifecyclePreview(history,4)+'</div><button id="projectLifecycleButton" class="primary">전체 라이프사이클 보기</button><button id="projectHistoryButton" class="secondary">변경 근거 · RAW 이력</button>';
-  $('projectInput').onclick=()=>linked.issueId?openUnifiedEvent(linked.issueId):toast('현재 활성 이슈가 없는 프로젝트입니다.');$('projectLifecycleButton').onclick=()=>projectLifecycle(p.orderId);$('projectHistoryButton').onclick=()=>projectHistory(p.orderId);
+ try{
+  const [planResult,historyResult]=await Promise.allSettled([
+   api('/api/sa2-lifecycle',{action:'plans',orderId:p.orderId}),
+   appCall({action:'history',orderId:p.orderId})
+  ]);
+  if(!el.isConnected)return;
+  const history=historyResult.status==='fulfilled'&&Array.isArray(historyResult.value?.events)?historyResult.value:{events:[],changes:[]};
+  if(historyResult.status==='fulfilled')projectHistoryCache.set(p.orderId,history);
+  const plans=planResult.status==='fulfilled'?planResult.value:null;
+  const planRows=plans&&plans.orderId===p.orderId?(Array.isArray(plans.records)?plans.records:Array.isArray(plans.plans)?plans.plans:[]):[];
+  const stages=groupProjectPlans(planRows),linked=items.find(x=>x.orderId===p.orderId)||p;
+  const currentState=linked.state||p.state||'미등록';
+  const foundStage=stages.findIndex(s=>norm(currentState).includes(norm(s.process)));
+  const activeStage=Math.max(0,Math.min((stages.length||5)-1,foundStage<0?0:foundStage));
+  const shownStages=stages.length?stages.slice(0,5):[{process:'자재',start:'-'},{process:'조립',start:'-'},{process:'전장',start:'-'},{process:'검수',start:'-'},{process:'출고',start:'-'}];
+  const scheduleBlock=plans?'<div class="hybrid-timeline">'+shownStages.map((s,i)=>'<div class="hybrid-step '+(i<activeStage?'done':i===activeStage?'now':'')+'"><i></i><b>'+esc(s.process)+'</b><small>'+esc(s.start)+(s.end&&s.end!==s.start?'~'+esc(s.end):'')+'</small></div>').join('')+'</div>':'<p class="empty">계획일정 연결이 지연 중입니다. 라이프사이클은 아래에서 계속 확인할 수 있습니다.</p>';
+  el.innerHTML='<div class="hybrid-project-card"><small>'+esc(p.orderId)+' · PM '+esc(p.pm||'미등록')+'</small><h2>'+esc(p.customer)+' · '+esc(p.model)+'</h2><p>납기 '+esc(p.due||'미등록')+' · Core 원장 연결</p><div class="hybrid-state"><span>현재 상태 · '+esc(currentState)+'</span><span>'+esc(linked.priority===1?'우선 확인':linked.priority===3?'완료':'진행')+'</span></div></div><div class="hybrid-section"><b>전체 제작 일정</b><span>'+(plans?'원본 계획':'계획 연결 지연')+'</span></div>'+scheduleBlock+'<div class="hybrid-write"><small>지금 하는 일</small><h3>'+esc(currentState)+'</h3><p>진행·이슈·사유를 한 곳에 입력하면 Event와 현재상태에 연결됩니다.</p><button id="projectInput">🎙 오늘 이슈 입력 <span style="float:right">＋</span></button></div><div class="hybrid-section"><b>최근 라이프사이클</b><span>'+(historyResult.status==='fulfilled'?'JOB NO. 기준':'이력 연결 지연')+'</span></div><div class="lifecycle-preview">'+(historyResult.status==='fulfilled'?lifecyclePreview(history,4):'<p class="empty">라이프사이클 이력 연결이 지연 중입니다.</p>')+'</div><button id="projectLifecycleButton" class="primary">전체 라이프사이클 보기</button><button id="projectHistoryButton" class="secondary">변경 근거 · RAW 이력</button>';
+  $('projectInput').onclick=()=>linked.issueId?openUnifiedEvent(linked.issueId):toast('현재 활성 이슈가 없는 프로젝트입니다.');
+  $('projectLifecycleButton').onclick=()=>projectLifecycle(p.orderId);
+  $('projectHistoryButton').onclick=()=>projectHistory(p.orderId);
  }catch(e){appFailure(el,e);}
 }
+
 const appScheduleBase=scheduleReport;
 scheduleReport=function(id){const x=typeof id==='object'?id:items[id];if(x?.orderId?.includes('*'))return allProjects(x.orderId.replace(/\*.*$/,''),'schedule');return appScheduleBase(id);};
 const appInputBase=input;
