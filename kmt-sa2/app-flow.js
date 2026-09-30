@@ -55,6 +55,14 @@ async function allProjects(prefix='',purpose='detail'){
   el.querySelectorAll('[data-project]').forEach(button=>button.onclick=()=>openProject(button.dataset.project,button.dataset.purpose));
  }catch(e){appFailure(el,e);}
 }
+function lifecycleDisplayAt(v){
+ const s=String(v||'').trim();if(!s)return '';
+ if(/\bKST\b/.test(s))return s.replace(/\s*KST\s*$/,'').slice(0,16);
+ if(/^\d{4}-\d{2}-\d{2}T/.test(s)){
+   const d=new Date(s);if(!Number.isNaN(d.getTime()))return d.toLocaleString('sv-SE',{timeZone:'Asia/Seoul',hour12:false}).slice(0,16);
+ }
+ return s.replace('T',' ').slice(0,16);
+}
 function legacyLifecycleDate(text,fallback=''){
  const m=String(text||'').match(/(?:^|\s)(\d{1,2})\/(\d{1,2})(?:\s|$)/);
  if(m){const y=(String(fallback||'').match(/^(20\d{2})/)||[])[1]||new Date().getFullYear();return y+'-'+String(m[1]).padStart(2,'0')+'-'+String(m[2]).padStart(2,'0');}
@@ -91,7 +99,7 @@ function lifecycleEntriesFromHistory(history,item=null){
 }
 function lifecyclePreview(history,limit=4,item=null){
  const rows=lifecycleEntriesFromHistory(history,item),shown=rows.slice(-limit);
- return shown.length?shown.map(r=>'<div class="lifecycle-row '+esc(r.kind)+'"><time>'+esc(String(r.at||'').replace('T',' ').slice(0,16))+'</time><div><span class="lifecycle-type">'+esc(r.type)+'</span><b>'+esc(r.text)+'</b>'+(r.change?'<p class="lifecycle-change">'+esc(r.change)+'</p>':'')+'<small>'+esc(r.actor)+'</small></div></div>').join(''):'<p class="empty">연결된 라이프사이클 기록이 없습니다.</p>';
+ return shown.length?shown.map(r=>'<div class="lifecycle-row '+esc(r.kind)+'"><time>'+esc(lifecycleDisplayAt(r.at))+'</time><div><span class="lifecycle-type">'+esc(r.type)+'</span><b>'+esc(r.text)+'</b>'+(r.change?'<p class="lifecycle-change">'+esc(r.change)+'</p>':'')+'<small>'+esc(r.actor)+'</small></div></div>').join(''):'<p class="empty">연결된 라이프사이클 기록이 없습니다.</p>';
 }
 async function projectLifecycle(orderId){
  const cached=projectHistoryCache.get(orderId)||lifecycleCacheGet(orderId)?.history||null;
@@ -105,7 +113,7 @@ async function projectLifecycle(orderId){
      '<p class="lifecycle-owner">'+esc(p.customer||'')+(p.model?' · '+esc(p.model):'')+'</p>'+
      '<div class="lifecycle-legend"><span>Event '+((history?.events)||[]).length+'건</span><span>변경 '+((history?.changes)||[]).length+'건</span></div>'+
      '<p class="note">'+(syncing?'최신 이력 확인 중…':cachedAt?'마지막 동기화 '+esc(new Date(cachedAt).toLocaleString('ko-KR')):'최신 이력')+'</p>'+
-     '<div class="lifecycle-list">'+(rows.length?rows.map(r=>'<article class="lifecycle-row '+esc(r.kind)+'"><time>'+esc(String(r.at||'').replace('T',' ').slice(0,16))+'</time><div><span class="lifecycle-type">'+esc(r.type)+'</span><b>'+esc(r.text)+'</b>'+(r.change?'<p class="lifecycle-change">'+esc(r.change)+'</p>':'')+'<small>'+esc(r.actor)+'</small></div></article>').join(''):'<p class="empty">'+(syncing?'저장된 이력이 없습니다. 서버 이력을 확인 중입니다.':'연결된 라이프사이클 기록이 없습니다.')+'</p>')+'</div>'+
+     '<div class="lifecycle-list">'+(rows.length?rows.map(r=>'<article class="lifecycle-row '+esc(r.kind)+'"><time>'+esc(lifecycleDisplayAt(r.at))+'</time><div><span class="lifecycle-type">'+esc(r.type)+'</span><b>'+esc(r.text)+'</b>'+(r.change?'<p class="lifecycle-change">'+esc(r.change)+'</p>':'')+'<small>'+esc(r.actor)+'</small></div></article>').join(''):'<p class="empty">'+(syncing?'저장된 이력이 없습니다. 서버 이력을 확인 중입니다.':'연결된 라이프사이클 기록이 없습니다.')+'</p>')+'</div>'+
      '<button class="secondary" onclick="openProject(\''+esc(orderId)+'\')">프로젝트 상세로 돌아가기</button>';
  };
  const local=lifecycleCacheGet(orderId);
@@ -324,12 +332,19 @@ function classifyUnifiedEvent(raw){
    ];
    return pairs.find(([re])=>re.test(text))?.[1]||'';
  })();
+ const waitProcess=(()=>{
+   const before=(text.match(/^(.*?)(?:대기|보류|지연)/)||[])[1]||text;
+   const pairs=[[/프로그램|프로그래밍/,'프로그램'],[/출고|납품|포장/,'출고'],[/검수/,'검수'],[/점검/,'점검'],[/테스트|시험/,'테스트'],[/전장|배선|전기/,'전장'],[/마감조립/,'마감조립'],[/재조립/,'재조립'],[/조립|기구|프레임/,'조립'],[/자재|부품|입고/,'자재']];
+   let best='',pos=-1;pairs.forEach(([re,name])=>{const m=[...before.matchAll(new RegExp(re.source,'g'))].at(-1);if(m&&m.index>=pos){pos=m.index;best=name;}});
+   return best||process;
+ })();
  if(/출고완료|납품완료/.test(n))return {type:'DELIVERY',state:'출고 완료',status:'CLOSED',changesState:true,label:'출고 완료 · 프로젝트 종료'};
- if(/완료/.test(text)&&process)return {type:process==='출고'?'DELIVERY':process==='검수'||process==='점검'||process==='테스트'?'INSPECTION':'PROGRESS',state:process+' 완료',status:'OPEN',changesState:true,label:'상태 변경 → '+process+' 완료'};
  if(/대기|보류|지연/.test(text)){
-   const state=process?(process==='자재'?'자재 대기':process+' 대기'):'대기';
+   let state=waitProcess?(waitProcess==='자재'?'자재 대기':waitProcess+' 대기'):'대기';
+   if(/수정대기/.test(text)&&waitProcess)state=waitProcess+' 수정대기';
    return {type:'WAIT',state,status:'OPEN',changesState:true,label:'상태 변경 → '+state};
  }
+ if(/완료/.test(text)&&process)return {type:process==='출고'?'DELIVERY':process==='검수'||process==='점검'||process==='테스트'?'INSPECTION':'PROGRESS',state:process+' 완료',status:'OPEN',changesState:true,label:'상태 변경 → '+process+' 완료'};
  if(/재개|착수|시작|진행/.test(text)&&process){
    const state=(process==='재조립'?'재조립':process)+' 진행';
    return {type:process==='재조립'?'REWORK':'PROGRESS',state,status:'OPEN',changesState:true,label:'상태 변경 → '+state};
@@ -342,6 +357,26 @@ function previewUnifiedEvent(issueId,scope=document){
  if(!field||!status)return;
  const v=field.value.trim();
  status.textContent=v?'자동 판정 · '+classifyUnifiedEvent(v).label:'내용을 입력하면 상태 반영 여부를 미리 보여줍니다.';
+}
+async function syncUnifiedStateBackground(noteId,x,classification,bodyText){
+ try{
+   const current=await appCall({action:'issue',issueId:x.issueId});
+   if(current.issueId!==x.issueId||current.orderId!==x.orderId)throw Error('project_mismatch');
+   const requestId=crypto.randomUUID();
+   const applied=await appCall({action:'edit',issueId:x.issueId,orderId:x.orderId,expected:current.revision,state:classification.state,nextAction:classification.status==='CLOSED'?'':current.nextAction,status:classification.status==='CLOSED'?'CLOSED':current.status,reason:'Event 자동반영: '+bodyText.slice(0,450),requestId});
+   if(applied.status!=='APPLIED')throw Error('issue_unconfirmed');
+   updateNote(noteId,{status:'applied',verifiedAt:new Date().toISOString(),issueVerifiedAt:new Date().toISOString(),issueRequestId:requestId,ack:'Event 기록 + 현재상태 자동반영 완료'});
+   const idx=items.findIndex(v=>v.issueId===applied.issueId);
+   if(applied.issueStatus==='CLOSED'){if(idx>=0)items.splice(idx,1);}
+   else if(idx>=0)items[idx]={...items[idx],state:applied.state,nextAction:applied.nextAction,issueStatus:applied.issueStatus,sourceLatestUpdate:new Date().toISOString(),since:new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'})};
+   items=items.map((v,id)=>({...v,id}));if(typeof coreCacheSave==='function')coreCacheSave();
+   projectHistoryCache.delete(x.orderId);
+   toast('현재상태 자동반영 완료 · '+classification.state);
+   if(screen==='issues')todayIssues();
+ }catch(e){
+   try{updateNote(noteId,{status:'partial',verifiedAt:'',ack:'Event 기록은 완료됐지만 현재상태 자동반영은 확인하지 못했습니다. 자동 재전송하지 않습니다.'});}catch{}
+   toast('Event는 저장됐고 상태 자동반영은 확인이 필요합니다.');
+ }
 }
 async function submitUnifiedEvent(issueId,text,statusEl){
  const x=items.find(v=>v.issueId===issueId);
@@ -362,35 +397,18 @@ async function submitUnifiedEvent(issueId,text,statusEl){
    updateNote(id,{status:state,requestId:d.requestId||'',ack:d.ack||'서버 접수 결과를 확인하세요.',respondedAt:new Date().toISOString()});
    return {ok:false,partial:true,classification,eventSaved:false};
   }
-
-  updateNote(id,{status:classification.changesState?'saved_unverified':'applied',requestId:d.requestId||'',ack:'Project Event 기록 완료',respondedAt:new Date().toISOString(),eventVerifiedAt:new Date().toISOString(),verifiedAt:classification.changesState?'':new Date().toISOString()});
-
-  if(!classification.changesState){
-   return {ok:true,classification,eventSaved:true,stateApplied:false,requestId:d.requestId||''};
-  }
-
-  try{
-   const current=await appCall({action:'issue',issueId:x.issueId});
-   if(current.issueId!==x.issueId||current.orderId!==x.orderId)throw Error('project_mismatch');
-   const requestId=crypto.randomUUID();
-   const applied=await appCall({action:'edit',issueId:x.issueId,orderId:x.orderId,expected:current.revision,state:classification.state,nextAction:classification.status==='CLOSED'?'':current.nextAction,status:classification.status==='CLOSED'?'CLOSED':current.status,reason:'Event 자동반영: '+bodyText.slice(0,450),requestId});
-   if(applied.status!=='APPLIED')throw Error('issue_unconfirmed');
-   updateNote(id,{status:'applied',verifiedAt:new Date().toISOString(),issueVerifiedAt:new Date().toISOString(),issueRequestId:requestId,ack:'Event 기록 + 현재상태 자동반영 완료'});
-   const idx=items.findIndex(v=>v.issueId===applied.issueId);
-   if(applied.issueStatus==='CLOSED'){if(idx>=0)items.splice(idx,1);}
-   else if(idx>=0)items[idx]={...items[idx],state:applied.state,nextAction:applied.nextAction,issueStatus:applied.issueStatus,sourceLatestUpdate:new Date().toISOString()};
-   items=items.map((v,id)=>({...v,id}));
-   return {ok:true,classification,eventSaved:true,stateApplied:true,applied,requestId:d.requestId||''};
-  }catch(e){
-   updateNote(id,{status:'partial',verifiedAt:'',ack:'Event 기록은 완료됐지만 현재상태 자동반영은 확인하지 못했습니다. 자동 재전송하지 않습니다.'});
-   return {ok:false,partial:true,classification,eventSaved:true,stateApplied:false,error:'state_apply_failed'};
-  }
+  updateNote(id,{status:classification.changesState?'saved_unverified':'applied',requestId:d.requestId||'',ack:classification.changesState?'Project Event 기록 완료 · 현재상태 자동반영 중':'Project Event 기록 완료',respondedAt:new Date().toISOString(),eventVerifiedAt:new Date().toISOString(),verifiedAt:classification.changesState?'':new Date().toISOString()});
+  projectHistoryCache.delete(x.orderId);
+  if(!classification.changesState)return {ok:true,classification,eventSaved:true,stateApplied:false,requestId:d.requestId||''};
+  setTimeout(()=>syncUnifiedStateBackground(id,{...x},classification,bodyText),0);
+  return {ok:true,classification,eventSaved:true,stateApplied:false,statePending:true,requestId:d.requestId||''};
  }catch(e){
   const rejected=[400,401,403].includes(e.status);
   try{updateNote(id,{status:rejected?'rejected':'unknown',requestId:e.data?.requestId||'',ack:appError(e),respondedAt:new Date().toISOString()});}catch{}
   return {ok:false,error:rejected?'rejected':'unknown'};
  }
 }
+
 function todayIssues(){
  active('issues');screen='issues';
  const activeRows=items.filter(x=>x.priority!==3&&!/^(출고완료|납품완료|완료)$/.test(String(x.state||''))).sort((a,b)=>(a.priority||9)-(b.priority||9));
@@ -434,7 +452,7 @@ async function saveTodayIssue(issueId){
  const result=await submitUnifiedEvent(issueId,text,statusEl);
  if(result.ok){
    field.value='';
-   toast(result.stateApplied?'Event + 현재상태 반영 완료':'Project Event 기록 완료');
+   toast(result.statePending?'Event 저장 완료 · 상태 자동반영 중':result.stateApplied?'Event + 현재상태 반영 완료':'Project Event 기록 완료');
    todayIssues();
    return;
  }else if(result.partial){
@@ -450,7 +468,7 @@ function openUnifiedEvent(issueId){
  open(heading('TODAY ISSUE',x.customer,x.model)+'<p class="note">'+esc(x.orderId)+' · 현재 '+esc(x.state||'미등록')+'</p><label>진행·이슈·사유<textarea id="unifiedDialogText" maxlength="800" placeholder="예: 마감조립 진행 / 부품 미입고로 조립 대기 / 센서값 이상 확인"></textarea></label><p id="unifiedDialogPreview" class="note">내용을 입력하면 상태 반영 여부를 미리 보여줍니다.</p><button id="unifiedDialogSave" class="primary">기록 및 자동 반영</button><button class="secondary" onclick="todayIssues();dialog.close()">오늘 이슈 전체 보기</button>');
  const field=$('unifiedDialogText'),preview=$('unifiedDialogPreview'),button=$('unifiedDialogSave');
  field.oninput=()=>{const v=field.value.trim();preview.textContent=v?'자동 판정 · '+classifyUnifiedEvent(v).label:'내용을 입력하면 상태 반영 여부를 미리 보여줍니다.';};
- button.onclick=async()=>{const text=field.value.trim();if(!text){preview.textContent='내용을 입력하세요.';return;}button.disabled=true;preview.textContent='기록 중…';const result=await submitUnifiedEvent(issueId,text,preview);if(result.ok){preview.textContent=result.stateApplied?'Event와 현재상태 반영 완료':'Project Event 기록 완료';field.value='';}else if(result.partial){preview.textContent=result.eventSaved?'Event 저장 완료 · 상태 자동반영 확인 필요':'서버 접수 결과 확인 필요';}else preview.textContent='기록 결과를 확인하지 못했습니다.';button.disabled=false;};
+ button.onclick=async()=>{const text=field.value.trim();if(!text){preview.textContent='내용을 입력하세요.';return;}button.disabled=true;preview.textContent='기록 중…';const result=await submitUnifiedEvent(issueId,text,preview);if(result.ok){preview.textContent=result.statePending?'Event 저장 완료 · 현재상태 자동반영 중':result.stateApplied?'Event와 현재상태 반영 완료':'Project Event 기록 완료';field.value='';}else if(result.partial){preview.textContent=result.eventSaved?'Event 저장 완료 · 상태 자동반영 확인 필요':'서버 접수 결과 확인 필요';}else preview.textContent='기록 결과를 확인하지 못했습니다.';button.disabled=false;};
 }
 
 const eventRefreshBase=refresh;
