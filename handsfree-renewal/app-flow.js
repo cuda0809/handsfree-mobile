@@ -48,18 +48,18 @@ function groupProjectPlans(rows){const sorted=rows.slice().sort((a,b)=>appDay(a[
 async function openProject(orderId,purpose='detail'){
  if(!personalConnected)return login();
  let p=appProjects.find(x=>x.orderId===orderId)||items.find(x=>x.orderId===orderId);if(!p)return toast('최신 프로젝트 목록을 다시 불러오세요.');
- if(purpose==='input')return input(p);
+ if(purpose==='input')return progressInput(p);
  open(heading('프로젝트 전체 보기',p.customer,p.model)+'<p>'+esc(p.orderId)+'</p><div id="projectOverview">전체 조립일정과 진행 기록을 불러오는 중…</div>');const el=$('projectOverview');
  try{const [plans,history]=await Promise.all([api('/api/sa2-lifecycle',{action:'plans',orderId:p.orderId}),appCall({action:'history',orderId:p.orderId})]);if(!el.isConnected)return;if(plans.orderId!==p.orderId||!Array.isArray(plans.plans)||!Array.isArray(history.events))throw Error('invalid_project');
   const stages=groupProjectPlans(plans.plans),events=history.events.slice().sort((a,b)=>String(a.at||'').localeCompare(String(b.at||''))),linked=items.find(x=>x.orderId===p.orderId)||p;
   el.innerHTML='<div class="project-summary"><span>납기 '+esc(p.due||'미등록')+'</span><b>현재 '+esc(p.state||linked.state||'미등록')+'</b></div><h3>전체 조립일정</h3><p class="note">자재수령부터 출고까지 원본 계획에 등록된 공정만 표시합니다.</p><div class="timeline">'+(stages.length?stages.map(s=>'<p><b>'+esc(s.process)+'</b><small>'+esc(s.start)+(s.end!==s.start?' ~ '+esc(s.end):'')+' · '+esc(s.status)+'</small></p>').join(''):'<p>연결된 조립일정이 없습니다.</p>')+'</div><h3>진행 내용</h3><p class="note">서버에 입력된 순서대로 표시합니다.</p><div class="progress-history">'+(events.length?events.map(r=>'<article class="item"><p>'+esc(r.raw||'내용 없음')+'</p><small>'+esc(r.at||'시간 미기록')+' · '+esc(r.actor||'입력자 미기록')+'</small></article>').join(''):'<p>입력된 진행 내용이 없습니다.</p>')+'</div><button id="projectInput" class="primary">진행내용 입력</button>';
-  $('projectInput').onclick=()=>input(linked);
+  $('projectInput').onclick=()=>progressInput(linked);
  }catch(e){appFailure(el,e);}
 }
 const appScheduleBase=scheduleReport;
 scheduleReport=function(id){if(!personalConnected)return login();const x=typeof id==='object'?id:items[id];if(x?.orderId?.includes('*'))return allProjects(x.orderId.replace(/\*.*$/,''),'schedule');return appScheduleBase(id);};
-const appInputBase=input;
-input=function(id){if(!personalConnected)return login();const x=typeof id==='object'?id:items[id];if(x?.orderId?.includes('*'))return allProjects(x.orderId.replace(/\*.*$/,''),'input');editingNoteId=null;return appInputBase(id);};
+const appInputBase=progressInput;
+progressInput=function(id){if(!personalConnected)return login();const x=typeof id==='object'?id:items[id];if(x?.orderId?.includes('*'))return allProjects(x.orderId.replace(/\*.*$/,''),'input');editingNoteId=null;return appInputBase(id);};
 const appItemBase=openItem;
 openItem=function(id){appItemBase(id);const x=items[id];if(!x)return;const box=$('sheetBody');box.insertAdjacentHTML('beforeend','<button id="issueHistoryButton" class="secondary">전체 조립일정 · 진행이력</button>');$('issueHistoryButton').onclick=()=>openProject(x.orderId);};
 async function projectHistory(orderId){open(heading('Event · 변경이력',orderId)+'<div id="historyResult">서버 기록을 불러오는 중…</div>');const el=$('historyResult');try{const d=await appCall({action:'history',orderId});if(!el.isConnected)return;

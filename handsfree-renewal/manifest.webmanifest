@@ -3,7 +3,7 @@
   "name": "HandsFree Renewal",
   "short_name": "Renewal",
   "lang": "ko",
-  "start_url": "/handsfree-renewal/?app=renewal04",
+  "start_url": "/handsfree-renewal/?app=renewal05",
   "scope": "/handsfree-renewal/",
   "display": "standalone",
   "background_color": "#f5f7fb",
