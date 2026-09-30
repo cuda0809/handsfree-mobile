@@ -72,10 +72,12 @@ function hfCoreSync_(mode){
       var qty=String(b[6]||''),due=String(b[8]||pmRow&&pmRow[4]||''),pmName=String(pr&&pr[6]||b[2]||''),design=String(pr&&pr[7]||''),buyer=String(p&&p[5]||pr&&pr[8]||''),production=String(pr&&pr[9]||''),quality=String(pr&&pr[10]||'');
       var scheduleState=String(s&&s[9]||''),hfState=String(i&&i[16]||''),currentState=hfState||scheduleState||String(rndRow&&rndRow[4]||'');
       var nextAction=String(i&&i[18]||''),currentIssue=String(i&&(i[10]||i[15])||pmRow&&pmRow[5]||rndRow&&rndRow[7]||'');
-      var currentStage=hfCoreStage_(i&&i[6],currentState,nextAction,e),shipment=String(s&&s[10]||'');
+      var shipment=String(s&&s[10]||''),completed=!!shipment||/출고\s*완료|납품\s*완료/.test(hfState+' '+scheduleState);
+      var currentStage=completed?'출고':hfCoreStage_(i&&i[6],currentState,nextAction,e);
+      if(completed){currentState='출고완료';nextAction='';}
       var qualityState=String(q&&q[11]||'')||(String(q&&q[9]||'').trim()?'검수완료':'');
       var purchaseProgress=hfCorePurchasePct_(p)||String(b[17]||''),missing=String(p&&p[21]||'');
-      var confidence=i?'HIGH·HF_CURRENT':(s||p||e||q)?'MEDIUM·MULTI_SOURCE':src.kind==='PROD'?'BASE_ONLY':'PARTIAL_SOURCE';
+      var confidence=completed?'HIGH·CLOSED':i?'HIGH·HF_CURRENT':(s||p||e||q)?'MEDIUM·MULTI_SOURCE':src.kind==='PROD'?'BASE_ONLY':'PARTIAL_SOURCE';
       if(hfState&&scheduleState&&hfCoreNorm_(hfState)!==hfCoreNorm_(scheduleState)){confidence+='·SOURCE_CONFLICT';conflicts++;}
       if(Number(qty)>1&&!/-\d+$/.test(job))confidence+='·CHECK_QTY_SPLIT';
 
@@ -84,7 +86,7 @@ function hfCoreSync_(mode){
         hfCoreDesignState_(b),String(b[11]||''),String(b[13]||''),String(b[14]||''),
         String(p&&p[7]||b[15]||''),String(p&&p[8]||b[16]||''),purchaseProgress,missing,
         String(b[22]||b[21]||''),String(b[25]||''),String(e&&e[16]||''),String(e&&e[20]||''),qualityState,
-        shipment?'출고완료':scheduleState,currentStage,currentState,nextAction,currentIssue,
+        completed?'출고완료':scheduleState,currentStage,currentState,nextAction,currentIssue,
         String(pmRow&&pmRow[5]||rndRow&&rndRow[6]||''),'',
         String(b[23]||''),String(e&&e[14]||''),String(e&&e[18]||''),String(q&&q[8]||''),String(b[8]||''),shipment,
         confidence,nowText
