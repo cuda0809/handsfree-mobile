@@ -638,4 +638,4 @@ const eventRefreshBase=refresh;
 refresh=async function(){const ok=await eventRefreshBase();if(screen==='issues')todayIssues();return ok;};
 home();
 
-applyProjectMeta(projectMetaCache()?.projects||[],projectMetaCache()?.source||'catalog');setTimeout(()=>syncProjectMeta(false),300);
+applyProjectMeta(projectMetaCache()?.projects||[],projectMetaCache()?.source||'catalog');setTimeout(()=>syncProjectMeta(true),300);
