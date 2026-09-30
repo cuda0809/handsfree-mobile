@@ -77,3 +77,18 @@ main{padding:0 14px 84px!important}.date{font-size:11px!important}.lead{font-siz
   right:16px!important;
 }
 .app{padding-bottom:124px!important}
+
+.today-issue-list{display:grid;gap:10px;margin-top:12px}
+.today-issue-card{background:#fff;border:1px solid var(--hy-line);border-radius:14px;padding:14px}
+.today-issue-head{display:flex;justify-content:space-between;align-items:start;gap:10px}
+.today-issue-head small{display:block;color:var(--hy-sub);font-size:8px;margin-bottom:4px}
+.today-issue-head h3{margin:0;font-size:14px;line-height:1.4}
+.today-issue-priority{flex:0 0 auto;padding:5px 7px;border-radius:999px;background:#edf2f4;color:#64717a;font-size:9px;font-weight:900}
+.today-issue-priority.p1{background:#fce9e7;color:#b5322c}.today-issue-priority.p2{background:#eef3f6;color:#53646f}
+.today-issue-state{margin:10px 0 6px!important;font-size:11px!important;color:var(--hy-ink)!important}.today-issue-state span{color:var(--hy-sub)}
+.today-issue-cause{margin:0 0 9px!important;padding:8px 9px;background:#fff7f2;border-radius:8px;color:#8a4d31!important;font-size:10px!important}
+.today-issue-label{display:block;margin:10px 0 0!important;font-size:10px!important;font-weight:800;color:var(--hy-sub)}
+.today-issue-label textarea{width:100%;height:82px;margin-top:6px;padding:11px;border:1px solid var(--hy-line);border-radius:10px;resize:vertical;background:#fbfcfc;font-size:14px!important;line-height:1.45}
+.today-issue-actions{display:grid;grid-template-columns:90px 1fr;gap:8px;align-items:end}
+.today-issue-actions .chip,.today-issue-actions .primary{margin-top:8px!important;min-height:42px}
+.today-issue-actions .primary{padding:10px!important}
