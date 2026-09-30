@@ -102,7 +102,7 @@ function renderUnifiedHome(){
  const attentionMap=new Map();
  urgent.forEach(x=>attentionMap.set(x.orderId,x));plannedToday.forEach(x=>attentionMap.set(x.orderId,x));
  const attention=[...attentionMap.values()].sort((a,b)=>(a.priority||9)-(b.priority||9)||hybridDueKey(a.due).localeCompare(hybridDueKey(b.due)));
- const top=attention[0],done=all.filter(isCompletedOperational);
+ const top=urgent[0]||null,done=all.filter(isCompletedOperational);
  const planCards=plannedToday.map(x=>{
   const stages=planStagesOnDay(x,today);
   return '<button class="hf-card '+hfCardTone(x,'plan')+'" data-home-order="'+esc(x.orderId)+'">'+hfCardIdentity(x,stages.join(' · '))+
@@ -120,7 +120,7 @@ function renderUnifiedHome(){
  '<h1 class="hybrid-title">오늘 확인할 일<br>'+attention.length+'건이 있습니다</h1>'+
  '<p class="hybrid-desc">생산계획과 현장 이슈를 같은 카드 규칙으로 보여줍니다.</p>'+
  '<div class="hf-stat-grid"><button class="hf-stat-card tone-active" onclick="productionPlan()"><small>관리중</small><b>'+activeRows.length+'</b><span>통합 운영</span></button><button class="hf-stat-card tone-urgent" onclick="projects(\'active\')"><small>우선순위 1</small><b>'+urgent.length+'</b><span>먼저 확인</span></button><button class="hf-stat-card tone-complete" onclick="projects(\'completed\')"><small>완료</small><b>'+done.length+'</b><span>이력 보존</span></button></div>'+
- (top?'<div class="hybrid-section"><b>가장 먼저 볼 항목</b><span>'+(top.priority===1?'P1':'오늘 계획')+'</span></div><button class="hf-card hf-feature-card '+hfCardTone(top,top.priority===1?'issue':'plan')+'" data-home-order="'+esc(top.orderId)+'">'+hfCardIdentity(top,top.priority===1?'우선 확인':'오늘')+'<div class="hf-card-meta"><div><small>현재 상태</small><b>'+esc(top.state||'계획')+'</b></div><div><small>납기</small><b>'+esc(formatHfDate(top.due))+'</b></div></div><div class="hf-card-next"><span>다음</span>'+esc(planStagesOnDay(top,today).length?'오늘 '+planStagesOnDay(top,today).join(' · '):top.nextAction||'확인 필요')+'</div></button>':'')+
+ (top?'<div class="hybrid-section"><b>우선 확인 이슈</b><span>P1</span></div><button class="hf-card hf-feature-card '+hfCardTone(top,'issue')+'" data-home-order="'+esc(top.orderId)+'">'+hfCardIdentity(top,'우선 확인')+'<div class="hf-card-meta"><div><small>현재 상태</small><b>'+esc(top.state||'미등록')+'</b></div><div><small>납기</small><b>'+esc(formatHfDate(top.due))+'</b></div></div><div class="hf-card-next"><span>다음</span>'+esc(top.nextAction||'확인 필요')+'</div></button>':'')+
  '<div class="hybrid-section"><b>오늘 생산계획</b><span>'+plannedToday.length+'대</span></div>'+
  '<div class="hf-card-list">'+(planCards||'<div class="empty">오늘로 잡힌 생산계획이 없습니다.</div>')+'</div>'+
  '<div class="hybrid-section"><b>현장 이슈</b><span>'+issueActive.length+'대</span></div>'+
