@@ -357,7 +357,7 @@ async function openProject(orderId,purpose='detail'){
   const currentDate=closed&&actualDay!=='미정'?actualDay:(appDay(linked.since)||appDay(linked.sourceLatestUpdate)||new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'}));
   const planByStage={자재:'',조립:linked.planAssembly||'',전장:linked.planElectrical||linked.planProgram||'',검수:linked.planInspection||'',출고:linked.planDelivery||''};
   const scheduleBlock='<div class="hybrid-timeline">'+stageNames.map((name,i)=>{const cls=closed||i<currentStage?'done':i===currentStage?'now':'';const label=closed||i<currentStage?'종료':i===currentStage?currentDate:formatHfDate(planByStage[name]);return '<div class="hybrid-step '+cls+'"><i></i><b>'+name+'</b><small>'+esc(label)+'</small></div>';}).join('')+'</div><div class="project-schedule-status '+(closed?'closed':'active')+'">'+(closed?'<b>제작 종료</b><span>'+esc(currentDate)+'</span>':'<b>진행중</b><span>'+esc(currentDate)+' · '+esc(currentState)+'</span>')+'</div>';
-  el.innerHTML='<div class="hybrid-project-card"><small>JOB NO. '+esc(p.orderId)+' · PM '+esc(p.pm||'미등록')+'</small><h2>'+esc(p.customer)+' · '+esc(p.model)+'</h2><div class="project-date-grid"><div><small>납기</small><b>'+esc(formatHfDate(linked.due||p.due))+'</b></div><div><small>실납기일</small><b>'+esc(formatHfDate(linked.actualDelivery||p.actualDelivery))+'</b></div></div><div class="hybrid-state"><span>현재 상태 · '+esc(currentState)+'</span><span>'+esc(closed?'완료':linked.priority===1?'우선 확인':'진행')+'</span></div></div><div class="hybrid-section"><b>전체 제작 일정</b><span>현장 기준</span></div>'+scheduleBlock+'<div class="hybrid-section"><b>최근 라이프사이클</b><span>'+esc(historyState)+'</span></div><div class="lifecycle-preview">'+(shownHistory?lifecyclePreview(shownHistory,4,linked):lifecyclePreview({events:[],changes:[]},4,linked))+'</div><button id="projectLifecycleButton" class="primary">전체 라이프사이클 보기</button><button id="projectHistoryButton" class="secondary">변경 근거 · RAW 이력</button><button id="projectPlanButton" class="secondary">원본 계획일정 확인</button>';
+  el.innerHTML='<div class="hybrid-project-card"><small>JOB NO. '+esc(p.orderId)+' · PM '+esc(p.pm||'미등록')+'</small><h2>'+esc(p.customer)+' · '+esc(p.model)+'</h2><div class="project-date-grid"><div><small>납기</small><b>'+esc(formatHfDate(linked.due||p.due))+'</b></div><div><small>실납기일</small><b>'+esc(formatHfDate(linked.actualDelivery||p.actualDelivery))+'</b></div></div>'+(closed?'<div class="project-delivery-result '+deliveryPerformance(linked).tone+'">'+esc(deliveryPerformance(linked).label)+'</div>':'')+'<div class="hybrid-state"><span>현재 상태 · '+esc(currentState)+'</span><span>'+esc(closed?'완료':linked.priority===1?'우선 확인':'진행')+'</span></div></div><div class="hybrid-section"><b>전체 제작 일정</b><span>현장 기준</span></div>'+scheduleBlock+'<div class="hybrid-section"><b>최근 라이프사이클</b><span>'+esc(historyState)+'</span></div><div class="lifecycle-preview">'+(shownHistory?lifecyclePreview(shownHistory,4,linked):lifecyclePreview({events:[],changes:[]},4,linked))+'</div><button id="projectLifecycleButton" class="primary">전체 라이프사이클 보기</button><button id="projectHistoryButton" class="secondary">변경 근거 · RAW 이력</button><button id="projectPlanButton" class="secondary">원본 계획일정 확인</button>';
   $('projectLifecycleButton').onclick=()=>projectLifecycle(p.orderId);
   $('projectHistoryButton').onclick=()=>projectHistory(p.orderId);
   $('projectPlanButton').onclick=()=>openProjectPlan(p.orderId,linked);
@@ -643,18 +643,55 @@ function projects(mode='active',skipMeta=false){
  '<div id="hybridProjectList" class="hybrid-project-list"></div>';
  renderHybridProjects();
 }
+function ymdTime(v){
+ const s=formatHfDate(v);if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return NaN;
+ const [y,m,d]=s.split('-').map(Number);return Date.UTC(y,m-1,d);
+}
+function deliveryPerformance(x){
+ const due=ymdTime(x?.due),actual=ymdTime(x?.actualDelivery);
+ if(!Number.isFinite(due)||!Number.isFinite(actual))return {days:null,label:'비교 미정',tone:'unknown'};
+ const diff=Math.round((actual-due)/86400000);
+ if(diff<0)return {days:diff,label:'납기 대비 '+Math.abs(diff)+'일 단축',tone:'early'};
+ if(diff>0)return {days:diff,label:'납기 대비 '+diff+'일 지연',tone:'late'};
+ return {days:0,label:'정시 출고',tone:'ontime'};
+}
+function projectStageLabel(x){
+ const state=norm([x.process,x.state,x.nextAction].join(' '));
+ if(/출고|납품|포장/.test(state))return '출고';
+ if(/검수|점검|테스트|시험/.test(state))return '검수';
+ if(/전장|배선|전기|프로그램|프로그래밍/.test(state))return '전장';
+ if(/조립|기구|마감|갭세팅|프레임/.test(state))return '조립';
+ if(/자재|입고|구매|발주/.test(state))return '자재';
+ return '기타';
+}
 function renderHybridProjects(){
  const el=$('hybridProjectList');if(!el)return;
  const q=norm($('hybridProjectSearch')?.value||'');
  let rows=operationalRows(true).filter(x=>(filter==='completed'?isCompletedOperational(x):!isCompletedOperational(x)));
  if(q)rows=rows.filter(x=>norm([x.orderId,x.customer,x.model,x.state,x.pm,x.nextAction].join(' ')).includes(q));
- if(filter==='completed')rows.sort((a,b)=>String(formatHfDate(b.actualDelivery)==='미정'?'':formatHfDate(b.actualDelivery)).localeCompare(String(formatHfDate(a.actualDelivery)==='미정'?'':formatHfDate(a.actualDelivery)))||hybridDueKey(b.due).localeCompare(hybridDueKey(a.due)));
- el.innerHTML=rows.map(x=>{
-  if(filter==='completed'){
-   return '<button class="hybrid-project-row project-completed" data-project-order="'+esc(x.orderId)+'"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(x.orderId)+'</p><div class="project-row-dates"><span>납기 <b>'+esc(formatHfDate(x.due))+'</b></span><span>실납기일 <b>'+esc(formatHfDate(x.actualDelivery))+'</b></span></div></button>';
-  }
-  return '<button class="hybrid-project-row project-active" data-project-order="'+esc(x.orderId)+'"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(x.orderId)+' · 납기 '+esc(formatHfDate(x.due))+'</p><div class="project-row-state"><span>현재</span><b>'+esc(x.state||'상태 미등록')+'</b></div><div class="project-row-next"><span>다음</span>'+esc(x.nextAction||'미정')+'</div></button>';
- }).join('')||'<p class="empty">'+(filter==='completed'?'완료 프로젝트가 없습니다.':'현재 진행 중인 프로젝트가 없습니다.')+'</p>';
+ if(!rows.length){el.innerHTML='<p class="empty">'+(filter==='completed'?'완료 프로젝트가 없습니다.':'현재 진행 중인 프로젝트가 없습니다.')+'</p>';return;}
+
+ if(filter==='completed'){
+  rows.sort((a,b)=>String(formatHfDate(b.actualDelivery)==='미정'?'':formatHfDate(b.actualDelivery)).localeCompare(String(formatHfDate(a.actualDelivery)==='미정'?'':formatHfDate(a.actualDelivery)))||hybridDueKey(b.due).localeCompare(hybridDueKey(a.due)));
+  const groups=new Map();
+  rows.forEach(x=>{const d=formatHfDate(x.actualDelivery),key=/^\d{4}-\d{2}-\d{2}$/.test(d)?d.slice(0,7):'날짜 미정';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(x);});
+  let first=true;
+  el.innerHTML=[...groups].map(([month,list])=>{
+   const title=month==='날짜 미정'?month:month.replace('-','년 ')+'월';
+   const html=list.map(x=>{const perf=deliveryPerformance(x);return '<button class="hybrid-project-row project-completed compact-project" data-project-order="'+esc(x.orderId)+'"><div class="project-card-top"><div><small class="project-job">'+esc(x.orderId)+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b></div><span class="delivery-performance '+perf.tone+'">'+esc(perf.label)+'</span></div><div class="project-row-dates compact-dates"><span>납기 <b>'+esc(formatHfDate(x.due))+'</b></span><span>실납기 <b>'+esc(formatHfDate(x.actualDelivery))+'</b></span></div></button>';}).join('');
+   const open=first?' open':'';first=false;
+   return '<details class="project-group"'+open+'><summary><span>'+esc(title)+'</span><b>'+list.length+'대</b></summary><div class="project-group-body">'+html+'</div></details>';
+  }).join('');
+ }else{
+  const order=['출고','검수','전장','조립','자재','기타'];
+  const groups=new Map(order.map(k=>[k,[]]));
+  rows.forEach(x=>groups.get(projectStageLabel(x)).push(x));
+  el.innerHTML=order.filter(k=>groups.get(k).length).map(stage=>{
+   const list=groups.get(stage).sort((a,b)=>(a.priority||9)-(b.priority||9)||hybridDueKey(a.due).localeCompare(hybridDueKey(b.due)));
+   const html=list.map(x=>'<button class="hybrid-project-row project-active compact-project" data-project-order="'+esc(x.orderId)+'"><div class="project-card-top"><div><small class="project-job">'+esc(x.orderId)+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b></div><span class="project-stage-badge">'+esc(stage)+'</span></div><div class="project-compact-line"><span>현재</span><b>'+esc(x.state||'상태 미등록')+'</b><em>납기 '+esc(formatHfDate(x.due))+'</em></div><div class="project-row-next"><span>다음</span>'+esc(x.nextAction||'미정')+'</div></button>').join('');
+   return '<details class="project-group" open><summary><span>'+esc(stage)+'</span><b>'+list.length+'대</b></summary><div class="project-group-body">'+html+'</div></details>';
+  }).join('');
+ }
  el.querySelectorAll('[data-project-order]').forEach(b=>b.onclick=()=>openProject(b.dataset.projectOrder));
 }
 
