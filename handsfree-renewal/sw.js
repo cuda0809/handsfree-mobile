@@ -1,5 +1,5 @@
-const CACHE='handsfree-renewal-preview-01';
-const FILES=['./','./index.html','./mobile.js','./theme.js','./schedule.js','./app-flow.js','./manifest.webmanifest','./icon.svg','./renewal.css'];
+const CACHE='handsfree-renewal-preview-02';
+const FILES=['./','./index.html','./mobile.js','./theme.js','./schedule.js','./app-flow.js','./manifest.webmanifest','./icon.svg','./kmt-logo.png','./renewal.css'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('handsfree-renewal-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{const u=new URL(event.request.url);if(event.request.method!=='GET'||u.origin!==location.origin||!u.pathname.startsWith('/handsfree-renewal/')||!FILES.some(f=>new URL(f,self.registration.scope).pathname===u.pathname))return;event.respondWith(caches.open(CACHE).then(async c=>{try{const fresh=await fetch(event.request,{cache:'no-store'});if(fresh.ok)await c.put(event.request,fresh.clone());return fresh;}catch{return (await c.match(event.request,{ignoreSearch:true}))||Response.error();}}));});

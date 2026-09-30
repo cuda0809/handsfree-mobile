@@ -1,0 +1,40 @@
+name: Build HandsFree Renewal APK
+
+on:
+  push:
+    paths:
+      - 'android-renewal/**'
+      - '.github/workflows/build-renewal-apk.yml'
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Build Renewal debug APK
+        working-directory: android-renewal
+        run: gradle assembleDebug --no-daemon
+
+      - name: Rename APK
+        run: cp android-renewal/app/build/outputs/apk/debug/app-debug.apk HandsFree-Renewal-0.2-Preview.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: HandsFree-Renewal-0.2-Preview-APK
+          path: HandsFree-Renewal-0.2-Preview.apk
+          if-no-files-found: error
