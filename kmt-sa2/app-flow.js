@@ -257,7 +257,10 @@ async function submitUnifiedEvent(issueId,text,statusEl){
    const applied=await appCall({action:'edit',issueId:x.issueId,orderId:x.orderId,expected:current.revision,state:classification.state,nextAction:classification.status==='CLOSED'?'':current.nextAction,status:classification.status==='CLOSED'?'CLOSED':current.status,reason:'Event 자동반영: '+bodyText.slice(0,450),requestId});
    if(applied.status!=='APPLIED')throw Error('issue_unconfirmed');
    updateNote(id,{status:'applied',verifiedAt:new Date().toISOString(),issueVerifiedAt:new Date().toISOString(),issueRequestId:requestId,ack:'Event 기록 + 현재상태 자동반영 완료'});
-   applyIssueReceiptLocal(applied);
+   const idx=items.findIndex(v=>v.issueId===applied.issueId);
+   if(applied.issueStatus==='CLOSED'){if(idx>=0)items.splice(idx,1);}
+   else if(idx>=0)items[idx]={...items[idx],state:applied.state,nextAction:applied.nextAction,issueStatus:applied.issueStatus,sourceLatestUpdate:new Date().toISOString()};
+   items=items.map((v,id)=>({...v,id}));
    return {ok:true,classification,eventSaved:true,stateApplied:true,applied,requestId:d.requestId||''};
   }catch(e){
    updateNote(id,{status:'partial',verifiedAt:'',ack:'Event 기록은 완료됐지만 현재상태 자동반영은 확인하지 못했습니다. 자동 재전송하지 않습니다.'});
@@ -273,7 +276,7 @@ function todayIssues(){
  active('issues');screen='issues';
  const activeRows=items.filter(x=>x.priority!==3&&!/^(출고완료|납품완료|완료)$/.test(String(x.state||''))).sort((a,b)=>(a.priority||9)-(b.priority||9));
  const todayKey=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
- const todayLocal=notes().filter(r=>String(r.createdAt||'').slice(0,10)===todayKey&&(r.eventType||r.eventOnly));
+ const todayLocal=notes().filter(r=>{try{return new Date(r.createdAt).toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'})===todayKey&&(r.eventType||r.eventOnly);}catch{return false;}});
  main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">TODAY ISSUES</div><h1>오늘 이슈</h1></div><button class="chip" onclick="refresh()">Core 새로고침</button></div>'+
  '<p class="hybrid-desc">진행·대기·완료·문제·사유를 한 곳에 입력합니다. 명확한 진행 문장은 현재상태를 자동 갱신하고, 문제/사유 문장은 라이프사이클 Event로만 남깁니다.</p>'+
  '<div class="today-issue-list">'+
@@ -312,8 +315,9 @@ async function saveTodayIssue(issueId){
  const result=await submitUnifiedEvent(issueId,text,statusEl);
  if(result.ok){
    field.value='';
-   if(statusEl)statusEl.textContent=result.stateApplied?'기록 완료 · Event와 현재상태가 함께 반영됐습니다.':'기록 완료 · Project 라이프사이클 Event에 누적됐습니다.';
-   previewUnifiedEvent(issueId,main);
+   toast(result.stateApplied?'Event + 현재상태 반영 완료':'Project Event 기록 완료');
+   todayIssues();
+   return;
  }else if(result.partial){
    if(statusEl)statusEl.textContent=result.eventSaved?'Event는 저장됐지만 상태 자동반영은 확인하지 못했습니다. 중복 입력하지 말고 이력을 확인하세요.':'서버 접수 결과를 확인해야 합니다.';
  }else{
