@@ -147,7 +147,7 @@ function renderUnifiedHome(){
  '<div class="hf-card-list">'+(issueCards||'<div class="empty">현재 진행 이슈가 없습니다.</div>')+'</div>'+
  '<button class="hybrid-quick hf-quick-card" onclick="todayIssues()"><span>🎙 오늘 이슈 입력</span><span>＋</span></button>'+
  '<p class="source">통합 운영 · 계획 + 현재상태 · 조회 '+esc(lastRead||new Date().toLocaleString('ko-KR'))+'</p>';
- main.querySelectorAll('[data-home-order]').forEach(b=>b.onclick=()=>{const x=operationalRows(true).find(v=>v.orderId===b.dataset.homeOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.homeOrder);});
+ main.querySelectorAll('[data-home-order]').forEach(b=>b.onclick=()=>{const x=operationalRows(true).find(v=>v.orderId===b.dataset.homeOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.homeOrder,'detail',x);});
  banner();
 }
 
@@ -388,20 +388,24 @@ function projectDetailRow(orderId,fallback={}){
  const canonical=operationalRows(true).find(x=>x.orderId===orderId)||{};
  const valid=v=>{const s=String(v??'').trim();return s&&s!=='미정';};
  const pick=(...vals)=>{for(const v of vals)if(valid(v))return String(v);return '';};
- return {...fallback,...snap,...canonical,orderId,
-  customer:pick(canonical.customer,snap.customer,fallback.customer),
-  model:pick(canonical.model,snap.model,fallback.model),
-  due:pick(canonical.due,snap.due,fallback.due),
-  actualDelivery:pick(canonical.actualDelivery,snap.actualDelivery,fallback.actualDelivery),
-  planAssembly:pick(canonical.planAssembly,snap.planAssembly,fallback.planAssembly),
-  planElectrical:pick(canonical.planElectrical,snap.planElectrical,fallback.planElectrical),
-  planProgram:pick(canonical.planProgram,snap.planProgram,fallback.planProgram),
-  planInspection:pick(canonical.planInspection,snap.planInspection,fallback.planInspection),
-  planDelivery:pick(canonical.planDelivery,snap.planDelivery,fallback.planDelivery)
+ return {...canonical,...fallback,...snap,orderId,
+  customer:pick(snap.customer,fallback.customer,canonical.customer),
+  model:pick(snap.model,fallback.model,canonical.model),
+  due:pick(snap.due,fallback.due,canonical.due),
+  actualDelivery:pick(snap.actualDelivery,fallback.actualDelivery,canonical.actualDelivery),
+  planAssembly:pick(snap.planAssembly,fallback.planAssembly,canonical.planAssembly),
+  planElectrical:pick(snap.planElectrical,fallback.planElectrical,canonical.planElectrical),
+  planProgram:pick(snap.planProgram,fallback.planProgram,canonical.planProgram),
+  planInspection:pick(snap.planInspection,fallback.planInspection,canonical.planInspection),
+  planDelivery:pick(snap.planDelivery,fallback.planDelivery,canonical.planDelivery),
+  process:pick(canonical.process,snap.process,fallback.process),
+  state:pick(canonical.state,snap.state,fallback.state),
+  nextAction:pick(canonical.nextAction,snap.nextAction,fallback.nextAction)
  };
 }
-async function openProject(orderId,purpose='detail'){
- let p=projectDetailRow(orderId,appProjects.find(x=>x.orderId===orderId)||items.find(x=>x.orderId===orderId)||{});
+async function openProject(orderId,purpose='detail',sourceSnapshot=null){
+ if(sourceSnapshot?.orderId)rememberProjectDetail(sourceSnapshot);
+ let p=projectDetailRow(orderId,sourceSnapshot||appProjects.find(x=>x.orderId===orderId)||items.find(x=>x.orderId===orderId)||{});
  if(!p.customer&&!p.model){
   try{await getAppProjects();}catch{}
   p=projectDetailRow(orderId,appProjects.find(x=>x.orderId===orderId)||items.find(x=>x.orderId===orderId)||{});
@@ -420,7 +424,7 @@ async function openProject(orderId,purpose='detail'){
   const currentState=linked.state||p.state||'미등록';
   const stageNames=['자재','조립','전장','검수','출고'];
   const closed=isCompletedOperational(linked);
-  const currentStage=closed?4:hybridStageIndex({state:currentState,nextAction:linked.nextAction||'',process:linked.process||''});
+  const currentStage=closed?4:strictCurrentStageIndex({state:currentState,process:linked.process||''});
   const actualDay=formatHfDate(linked.actualDelivery||p.actualDelivery);
   const currentDate=closed&&actualDay!=='미정'?actualDay:(appDay(linked.since)||appDay(linked.sourceLatestUpdate)||new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'}));
   const planByStage={자재:'',조립:linked.planAssembly||'',전장:linked.planElectrical||linked.planProgram||'',검수:linked.planInspection||'',출고:linked.planDelivery||''};
@@ -456,7 +460,7 @@ async function openProject(orderId,purpose='detail'){
    if(idx>=0)items[idx]=updated;else items.push(updated);
    items=items.map((x,id)=>({...x,id}));
    if(typeof coreCacheSave==='function')coreCacheSave();
-   linked=projectDetailRow(p.orderId,{...p,...updated});
+   linked=projectDetailRow(p.orderId,{...p,state:updated.state,nextAction:updated.nextAction,process:updated.process,issueStatus:updated.issueStatus,priority:updated.priority,since:updated.since,sourceLatestUpdate:updated.sourceLatestUpdate});
    render();
   }).catch(()=>{});
  }
@@ -581,6 +585,22 @@ async function verifyIssueReceipt(d){
 function hybridProjectMatch(orderId){const id=String(orderId||''),exact=items.find(x=>x.orderId===id);if(exact)return exact;return items.find(x=>x.orderId?.includes('*')&&id.startsWith(x.orderId.replace(/\*.*$/,'')))||null;}
 function hybridDueKey(v){const d=appDay(v);return /^\d{4}-\d{2}-\d{2}$/.test(d)?d:'9999-12-31';}
 const HYBRID_FLOW_STAGES=['자재','조립','전장','검수','출고'];
+function strictCurrentStageIndex(x){
+ const rank=t=>{
+  const v=norm(t);
+  if(/출고완료|납품완료|출고대기|납품대기|출고|납품|포장/.test(v))return 4;
+  if(/검수|점검|테스트|시험|FAT|SAT/.test(v))return 3;
+  if(/전장|배선|전기|프로그램|프로그래밍|셋업/.test(v))return 2;
+  if(/조립|기구|마감|갭세팅|프레임|본체/.test(v))return 1;
+  if(/자재|입고|구매|발주/.test(v))return 0;
+  return -1;
+ };
+ const byProcess=rank(x?.process);
+ if(byProcess>=0)return byProcess;
+ const byState=rank(x?.state);
+ if(byState>=0)return byState;
+ return 0;
+}
 function hybridStageIndex(x){
  const text=norm([x.process,x.state,x.nextAction].join(' '));
  if(/출고완료|납품완료|출고대기|출고|포장/.test(text))return 4;
@@ -722,7 +742,7 @@ function productionPlan(mode='plan',skipMeta=false){
    '<p class="production-plan-next"><span>다음 행동</span>'+esc(x.nextAction||'미정')+'</p></button>';
  }).join(''):'<p class="empty">현재 관리 중인 장비가 없습니다.</p>')+
  '</div>';
- main.querySelectorAll('[data-plan-order]').forEach(b=>b.onclick=()=>{const x=productionPlanRows().find(v=>v.orderId===b.dataset.planOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.planOrder);});
+ main.querySelectorAll('[data-plan-order]').forEach(b=>b.onclick=()=>{const x=productionPlanRows().find(v=>v.orderId===b.dataset.planOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.planOrder,'detail',x);});
 }
 function delivery(skipMeta=false){return productionPlan('delivery',skipMeta);}
 function projects(mode='active',skipMeta=false){
@@ -786,7 +806,7 @@ function renderHybridProjects(){
    return '<details class="project-group" open><summary><span>'+esc(stage)+'</span><b>'+list.length+'대</b></summary><div class="project-group-body">'+html+'</div></details>';
   }).join('');
  }
- el.querySelectorAll('[data-project-order]').forEach(b=>b.onclick=()=>{const x=operationalRows(true).find(v=>v.orderId===b.dataset.projectOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.projectOrder);});
+ el.querySelectorAll('[data-project-order]').forEach(b=>b.onclick=()=>{const x=operationalRows(true).find(v=>v.orderId===b.dataset.projectOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.projectOrder,'detail',x);});
 }
 
 function classifyUnifiedEvent(raw){
