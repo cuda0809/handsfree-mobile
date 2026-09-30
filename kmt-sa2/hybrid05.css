@@ -111,3 +111,9 @@ main{padding:0 14px 84px!important}.date{font-size:11px!important}.lead{font-siz
 .lifecycle-legend{display:flex;gap:8px;margin-bottom:10px}
 .lifecycle-legend span{padding:5px 8px;border-radius:999px;background:#eef2f3;color:#566670;font-size:8px;font-weight:900}
 @media(max-width:380px){.lifecycle-row{grid-template-columns:62px 1fr;gap:8px;padding:10px}.lifecycle-row time{font-size:7px}}
+
+.project-schedule-status{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0 2px;padding:10px 12px;border-radius:10px;background:#fff;border:1px solid var(--hy-line);font-size:10px}
+.project-schedule-status b{font-size:11px}
+.project-schedule-status.active b,.project-schedule-status.active span{color:var(--hy-orange)}
+.project-schedule-status.closed b,.project-schedule-status.closed span{color:var(--hy-green)}
+.project-schedule-status span{text-align:right;font-weight:850}
