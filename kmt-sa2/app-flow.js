@@ -65,7 +65,7 @@ async function projectHistory(orderId){open(heading('Event · 변경이력',orde
 async function editIssue(issueId){open(heading('상태 수정',issueId)+'<div id="issueEditResult">최신 상태를 불러오는 중…</div>');const el=$('issueEditResult');try{const d=await appCall({action:'issue',issueId});if(!el.isConnected)return;if(!['OPEN','MONITOR','CLOSED'].includes(d.status)){el.textContent='취소된 과거 이슈는 수정할 수 없습니다. 변경이력에서 확인하세요.';appIssue=null;return;}appIssue=d;
  el.innerHTML='<p>'+esc(d.customer)+' · '+esc(d.model)+'<br>'+esc(d.orderId)+'</p><label>현재 상태<input id="issueState" maxlength="80" value="'+esc(d.state)+'"></label><label>다음 행동<textarea id="issueNext" maxlength="500">'+esc(d.nextAction)+'</textarea></label><label>이슈 관리 상태<select id="issueStatus">'+[['OPEN','진행 중'],['MONITOR','관찰 중'],['CLOSED','종결']].map(([v,t])=>'<option value="'+v+'" '+(d.status===v?'selected':'')+'>'+t+'</option>').join('')+'</select></label><label>변경 사유<textarea id="issueReason" maxlength="500"></textarea></label><p id="issueSaveHint" role="status"></p><button id="issueSaveButton" class="primary" onclick="saveIssue()">변경 내용 확인 후 저장</button><button class="secondary" onclick="checkIssueReceipt()">이 기기의 마지막 상태 저장 결과 확인</button>';
  }catch(e){appFailure(el,e);}}
-function applyIssueReceiptLocal(d){const i=items.findIndex(x=>x.issueId===d.issueId);if(d.issueStatus==='CLOSED'){if(i>=0)items.splice(i,1);}else if(i>=0){items[i]={...items[i],state:d.state,nextAction:d.nextAction,issueStatus:d.issueStatus,sourceLatestUpdate:new Date().toISOString()};}items=items.map((x,id)=>({...x,id}));if(screen==='home')home();if(screen==='work')work(filter,$('search')?.value||'');if(screen==='delivery')delivery();if(screen==='projects')projects(filter);}
+function applyIssueReceiptLocal(d){const i=items.findIndex(x=>x.issueId===d.issueId);if(d.issueStatus==='CLOSED'){if(i>=0)items.splice(i,1);}else if(i>=0){items[i]={...items[i],state:d.state,nextAction:d.nextAction,issueStatus:d.issueStatus,sourceLatestUpdate:new Date().toISOString()};}items=items.map((x,id)=>({...x,id}));if(screen==='home')home();if(screen==='work')work(filter,$('search')?.value||'');if(screen==='delivery')delivery();if(screen==='projects')projects(filter);if(screen==='issues'&&typeof todayIssues==='function')todayIssues();}
 async function saveIssue(){if(!appIssue||$('issueSaveButton')?.disabled)return;if(readStore('hf-issue-pending',null))return toast('이전 상태 저장 결과부터 확인하세요. 자동 재전송하지 않습니다.');const body={action:'edit',issueId:appIssue.issueId,orderId:appIssue.orderId,expected:appIssue.revision,state:$('issueState').value.trim(),nextAction:$('issueNext').value.trim(),status:$('issueStatus').value,reason:$('issueReason').value.trim(),requestId:crypto.randomUUID()};const hint=$('issueSaveHint');if(!body.state||!body.reason||(!body.nextAction&&body.status!=='CLOSED')){hint.textContent='현재 상태, 다음 행동, 변경 사유를 확인하세요.';return;}try{persist('hf-issue-pending',body);}catch{hint.textContent='요청을 기기에 보관하지 못해 전송하지 않았습니다.';return;}$('issueSaveButton').disabled=true;hint.textContent='서버 저장 중…';try{const d=await appCall(body);if(d.status!=='APPLIED')throw Error('unconfirmed');applyIssueReceiptLocal(d);showIssueReceiptPending(d);setTimeout(()=>verifyIssueReceipt(d),0);}catch(e){if([400,401,403,409].includes(e.status))localStorage.removeItem('hf-issue-pending');if(hint.isConnected){hint.textContent=appError(e);$('issueSaveButton').hidden=true;}}}
 function showIssueReceiptPending(d){open(heading('서버 저장 성공',d.state,d.orderId)+'<p>다음 행동 '+esc(d.nextAction||'없음')+'</p><p>'+esc(d.reason)+'</p><p class="alert">화면에 바로 반영했습니다. 서버 원본을 다시 확인하고 있습니다.</p><p class="note">'+esc(d.requestId)+'</p>');}
 function showIssueReceipt(d){if(d.status!=='APPLIED')throw Error('unconfirmed');try{localStorage.removeItem('hf-issue-pending');}catch{}open(heading('현재 상태 저장 완료',d.state,d.orderId)+'<p>다음 행동 '+esc(d.nextAction||'없음')+'</p><p>'+esc(d.reason)+'</p><p class="alert">앱의 현재 업무 화면에도 수정 내용을 반영했습니다.</p><p class="note">'+esc(d.actor)+'<br>'+esc(d.requestId)+'</p><button id="savedIssueHistory" class="secondary">변경이력 확인</button>');$('savedIssueHistory').onclick=()=>projectHistory(d.orderId);}
@@ -194,6 +194,70 @@ function projects(mode='all'){
  renderHybridProjects();
 }
 function renderHybridProjects(){const el=$('hybridProjectList');if(!el)return;const q=norm($('hybridProjectSearch')?.value||''),rows=items.filter(x=>{if(filter==='urgent'&&x.priority!==1)return false;return !q||norm([x.orderId,x.customer,x.model,x.state,x.pm].join(' ')).includes(q);});el.innerHTML=rows.map(x=>'<button class="hybrid-project-row" data-project-id="'+x.id+'"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(x.orderId)+' · '+esc(x.state||'상태 미등록')+(x.due?' · 납기 '+esc(appDay(x.due)):'')+'</p></button>').join('')||'<p class="empty">일치하는 현재 프로젝트가 없습니다.</p>';el.querySelectorAll('[data-project-id]').forEach(b=>b.onclick=()=>openItem(Number(b.dataset.projectId)));}
+
+function todayIssues(){
+ active('issues');screen='issues';
+ const activeRows=items.filter(x=>x.priority!==3&&!/^(출고완료|납품완료|완료)$/.test(String(x.state||''))).sort((a,b)=>(a.priority||9)-(b.priority||9));
+ const todayKey=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
+ const todayLocal=notes().filter(r=>r.eventOnly&&String(r.createdAt||'').slice(0,10)===todayKey);
+ main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">TODAY ISSUES</div><h1>오늘 이슈</h1></div><button class="chip" onclick="refresh()">Core 새로고침</button></div>'+
+ '<p class="hybrid-desc">현재 진행 중인 장비에 오늘 발생한 이유·문제·변경사항을 기록합니다. 이 입력은 현재 상태를 덮어쓰지 않고 해당 Project ID의 Event 이력에 누적됩니다.</p>'+
+ '<div class="today-issue-list">'+
+ (activeRows.length?activeRows.map(x=>'<section class="today-issue-card"><div class="today-issue-head"><div><small>'+esc(x.orderId||x.issueId)+'</small><h3>'+esc(x.customer)+' · '+esc(x.model)+'</h3></div><span class="today-issue-priority p'+esc(x.priority||2)+'">P'+esc(x.priority||2)+'</span></div><p class="today-issue-state">현재 · '+esc(x.state||'미등록')+(x.nextAction?' <span>→ 다음 '+esc(x.nextAction)+'</span>':'')+'</p>'+(x.cause?'<p class="today-issue-cause">기존 사유 · '+esc(x.cause)+'</p>':'')+'<label class="today-issue-label">오늘 이슈 / 사유<textarea data-today-issue-text="'+esc(x.issueId)+'" maxlength="800" placeholder="예: 부품 미입고로 조립 대기, 센서값 이상 확인"></textarea></label><div class="today-issue-actions"><button class="chip" data-today-voice="'+esc(x.issueId)+'">🎙 음성</button><button class="primary" data-today-save="'+esc(x.issueId)+'">이슈 기록</button></div><p class="note" data-today-status="'+esc(x.issueId)+'"></p></section>').join(''):'<div class="empty">현재 진행 중인 장비가 없습니다.</div>')+
+ '</div>'+
+ '<div class="hybrid-section"><b>오늘 기록</b><span>'+todayLocal.length+'건</span></div>'+
+ (todayLocal.length?todayLocal.slice(0,12).map(r=>'<button class="hybrid-record" data-note="'+esc(r.id)+'"><b>'+esc(r.target)+'</b><p>'+esc(r.text)+'</p><small>'+esc(new Date(r.createdAt).toLocaleString('ko-KR'))+' · '+esc(labels[r.status]||r.status)+'</small></button>').join(''):'<p class="empty">오늘 입력한 이슈가 없습니다.</p>')+
+ '<button id="allInputHistory" class="secondary">전체 입력 이력 보기</button>';
+ main.querySelectorAll('[data-today-save]').forEach(b=>b.onclick=()=>saveTodayIssue(b.dataset.todaySave));
+ main.querySelectorAll('[data-today-voice]').forEach(b=>b.onclick=()=>voiceTodayIssue(b.dataset.todayVoice));
+ main.querySelectorAll('[data-note]').forEach(b=>b.onclick=()=>receiptDetail(b.dataset.note));
+ const history=$('allInputHistory');if(history)history.onclick=showInbox;
+}
+let todayIssueRecognition=null;
+function voiceTodayIssue(issueId){
+ const Speech=window.SpeechRecognition||window.webkitSpeechRecognition;
+ const field=main.querySelector('[data-today-issue-text="'+issueId+'"]');
+ const status=main.querySelector('[data-today-status="'+issueId+'"]');
+ if(!field)return;
+ if(!Speech){if(status)status.textContent='이 브라우저는 음성 인식을 지원하지 않습니다. 키보드 음성 입력을 사용하세요.';return;}
+ if(todayIssueRecognition){try{todayIssueRecognition.abort();}catch{}todayIssueRecognition=null;}
+ const rec=new Speech();todayIssueRecognition=rec;rec.lang='ko-KR';rec.interimResults=false;
+ rec.onresult=e=>{field.value=(field.value+' '+e.results[0][0].transcript).trim().slice(0,800);if(status)status.textContent='음성 입력됨 · 내용을 확인하고 이슈 기록을 누르세요.';};
+ rec.onerror=()=>{if(status)status.textContent='음성 인식에 실패했습니다. 다시 시도하세요.';};
+ rec.onend=()=>{todayIssueRecognition=null;};
+ try{rec.start();if(status)status.textContent='듣고 있습니다…';}catch{todayIssueRecognition=null;if(status)status.textContent='마이크를 시작하지 못했습니다.';}
+}
+async function saveTodayIssue(issueId){
+ const x=items.find(v=>v.issueId===issueId);
+ const field=main.querySelector('[data-today-issue-text="'+issueId+'"]');
+ const statusEl=main.querySelector('[data-today-status="'+issueId+'"]');
+ if(!x||!field)return;
+ const text=field.value.trim();
+ if(!text){if(statusEl)statusEl.textContent='이유나 문제 내용을 입력하세요.';return;}
+ if(navigator.onLine===false){if(statusEl)statusEl.textContent='오프라인입니다. 네트워크 연결 후 기록하세요.';return;}
+ const id=crypto.randomUUID(),target=(x.orderId?x.orderId+' · ':'')+x.customer+' · '+x.model;
+ const note={id,submissionId:id,target,text:'이슈/사유 · '+text,status:'sending',createdAt:new Date().toISOString(),issueId:x.issueId||'',orderId:x.orderId||'',displayState:'',nextAction:x.nextAction||'',issueStatus:x.issueStatus||'OPEN',eventOnly:true};
+ try{const list=notes();list.unshift(note);persist(KEY,list);}catch{if(statusEl)statusEl.textContent='기기 기록 보관에 실패해 전송하지 않았습니다.';return;}
+ const saveButton=main.querySelector('[data-today-save="'+issueId+'"]');if(saveButton)saveButton.disabled=true;
+ if(statusEl)statusEl.textContent='프로젝트 이력에 기록 중…';
+ try{
+  const d=await api('/api/sa2-write',{op:'safe_write',submissionId:id,text:target+' 이슈/사유 · '+text,targetHint:target,source:'MOBILE|TODAY_ISSUE',requester:'Emotion'},55000);
+  if(d.applied){
+   updateNote(id,{status:'applied',requestId:d.requestId||'',ack:'오늘 이슈를 프로젝트 Event 이력에 기록했습니다.',respondedAt:new Date().toISOString(),verifiedAt:new Date().toISOString(),eventVerifiedAt:new Date().toISOString()});
+   field.value='';
+   if(statusEl)statusEl.textContent='기록 완료 · '+(x.orderId||x.issueId)+' 라이프사이클에 누적됨';
+  }else{
+   const state=/REVIEW/i.test(d.status)?'review':/EXCLUDED/i.test(d.status)?'excluded':/DUPLICATE/i.test(d.status)?'duplicate':'received';
+   updateNote(id,{status:state,requestId:d.requestId||'',ack:d.ack||'서버 접수 결과를 확인하세요.',respondedAt:new Date().toISOString()});
+   if(statusEl)statusEl.textContent='접수됨 · 처리 결과 확인 필요';
+  }
+ }catch(e){
+  const rejected=[400,401,403].includes(e.status);
+  try{updateNote(id,{status:rejected?'rejected':'unknown',requestId:e.data?.requestId||'',ack:appError(e),respondedAt:new Date().toISOString()});}catch{}
+  if(statusEl)statusEl.textContent=rejected?appError(e):'응답을 확정하지 못했습니다. 중복 방지를 위해 자동 재전송하지 않습니다.';
+ }finally{if(saveButton)saveButton.disabled=false;}
+}
+
 const eventRefreshBase=refresh;
-refresh=async function(){return await eventRefreshBase();};
+refresh=async function(){const ok=await eventRefreshBase();if(screen==='issues')todayIssues();return ok;};
 home();
