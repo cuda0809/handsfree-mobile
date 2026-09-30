@@ -156,3 +156,4 @@ const eventRefreshBase=refresh;
 refresh=async function(){const ok=await eventRefreshBase();if(ok&&!eventReceiptSweep)reconcileEventReceipts();return ok;};
 setTimeout(()=>reconcileEventReceipts(),0);
 home();
+setTimeout(async()=>{const params=new URLSearchParams(location.search),raw=params.get('progress');if(raw===null)return;if(readPending)await readPending;else if(!live)await refresh();const clean=new URL(location.href);clean.searchParams.delete('progress');history.replaceState(null,'',clean);const id=Number(raw),x=items[id];if(!Number.isInteger(id)||!x)return toast('최신 업무를 다시 선택하세요.');if(x.orderId?.includes('*'))return allProjects(x.orderId.replace(/\*.*$/,''),'input');progressInput(id);},0);

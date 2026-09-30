@@ -97,6 +97,7 @@ h1 span { color: var(--ink); font-weight: 850; }
   text-align: left;
   font-size: 13px;
   font-weight: 900;
+  text-decoration: none;
 }
 .quick-action small { font-size: 9px; font-weight: 650; opacity: .85; }
 .voice-action {
@@ -111,7 +112,7 @@ h1 span { color: var(--ink); font-weight: 850; }
 .delivery-date { margin-bottom: 7px; color: var(--orange); font-size: 12px; font-weight: 900; }
 .pending-update { border-color: #f2a17c; background: #fff9f6; }
 .pending-update .tag { background: var(--orange); color: #fff; }
-.primary { background: var(--orange); border-radius: 11px; }
+.primary { background: var(--orange); border-radius: 11px; display: block; text-align: center; text-decoration: none; }
 .secondary, .sheet input, .sheet textarea, .sheet select { border-radius: 10px; }
 .action-box { background: #eef5f2; }
 .alert { background: #fff1e9; color: #874421; }

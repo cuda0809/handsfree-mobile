@@ -11,12 +11,12 @@ const companyLogo=new URL('app/src/main/res/drawable/kmt_company_logo.png',base)
 assert.match(manifest,/android\.permission\.RECORD_AUDIO/);
 assert.match(manifest,/@drawable\/ic_handsfree/);
 assert.match(gradle,/applicationId 'com\.handsfree\.renewal'/);
-assert.match(gradle,/handsfree-renewal\/\?app=renewal09/);
-assert.match(gradle,/versionName '0\.9\.0'/);
+assert.match(gradle,/handsfree-renewal\/\?app=renewal10/);
+assert.match(gradle,/versionName '0\.10\.0'/);
 assert.match(gradle,/핸즈프리 리뉴얼/);
 assert.match(main,/package com\.handsfree\.renewal/);
 assert.match(main,/isTrustedOrigin/);
-assert.match(workflow,/HandsFree-Renewal-0\.9-Preview\.apk/);
+assert.match(workflow,/HandsFree-Renewal-0\.10-Preview\.apk/);
 assert.match(main,/webView\.clearCache\(true\)/);
 assert.doesNotMatch(main,/restoreState/);
 assert.match(main,/CookieManager\.getInstance\(\)\.flush\(\)/);

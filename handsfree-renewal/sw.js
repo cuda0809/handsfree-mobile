@@ -1,4 +1,4 @@
-const CACHE='handsfree-renewal-preview-09';
+const CACHE='handsfree-renewal-preview-10';
 const FILES=['./','./index.html','./mobile.js','./theme.js','./schedule.js','./app-flow.js','./manifest.webmanifest','./icon.svg','./kmt-mobile-logo.png','./renewal.css'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('handsfree-renewal-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
