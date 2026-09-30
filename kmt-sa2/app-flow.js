@@ -148,6 +148,29 @@ function projectPlanStageMap(rows){
  return map;
 }
 function groupProjectPlans(rows){const normalized=rows.map(row=>Array.isArray(row)?{date:appDay(row[3]),process:String(row[10]||'공정 미등록'),status:String(row[11]||'상태 미등록')}:{date:appDay(row.date),process:String(row.process||'공정 미등록'),status:String(row.status||row.sourceMonth||'계획')}).filter(r=>r.date),sorted=normalized.sort((a,b)=>a.date.localeCompare(b.date)),groups=[];for(const row of sorted){const date=row.date,process=row.process,last=groups.at(-1),next=last&&new Date(last.end+'T00:00:00Z').getTime()+86400000===new Date(date+'T00:00:00Z').getTime();if(last&&last.process===process&&next){last.end=date;last.status=row.status||last.status;}else groups.push({start:date,end:date,process,status:row.status||'계획'});}return groups;}
+function applyLatestHistoryState(orderId,history){
+ const issueChanges=(history?.changes||[]).filter(r=>r&&r.kind==='issue'&&Array.isArray(r.after)&&String(r.after[3]||orderId)===orderId);
+ if(!issueChanges.length)return false;
+ const latest=issueChanges.slice().sort((a,b)=>{
+   const ta=Date.parse(String(a.at||'')),tb=Date.parse(String(b.at||''));
+   if(Number.isFinite(ta)&&Number.isFinite(tb))return tb-ta;
+   return String(b.at||'').localeCompare(String(a.at||''));
+ })[0];
+ const state=String(latest.after?.[16]||''),next=String(latest.after?.[18]||''),status=String(latest.after?.[8]||'');
+ if(!state)return false;
+ const idx=items.findIndex(x=>x.orderId===orderId);
+ const previous=idx>=0?items[idx]:null;
+ if(!previous)return false;
+ const at=String(latest.at||'');
+ let day='';
+ try{const d=new Date(at);if(!Number.isNaN(d.getTime()))day=d.toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});}catch{}
+ const updated={...previous,state,nextAction:next||previous.nextAction,issueStatus:status||previous.issueStatus,process:coreProcessFromState(state,next,previous.process),priority:corePriorityFromState(state,next,status||previous.issueStatus,previous.priority),since:day||previous.since,sourceLatestUpdate:at||previous.sourceLatestUpdate};
+ const changed=updated.state!==previous.state||updated.nextAction!==previous.nextAction||updated.issueStatus!==previous.issueStatus||updated.process!==previous.process;
+ if(!changed)return false;
+ items[idx]=updated;items=items.map((x,id)=>({...x,id}));
+ if(typeof coreCacheSave==='function')coreCacheSave();
+ return true;
+}
 async function openProject(orderId,purpose='detail'){
  let p=appProjects.find(x=>x.orderId===orderId)||items.find(x=>x.orderId===orderId);if(!p)return toast('최신 프로젝트 목록을 다시 불러오세요.');
  if(purpose==='input')return input(p);
@@ -191,7 +214,10 @@ async function openProject(orderId,purpose='detail'){
 
  appCall({action:'history',orderId:p.orderId}).then(history=>{
   if(!el?.isConnected)return;
-  projectHistoryCache.set(p.orderId,history);lifecycleCacheSet(p.orderId,history);shownHistory=history;historyState='최신 동기화';render();
+  projectHistoryCache.set(p.orderId,history);lifecycleCacheSet(p.orderId,history);
+  applyLatestHistoryState(p.orderId,history);
+  linked=items.find(x=>x.orderId===p.orderId)||linked;
+  shownHistory=history;historyState='최신 동기화';render();
  }).catch(()=>{if(shownHistory){historyState='동기화 지연 · 최근 정상값';render();}else{historyState='이력 연결 지연';render();}});
 }
 
