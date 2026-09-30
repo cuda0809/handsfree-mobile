@@ -642,6 +642,7 @@ async function syncPlanOverview(force=false){
   if((changed||cacheChanged)&&screen==='home')home();
   if(screen==='plan')productionPlan(productionPlanMode,true);
   if((changed||cacheChanged)&&screen==='projects')projects(filter,true);
+  if((changed||cacheChanged)&&screen==='issues')todayIssues();
   return {byOrder,candidateCount:targets.length,changed,cacheChanged};
  })().finally(()=>{planOverviewPending=null;});
  return planOverviewPending;
@@ -896,6 +897,7 @@ function toggleTodayIssue(key){
 }
 function todayIssues(){
  active('issues');screen='issues';
+ setTimeout(()=>syncProjectMeta(false),0);setTimeout(()=>syncPlanOverview(false),80);
  const merged=new Map();
  productionPlanRows().forEach(x=>merged.set(String(x.orderId||''),x));
  items.filter(x=>!isCompletedOperational(x)&&x.priority!==3).forEach(x=>{
