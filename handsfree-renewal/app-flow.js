@@ -90,15 +90,15 @@ function receiptState(d){if(d.applied&&/REVIEW|EXCLUDED|FAILED/.test(d.status))r
 const appReceiptBase=receiptDetail;
 function linkedIssueForNote(r){return items.find(x=>x.issueId&&(r.target.includes(x.orderId)||r.target.includes(x.customer)&&r.target.includes(x.model)));}
 receiptDetail=function(id){appReceiptBase(id);const r=notes().find(x=>x.id===id);if(!r)return;if(r.copiedFrom)$('sheetBody').insertAdjacentHTML('beforeend','<p class="note">원문 보관 번호 '+esc(r.copiedFrom)+'</p>');if(r.revisions?.length)$('sheetBody').insertAdjacentHTML('beforeend','<details><summary>기기에 보관한 수정 이력</summary>'+r.revisions.map(v=>'<p>'+esc(v.target)+'<br>'+esc(v.text)+'</p>').join('')+'</details>');if(r.status!=='draft'){$('sheetBody').insertAdjacentHTML('beforeend','<button id="serverReceiptButton" class="secondary">서버 저장 결과 다시 확인</button>');$('serverReceiptButton').onclick=()=>checkEventReceipt(id);}if(r.status!=='sending'){$('sheetBody').insertAdjacentHTML('beforeend','<button id="editLocalNote" class="secondary">'+(['draft','rejected'].includes(r.status)?'내용 수정하기':'내용 수정 후 새로 접수')+'</button>');$('editLocalNote').onclick=()=>editLocalNote(id);}};
-function showSavedNote(id,orderId){const r=notes().find(x=>x.id===id);if(!r)return;const projectId=orderId||r.orderId||'';restoreProgressPreview(id);open(heading('저장 완료','업무이력 재조회 확인',projectId||r.target)+'<div class="action-box" style="white-space:pre-wrap">'+esc(r.text)+'</div><p class="alert">서버 원문에서 같은 내용을 확인했습니다. 현재 상태·다음 행동·일정은 변경하지 않았습니다.</p><button id="savedProjectOpen" class="primary">프로젝트에서 바로 보기</button><button id="savedProjectSearch" class="secondary">프로젝트 검색에서 찾기</button>');$('savedProjectOpen').onclick=()=>openProject(projectId);$('savedProjectSearch').onclick=()=>{dialog.close();projects('all',projectId);};}
+function showSavedNote(id,orderId){const r=notes().find(x=>x.id===id);if(!r)return;const projectId=orderId||r.orderId||'';restoreProgressPreview(id);open(heading('저장 완료','서버 저장·재조회 확인',projectId||r.target)+'<div class="action-box" style="white-space:pre-wrap">'+esc(r.text)+'</div><p class="alert">'+(r.issueId?'업무이력·현재상태·다음행동을 서버에서 다시 확인했습니다. 일정은 변경하지 않았습니다.':'업무이력을 서버에서 다시 확인했습니다. 연결된 현재 업무 카드가 없어 상태값은 변경하지 않았습니다.')+'</p><button id="savedProjectOpen" class="primary">프로젝트에서 바로 보기</button><button id="savedProjectSearch" class="secondary">프로젝트 검색에서 찾기</button>');$('savedProjectOpen').onclick=()=>openProject(projectId);$('savedProjectSearch').onclick=()=>{dialog.close();projects('all',projectId);};}
 async function checkEventReceipt(id,silent=false){const r=notes().find(x=>x.id===id);if(!r)return false;try{const d=await appCall({action:'receipt',requestId:r.requestId||'',submissionId:r.submissionId||r.id,text:`${r.target} ${r.text}`,targetHint:r.target});if(d.status==='NOT_FOUND'){updateNote(id,{status:'received',ack:'서버 요청은 전송됐고 저장 기록을 계속 확인합니다. 자동 재전송하지 않습니다.',respondedAt:new Date().toISOString()});if(!silent)receiptDetail(id);return false;}updateNote(id,{status:receiptState(d),requestId:d.requestId||r.requestId,ack:d.ack||r.ack||'서버 저장 결과를 확인했습니다.',respondedAt:new Date().toISOString()});const verified=d.applied?await verifyEventNote(id,d):false;if(verified&&!silent){showSavedNote(id,d.events?.[0]?.orderId||r.orderId);return true;}if(!silent)receiptDetail(id);return verified||d.status!=='NOT_FOUND';}catch(e){const current=notes().find(x=>x.id===id);const saved=!!current?.requestId||['saved_unverified','applied','partial'].includes(current?.status);updateNote(id,{ack:saved?(current.ack||'서버 저장 응답을 받았습니다.')+' 원본 재조회가 지연 중이며 새로고침할 때 자동으로 다시 확인합니다.':appError(e)});if(!silent)receiptDetail(id);return false;}}
 const eventReceiptTimers=new Map(),eventReceiptAttempts=new Map(),eventReceiptDelays=[1200,2500,5000];
 function scheduleEventReceiptCheck(id,delay=0,silent=false,attempt=0){clearTimeout(eventReceiptTimers.get(id));eventReceiptAttempts.set(id,attempt);eventReceiptTimers.set(id,setTimeout(async()=>{eventReceiptTimers.delete(id);const ok=await checkEventReceipt(id,silent);const r=notes().find(x=>x.id===id),pending=r&&['sending','unknown','received','saved_unverified','partial'].includes(r.status)&&!r.verifiedAt;if(ok||!pending){eventReceiptAttempts.delete(id);return;}if(attempt<eventReceiptDelays.length)scheduleEventReceiptCheck(id,eventReceiptDelays[attempt],true,attempt+1);},delay));}
 let eventReceiptSweep=null;
 function reconcileEventReceipts(){if(eventReceiptSweep)return eventReceiptSweep;const pending=notes().filter(r=>['sending','unknown','received','saved_unverified'].includes(r.status)||(r.status==='partial'&&r.eventVerifiedAt&&r.issueId&&!r.issueVerifiedAt)).slice(0,5);eventReceiptSweep=(async()=>{for(const r of pending)await checkEventReceipt(r.id,true);})().finally(()=>{eventReceiptSweep=null;});return eventReceiptSweep;}
-function editLocalNote(id){const r=notes().find(x=>x.id===id);if(!r||r.status==='sending')return;if(!canSendNote(r,true))return;let editId=id;if(!['draft','rejected'].includes(r.status)){try{const edit={id:crypto.randomUUID(),target:r.target,text:r.text,status:'draft',createdAt:new Date().toISOString(),copiedFrom:r.id,issueId:r.issueId||'',orderId:r.orderId||'',displayState:r.displayState||'',nextAction:r.nextAction||'',issueStatus:r.issueStatus||'OPEN'};edit.submissionId=edit.id;const list=notes();list.unshift(edit);persist(KEY,list);editId=edit.id;}catch{return toast('수정본을 새 입력으로 만들지 못했습니다.');}}appInputBase();const e=notes().find(x=>x.id===editId);$('inputTarget').value=e.target;$('draft').value=e.text;if($('inputIssueId'))$('inputIssueId').value=e.issueId||'';if($('inputOrderId'))$('inputOrderId').value=e.orderId||'';if($('inputNextAction'))$('inputNextAction').value=e.nextAction||'';if($('inputIssueStatus'))$('inputIssueStatus').value=e.issueStatus||'OPEN';editingNoteId=editId;$('sheetBody').querySelector('button.primary').textContent='기기에만 보관';$('sheetBody').insertAdjacentHTML('beforeend','<p class="alert">수정본은 업무이력으로 한 번 저장합니다. 현재 상태·다음 행동·일정은 변경하지 않습니다.</p><button id="sendEditedNote" class="primary" onclick="saveEditedAndSend()">수정한 업무이력 저장하고 확인</button>');}
+function editLocalNote(id){const r=notes().find(x=>x.id===id);if(!r||r.status==='sending')return;if(!canSendNote(r,true))return;let editId=id;if(!['draft','rejected'].includes(r.status)){try{const edit={id:crypto.randomUUID(),target:r.target,text:r.text,status:'draft',createdAt:new Date().toISOString(),copiedFrom:r.id,issueId:r.issueId||'',orderId:r.orderId||'',displayState:r.displayState||'',nextAction:r.nextAction||'',issueStatus:r.issueStatus||'OPEN'};edit.submissionId=edit.id;const list=notes();list.unshift(edit);persist(KEY,list);editId=edit.id;}catch{return toast('수정본을 새 입력으로 만들지 못했습니다.');}}appInputBase();const e=notes().find(x=>x.id===editId);$('inputTarget').value=e.target;$('draft').value=e.text;if($('inputIssueId'))$('inputIssueId').value=e.issueId||'';if($('inputOrderId'))$('inputOrderId').value=e.orderId||'';if($('inputNextAction'))$('inputNextAction').value=e.nextAction||'';if($('inputIssueStatus'))$('inputIssueStatus').value=e.issueStatus||'OPEN';showProgressFields();editingNoteId=editId;$('sheetBody').querySelector('button.primary').textContent='기기에만 보관';$('sheetBody').insertAdjacentHTML('beforeend','<p class="alert">수정본을 한 번 보내면 업무이력·현재상태·다음행동을 함께 반영하고 다시 조회합니다.</p><button id="sendEditedNote" class="primary" onclick="saveEditedAndSend()">수정한 상태·다음행동 저장하고 확인</button>');}
 const appSaveNoteBase=saveNote;
-saveNote=function(){if(!editingNoteId)return appSaveNoteBase();const id=editingNoteId,r=notes().find(x=>x.id===id);if(!r||!['draft','rejected'].includes(r.status))return;const target=$('inputTarget').value.trim(),text=$('draft').value.trim();if(!target||!text){$('inputHint').textContent='입력 대상과 진행 내용을 모두 작성하세요.';return;}try{updateNote(id,{revisions:[...(r.revisions||[]),{target:r.target,text:r.text,at:r.updatedAt||r.createdAt,submissionId:r.submissionId}],verifiedAt:'',eventVerifiedAt:'',issueVerifiedAt:'',issueRequestId:'',issueSentAt:'',target,text,displayState:text.split(/\r?\n/).map(v=>v.trim()).find(Boolean)?.slice(0,80)||'',status:'draft',submissionId:crypto.randomUUID(),requestId:'',ack:'',respondedAt:'',updatedAt:new Date().toISOString()});localStorage.removeItem(DRAFT);editingNoteId=null;receiptDetail(id);return id;}catch{toast('수정 내용을 기기에 저장하지 못했습니다.');}};
+saveNote=function(){if(!editingNoteId)return appSaveNoteBase();const id=editingNoteId,r=notes().find(x=>x.id===id);if(!r||!['draft','rejected'].includes(r.status))return;const target=$('inputTarget').value.trim(),text=$('draft').value.trim(),fields=progressFields(text,$('inputNextAction')?.value||r.nextAction||'');if(!target||!text||!fields.state||!fields.nextAction){$('inputHint').textContent='현재상태와 다음행동을 모두 입력하세요.';return;}try{updateNote(id,{revisions:[...(r.revisions||[]),{target:r.target,text:r.text,at:r.updatedAt||r.createdAt,submissionId:r.submissionId}],verifiedAt:'',eventVerifiedAt:'',issueVerifiedAt:'',issueRequestId:'',issueSentAt:'',target,text,displayState:fields.state,nextAction:fields.nextAction,status:'draft',submissionId:crypto.randomUUID(),requestId:'',ack:'',respondedAt:'',updatedAt:new Date().toISOString()});localStorage.removeItem(DRAFT);editingNoteId=null;receiptDetail(id);return id;}catch{toast('수정 내용을 기기에 저장하지 못했습니다.');}};
 function canSendNote(r,editing=false){
  const unresolved=['sending','unknown','received','duplicate','saved_unverified','partial','review'];
  const parent=r.copiedFrom&&notes().find(x=>x.id===r.copiedFrom);
@@ -117,9 +117,9 @@ async function verifyEventNote(id,receipt){
    const h=await appCall({action:'history',orderId});
    if(h.orderId!==orderId||!Array.isArray(h.events)||d.events.filter(e=>e.orderId===orderId).some(e=>!h.events.some(x=>x.id===e.id&&x.requestId===d.requestId&&x.raw===e.raw&&x.status==='WRITTEN')))throw Error('history_mismatch');
   }
-  updateNote(id,{status:'applied',requestId:d.requestId,orderId:r.orderId||orderIds[0]||'',eventVerifiedAt:new Date().toISOString(),verifiedAt:new Date().toISOString(),ack:'업무이력 저장과 서버 원문 재조회가 일치합니다. 현재 상태·다음 행동·일정은 변경하지 않았습니다.'});
-  const i=items.findIndex(x=>x.pendingNoteId===id);if(i>=0)items[i]={...items[i],pendingNoteId:'',pendingProgress:''};
-  if(screen==='home')home();if(screen==='projects')renderProjectCatalog();if(screen==='delivery')renderDelivery();return true;
+  updateNote(id,{status:'saved_unverified',requestId:d.requestId,orderId:r.orderId||orderIds[0]||'',eventVerifiedAt:new Date().toISOString(),ack:'업무이력 저장을 확인했습니다. 현재상태와 다음행동을 반영하고 있습니다.'});
+  if(r.issueId)return await syncProgressIssue(id);
+  if(readPending)await readPending;if(!await refresh())throw Error('refresh_failed');updateNote(id,{status:'applied',verifiedAt:new Date().toISOString(),ack:'업무이력 저장과 서버 재조회를 확인했습니다.'});return true;
   }catch(e){const latest=notes().find(x=>x.id===id);updateNote(id,{status:'saved_unverified',verifiedAt:'',ack:(latest?.ack||'서버 저장 응답을 받았습니다.')+' 원본 재조회가 지연 중이며 새로고침할 때 자동으로 다시 확인합니다.'});return false;}
 }
 async function syncProgressIssue(id){
@@ -127,7 +127,7 @@ async function syncProgressIssue(id){
  try{
   let current=await appCall({action:'issue',issueId:r.issueId});
   if(current.issueId!==r.issueId||current.orderId!==r.orderId)throw Error('project_mismatch');
-  if(current.state===r.displayState){return await verifyProgressIssue(id,current);}
+  if(current.state===r.displayState&&current.nextAction===r.nextAction){return await verifyProgressIssue(id,current);}
   let applied;
   if(r.issueSentAt){
    applied=await appCall({action:'receipt',issueId:r.issueId,requestId:r.issueRequestId});
@@ -135,7 +135,7 @@ async function syncProgressIssue(id){
   }else{
    const requestId=r.issueRequestId||crypto.randomUUID();
    updateNote(id,{issueRequestId:requestId,issueSentAt:new Date().toISOString()});
-   applied=await appCall({action:'edit',issueId:r.issueId,orderId:r.orderId,expected:current.revision,state:r.displayState,nextAction:current.nextAction,status:current.status,reason:'진행내용 입력: '+r.text.slice(0,450),requestId});
+   applied=await appCall({action:'edit',issueId:r.issueId,orderId:r.orderId,expected:current.revision,state:r.displayState,nextAction:r.nextAction,status:current.status,reason:'진행내용 입력: '+r.text.slice(0,450),requestId});
    if(applied.status!=='APPLIED')throw Error('issue_unconfirmed');
    applyIssueReceiptLocal(applied);
   }
@@ -144,13 +144,13 @@ async function syncProgressIssue(id){
 }
 async function verifyProgressIssue(id,d){
  const r=notes().find(x=>x.id===id);if(!r)return false;
- const current=d.revision&&d.state===r.displayState?d:await appCall({action:'issue',issueId:r.issueId});
- if(current.issueId!==r.issueId||current.orderId!==r.orderId||current.state!==r.displayState)throw Error('readback_mismatch');
+ const current=d.revision&&d.state===r.displayState&&d.nextAction===r.nextAction?d:await appCall({action:'issue',issueId:r.issueId});
+ if(current.issueId!==r.issueId||current.orderId!==r.orderId||current.state!==r.displayState||current.nextAction!==r.nextAction)throw Error('readback_mismatch');
  if(readPending)await readPending;
  if(!await refresh())throw Error('refresh_failed');
  const shown=items.find(x=>x.issueId===r.issueId);
- if(!shown||shown.orderId!==r.orderId||shown.state!==r.displayState)throw Error('readback_mismatch');
- updateNote(id,{status:'applied',verifiedAt:new Date().toISOString(),issueVerifiedAt:new Date().toISOString(),issueRequestId:d.requestId||r.issueRequestId||'',ack:'업무이력 저장과 현재 진행 표시를 서버 재조회로 확인했습니다. 다음 행동·일정은 그대로 유지했습니다.'});
+ if(!shown||shown.orderId!==r.orderId||shown.state!==r.displayState||shown.nextAction!==r.nextAction)throw Error('readback_mismatch');
+ updateNote(id,{status:'applied',verifiedAt:new Date().toISOString(),issueVerifiedAt:new Date().toISOString(),issueRequestId:d.requestId||r.issueRequestId||'',ack:'업무이력·현재상태·다음행동 저장과 서버 재조회를 확인했습니다. 일정은 그대로 유지했습니다.'});
  return true;
 }
 async function verifyIssueReceipt(d){
@@ -170,4 +170,3 @@ refresh=async function(){const ok=await eventRefreshBase();if(ok&&!eventReceiptS
 setTimeout(()=>reconcileEventReceipts(),0);
 home();
 setTimeout(async()=>{const params=new URLSearchParams(location.search),raw=params.get('progress');if(raw===null)return;if(readPending)await readPending;else if(!live)await refresh();const clean=new URL(location.href);clean.searchParams.delete('progress');history.replaceState(null,'',clean);const id=Number(raw),x=items[id];if(!Number.isInteger(id)||!x)return toast('최신 업무를 다시 선택하세요.');if(x.orderId?.includes('*'))return allProjects(x.orderId.replace(/\*.*$/,''),'input');progressInput(id);},0);
-
