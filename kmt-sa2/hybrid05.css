@@ -706,3 +706,9 @@ main{padding:0 14px 84px!important}.date{font-size:11px!important}.lead{font-siz
  .hf-due-alert{grid-template-columns:auto 1fr}
  .hf-due-alert small{grid-column:2}
 }
+
+.today-issue-priority.plan{
+ background:#edf3fc!important;
+ color:#315e9e!important;
+ border:1px solid #cbdcf1!important;
+}
