@@ -45,7 +45,7 @@ function coreCacheSave(){
 }
 function coreCacheRestore(){
  const c=coreCacheRead();if(!c)return false;
- items=c.items.map((x,id)=>({...x,id}));sourceDate=String(c.sourceDate||'');lastRead=c.cachedAt?new Date(c.cachedAt).toLocaleString('ko-KR'):'';
+ items=c.items.map((x,id)=>({...x,priority:corePriorityFromState(x.state,x.nextAction,x.issueStatus,x.priority),id}));sourceDate=String(c.sourceDate||'');lastRead=c.cachedAt?new Date(c.cachedAt).toLocaleString('ko-KR'):'';
  live=true;readStale=true;readMessage='최근 정상값 · 최신 동기화 대기';
  return true;
 }
@@ -65,9 +65,12 @@ function coreProcessFromState(state,next,previous=''){
 function corePriorityFromState(state,next,status,previous=2){
  const text=String(state||'')+' '+String(next||'');
  if(status==='CLOSED'||/^(출고완료|납품완료|완료)$/.test(String(state||'')))return 3;
- if(/불량|문제|고장|지연|점검|재작업|수정중|에러|오류|멈춤|출고대기/.test(text))return 1;
+ const shippingWait=/출고\s*대기|납품\s*대기/.test(text);
+ const blocking=/불량|문제|고장|지연|점검|재작업|수정중|에러|오류|멈춤/.test(text);
+ if(shippingWait&&!blocking)return 2;
+ if(blocking)return 1;
  if(/대기|보류/.test(text))return 2;
- return previous||2;
+ return previous===1?2:(previous||2);
 }
 async function refreshCachedCore(){
  const d=await api('/api/sa2-app',{action:'catalog'},18000);
@@ -108,7 +111,7 @@ async function refresh(force=true){
    }
    const d=await api('/api/sa2-real-status',null,22000);
    if(d.live!==true||!Array.isArray(d.currentStatus))throw Error('invalid_response');
-   items=d.currentStatus.map((x,id)=>({...x,id}));live=true;readStale=false;lastReadErrorStatus=0;sourceDate=d.sourceLatestDate||'';lastRead=new Date().toLocaleString('ko-KR');readMessage=(d.test?'검증 데이터 · 운영 아님 · ':'')+(d.coreRead?'CORE · ':'')+`${items.length}건 · ${sourceDate||'기준일 미등록'}`;coreCacheSave();return true;
+   items=d.currentStatus.map((x,id)=>({...x,priority:corePriorityFromState(x.state,x.nextAction,x.issueStatus,x.priority),id}));live=true;readStale=false;lastReadErrorStatus=0;sourceDate=d.sourceLatestDate||'';lastRead=new Date().toLocaleString('ko-KR');readMessage=(d.test?'검증 데이터 · 운영 아님 · ':'')+(d.coreRead?'CORE · ':'')+`${items.length}건 · ${sourceDate||'기준일 미등록'}`;coreCacheSave();return true;
   }catch(e){
    lastReadErrorStatus=e.status||0;
    if(e.status===401){items=[];live=false;readStale=false;readMessage='사용자 등록 · 연결이 필요합니다';}
