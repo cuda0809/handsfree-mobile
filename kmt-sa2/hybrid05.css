@@ -34,3 +34,9 @@ main{padding:0 14px 84px!important}.date{font-size:11px!important}.lead{font-siz
 .hybrid-stage.now b{color:var(--hy-orange);font-weight:950}
 .hybrid-flow-now{grid-area:bar;margin-top:38px;padding-top:7px;border-top:1px solid #eef1f2;color:var(--hy-sub);font-size:9px}
 .hybrid-flow-now b{display:inline!important;color:var(--hy-ink);font-size:10px!important}
+
+/* Bottom navigation lift: keep bar anchored, move controls upward for thumb/gesture clearance. */
+.bottom{padding-top:7px!important;padding-bottom:max(16px,calc(env(safe-area-inset-bottom) + 8px))!important}
+.bottom button{transform:translateY(-6px)}
+.hybrid-voice-fab{bottom:92px!important}
+.app{padding-bottom:106px!important}
