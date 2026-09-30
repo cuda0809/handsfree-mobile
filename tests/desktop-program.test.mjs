@@ -46,3 +46,11 @@ test('late history responses cannot overwrite a newly selected screen',()=>{
   assert.match(js,/state\.view!==['"]history['"]\|\|run!==state\.renderRun/);
   assert.match(js,/const run=\+\+state\.renderRun/);
 });
+
+test('typing immediately enables one-click server save with visible progress',()=>{
+  assert.match(js,/text\.oninput=propose/);
+  assert.match(js,/입력한 진행내용 서버 저장/);
+  assert.doesNotMatch(js,/id="previewButton"/);
+  assert.match(js,/1\/3 업무이력을 서버에 저장/);
+  assert.match(js,/3\/3 서버 최신값을 다시 확인/);
+});
