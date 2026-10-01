@@ -225,6 +225,7 @@ main{padding-bottom:210px!important}
 }
 .project-date-grid b{
   display:block;
+  color:var(--hy-ink)!important;
   font-size:11px;
   line-height:1.35;
   overflow-wrap:anywhere;
