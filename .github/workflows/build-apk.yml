@@ -34,15 +34,18 @@ jobs:
         working-directory: android
         run: gradle assembleDebug --no-daemon
 
-      - name: Publish APK in public repository
+      - name: Publish APK and ZIP in public repository
         run: |
           mkdir -p submission
           cp android/app/build/outputs/apk/debug/app-debug.apk submission/KMT_Production_Proto_Competition_Guest10.apk
+          cd submission
+          zip -j KMT_Production_Proto_Competition_Guest10.zip KMT_Production_Proto_Competition_Guest10.apk
+          cd ..
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add submission/KMT_Production_Proto_Competition_Guest10.apk
+          git add submission/KMT_Production_Proto_Competition_Guest10.apk submission/KMT_Production_Proto_Competition_Guest10.zip
           if ! git diff --cached --quiet; then
-            git commit -m "Publish competition guest APK"
+            git commit -m "Publish competition guest APK and ZIP"
             git push origin HEAD:task/competition-guest10-offline-20261001
           fi
 
