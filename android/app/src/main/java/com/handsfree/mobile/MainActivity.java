@@ -107,16 +107,25 @@ public class MainActivity extends Activity {
 
     private void applyUiPatch(WebView view) {
         String js =
-            "(()=>{const apply=()=>{"
-          + "let s=document.getElementById('hfNativeUiPatch');"
-          + "if(!s){s=document.createElement('style');s.id='hfNativeUiPatch';"
-          + "s.textContent='.bottom{bottom:92px!important}.hybrid-voice-fab{bottom:183px!important}.app{padding-bottom:225px!important}main{padding-bottom:215px!important}.kmt-brand small{white-space:nowrap!important;letter-spacing:0!important}.top>button.icon{min-width:58px!important;width:auto!important;padding:0 10px!important;font-size:11px!important;font-weight:800!important}';"
-          + "document.head.appendChild(s);}"
+            "(()=>{"
+          + "const place=()=>{"
+          + "const demo=document.querySelector('.demo'),nav=document.querySelector('.bottom');if(!demo||!nav)return;"
+          + "let status=document.querySelector('.hf-native-connection');if(!status){status=document.createElement('div');status.className='hf-native-connection';}"
+          + "const span=demo.querySelector('span');if(span)status.replaceChildren(span);"
+          + "demo.after(nav);nav.after(status);"
           + "document.querySelector('.top > button[aria-label=\\\"처리함 열기\\\"]')?.remove();"
           + "const p=[...document.querySelectorAll('.top > button.icon')].find(b=>b.getAttribute('aria-label')!=='처리함 열기');"
           + "if(p){p.textContent='로그인';p.setAttribute('aria-label','로그인');p.onclick=()=>location.href='./login.html';}"
           + "const brand=document.querySelector('.kmt-brand small');if(brand)brand.style.whiteSpace='nowrap';"
-          + "};apply();setTimeout(apply,350);setTimeout(apply,1000);})();";
+          + "};"
+          + "let s=document.getElementById('hfNativeUiPatch');"
+          + "if(!s){s=document.createElement('style');s.id='hfNativeUiPatch';"
+          + "s.textContent='.demo{display:block!important;margin:0 17px!important;padding:8px 0 6px!important;border-bottom:0!important}.demo>b{display:block!important}.hf-native-connection{margin:0 17px 8px;padding:2px 0 8px;border-bottom:1px solid #d9dfe2;color:#66737c;font-size:10px;line-height:1.35}.bottom{position:relative!important;left:auto!important;bottom:auto!important;transform:none!important;width:calc(100% - 28px)!important;min-height:68px!important;margin:0 14px 6px!important;z-index:4!important}.app{padding-bottom:100px!important}main{padding-bottom:84px!important}.hybrid-voice-fab{bottom:18px!important;right:16px!important}.kmt-brand small{white-space:nowrap!important;letter-spacing:0!important}.top>button.icon{min-width:58px!important;width:auto!important;padding:0 10px!important;font-size:11px!important;font-weight:800!important}';"
+          + "document.head.appendChild(s);}"
+          + "const demo=document.querySelector('.demo');"
+          + "if(demo&&!window.__hfTopNavObserver){window.__hfTopNavObserver=new MutationObserver(()=>place());window.__hfTopNavObserver.observe(demo,{childList:true});}"
+          + "place();setTimeout(place,350);setTimeout(place,1000);"
+          + "})();";
         view.evaluateJavascript(js, null);
     }
 
