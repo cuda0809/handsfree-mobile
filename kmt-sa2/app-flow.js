@@ -36,10 +36,23 @@ function isCompletedOperational(x){
  const actual=formatHfDate(x?.actualDelivery);
  return actual!=='미정'||/출고\s*완료|납품\s*완료/.test(state+' '+delivery)||masterState==='완료';
 }
+function latestExplicitStateByOrder(){
+ const out=new Map();
+ notes().forEach(r=>{
+  if(r.stateSyncVersion!=='explicit-v2'||!r.displayState)return;
+  if(!['applied','saved_unverified','partial','received'].includes(String(r.status||'')))return;
+  const orderId=String(r.orderId||'').trim();if(!orderId)return;
+  const at=Date.parse(r.respondedAt||r.updatedAt||r.createdAt||0)||0;
+  const prior=out.get(orderId),priorAt=prior?(Date.parse(prior.respondedAt||prior.updatedAt||prior.createdAt||0)||0):0;
+  if(!prior||at>=priorAt)out.set(orderId,r);
+ });
+ return out;
+}
 function operationalRows(includeCompleted=true){
  const meta=projectMetaCache()?.projects||appProjects||[];
  const plans=planOverviewCache()?.byOrder||{};
  const live=new Map(items.map(x=>[String(x.orderId||''),x]));
+ const explicitStates=latestExplicitStateByOrder();
  const map=new Map();
  for(const p of meta){
   const orderId=String(p.orderId||'').trim();if(!orderId)continue;
@@ -53,15 +66,19 @@ function operationalRows(includeCompleted=true){
   if(map.has(orderId))continue;
   map.set(orderId,{orderId,...p,state:'계획',priority:2});
  }
- const rows=[...map.values()].map(x=>({
-  ...x,
-  customer:String(x.customer||''),
-  model:String(x.model||''),
-  due:String(x.due||''),
-  state:String(x.state||'계획'),
-  nextAction:String(x.nextAction||''),
-  priority:Number(x.priority||2)
- }));
+ const rows=[...map.values()].map(x=>{
+  const local=explicitStates.get(String(x.orderId||''));
+  const localState=String(local?.displayState||'').trim();
+  return {
+   ...x,
+   customer:String(x.customer||''),
+   model:String(x.model||''),
+   due:String(x.due||''),
+   state:localState||String(x.state||'계획'),
+   nextAction:String(x.nextAction||''),
+   priority:Number(x.priority||2)
+  };
+ });
  return (includeCompleted?rows:rows.filter(x=>!isCompletedOperational(x)))
    .sort((a,b)=>hybridDueKey(a.due).localeCompare(hybridDueKey(b.due))||(a.priority||9)-(b.priority||9));
 }
@@ -812,7 +829,7 @@ function renderHybridProjects(){
  el.querySelectorAll('[data-project-order]').forEach(b=>b.onclick=()=>{const x=operationalRows(true).find(v=>v.orderId===b.dataset.projectOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.projectOrder,'detail',x);});
 }
 
-function classifyUnifiedEvent(raw){
+function classifyUnifiedEventLine(raw){
  const text=String(raw||'').trim(),n=norm(text);
  const process=(()=>{
    const pairs=[
@@ -829,7 +846,7 @@ function classifyUnifiedEvent(raw){
    let best='',pos=-1;pairs.forEach(([re,name])=>{const m=[...before.matchAll(new RegExp(re.source,'g'))].at(-1);if(m&&m.index>=pos){pos=m.index;best=name;}});
    return best||process;
  })();
- if(/출고완료|납품완료/.test(n))return {type:'DELIVERY',state:'출고 완료',status:'CLOSED',changesState:true,label:'출고 완료 · 프로젝트 종료'};
+ if(/출고완료|납품완료/.test(n))return {type:'DELIVERY',state:'출고 완료',status:'CLOSED',changesState:true,label:'상태 변경 → 출고 완료'};
  if(/대기|보류|지연/.test(text)){
    let state=waitProcess?(waitProcess==='자재'?'자재 대기':waitProcess+' 대기'):'대기';
    if(/수정대기/.test(text)&&waitProcess)state=waitProcess+' 수정대기';
@@ -840,8 +857,15 @@ function classifyUnifiedEvent(raw){
    const state=(process==='재조립'?'재조립':process)+' 진행';
    return {type:process==='재조립'?'REWORK':'PROGRESS',state,status:'OPEN',changesState:true,label:'상태 변경 → '+state};
  }
- if(/불량|이상|간섭|누락|문제|오류|에러|고장|파손/.test(text))return {type:'ISSUE',state:'',status:'OPEN',changesState:false,label:'이력만 기록 · 현재상태 유지'};
- return {type:'NOTE',state:'',status:'OPEN',changesState:false,label:'이력만 기록 · 현재상태 유지'};
+ if(/불량|이상|간섭|누락|문제|오류|에러|고장|파손/.test(text))return {type:'ISSUE',state:'',status:'OPEN',changesState:false,label:'이력 기록 · 현재상태 유지'};
+ return {type:'NOTE',state:'',status:'OPEN',changesState:false,label:'이력 기록 · 현재상태 유지'};
+}
+function classifyUnifiedEvent(raw){
+ const lines=String(raw||'').split(/\r?\n|;/).map(v=>v.trim()).filter(Boolean);
+ let fallback={type:'NOTE',state:'',status:'OPEN',changesState:false,label:'이력 기록 · 현재상태 유지'};
+ let explicit=null;
+ lines.forEach(line=>{const r=classifyUnifiedEventLine(line);if(r.type==='ISSUE')fallback=r;if(r.changesState)explicit=r;});
+ return explicit||fallback;
 }
 function unifiedStageFromText(v){
  const t=norm(v);
@@ -923,11 +947,12 @@ async function submitUnifiedEvent(key,text,statusEl){
  if(navigator.onLine===false)return {ok:false,error:'offline'};
  const classification=classifyUnifiedEvent(bodyText),impact=resolveUnifiedImpact(x,classification,bodyText);
  const id=crypto.randomUUID(),target=(x.orderId?x.orderId+' · ':'')+x.customer+' · '+x.model;
- const note={id,submissionId:id,target,text:bodyText,status:'sending',createdAt:new Date().toISOString(),issueId:x.issueId||'',orderId:x.orderId||'',displayState:classification.state||'',nextAction:x.nextAction||'',issueStatus:x.issueStatus||'',eventOnly:!x.issueId||!classification.changesState,eventType:classification.type,autoClassification:impact.label};
+ const note={id,submissionId:id,target,text:bodyText,status:'sending',createdAt:new Date().toISOString(),issueId:x.issueId||'',orderId:x.orderId||'',displayState:classification.state||'',nextAction:x.nextAction||'',issueStatus:x.issueStatus||'',eventOnly:!x.issueId||!classification.changesState,eventType:classification.type,autoClassification:impact.label,stateSyncVersion:classification.changesState?'explicit-v2':''};
  try{const list=notes();list.unshift(note);persist(KEY,list);}catch{return {ok:false,error:'local_store'};}
  if(statusEl)statusEl.textContent='Event 기록 중… · '+impact.label;
  try{
-  const d=await api('/api/sa2-write',{op:'safe_write',submissionId:id,text:target+' ['+classification.type+'] '+bodyText,targetHint:target,source:'MOBILE|UNIFIED_EVENT',requester:'Emotion'},55000);
+  const serverText=bodyText.split(/\r?\n|;/).map(v=>v.trim()).filter(Boolean).map(line=>target+' '+line).join('\n');
+  const d=await api('/api/sa2-write',{op:'safe_write',submissionId:id,text:serverText,targetHint:target,source:'MOBILE|UNIFIED_EVENT',requester:'Emotion'},55000);
   if(!d.applied){
    const state=/REVIEW/i.test(d.status)?'review':/EXCLUDED/i.test(d.status)?'excluded':/DUPLICATE/i.test(d.status)?'duplicate':'received';
    updateNote(id,{status:state,requestId:d.requestId||'',ack:d.ack||'서버 접수 결과를 확인하세요.',respondedAt:new Date().toISOString()});
@@ -935,10 +960,14 @@ async function submitUnifiedEvent(key,text,statusEl){
   }
   projectHistoryCache.delete(x.orderId);
   if(!x.issueId){
-   updateNote(id,{status:'applied',requestId:d.requestId||'',ack:'Project Event 기록 완료 · 기존 이슈가 없는 계획 장비이므로 현재상태는 자동 변경하지 않음',respondedAt:new Date().toISOString(),eventVerifiedAt:new Date().toISOString(),verifiedAt:new Date().toISOString()});
-   return {ok:true,classification,eventSaved:true,stateApplied:false,planOnly:true,requestId:d.requestId||''};
+   updateNote(id,{status:'applied',requestId:d.requestId||'',ack:classification.changesState?'Project Event 기록 완료 · 명확한 상태문구를 현재 화면에 반영':'Project Event 기록 완료',respondedAt:new Date().toISOString(),eventVerifiedAt:new Date().toISOString(),verifiedAt:new Date().toISOString()});
+   if(classification.changesState){if(screen==='home')home();else if(screen==='plan')productionPlan(productionPlanMode,true);else if(screen==='projects')projects(filter,true);else if(screen==='issues')todayIssues();}
+   return {ok:true,classification,eventSaved:true,stateApplied:classification.changesState,planOnly:true,requestId:d.requestId||''};
   }
-  updateNote(id,{status:classification.changesState?'saved_unverified':'applied',requestId:d.requestId||'',ack:classification.changesState?'Project Event 기록 완료 · 현재상태 자동반영 중':'Project Event 기록 완료',respondedAt:new Date().toISOString(),eventVerifiedAt:new Date().toISOString(),verifiedAt:classification.changesState?'':new Date().toISOString()});
+  updateNote(id,{status:classification.changesState?'saved_unverified':'applied',requestId:d.requestId||'',ack:classification.changesState?'Project Event 기록 완료 · 명확한 상태문구만 현재상태 반영':'Project Event 기록 완료',respondedAt:new Date().toISOString(),eventVerifiedAt:new Date().toISOString(),verifiedAt:classification.changesState?'':new Date().toISOString()});
+  if(classification.changesState){
+    if(screen==='home')home();else if(screen==='plan')productionPlan(productionPlanMode,true);else if(screen==='projects')projects(filter,true);else if(screen==='issues')todayIssues();
+  }
   if(!classification.changesState)return {ok:true,classification,eventSaved:true,stateApplied:false,requestId:d.requestId||''};
   setTimeout(()=>syncUnifiedStateBackground(id,{...x},classification,bodyText),0);
   return {ok:true,classification,eventSaved:true,stateApplied:false,statePending:true,requestId:d.requestId||''};
