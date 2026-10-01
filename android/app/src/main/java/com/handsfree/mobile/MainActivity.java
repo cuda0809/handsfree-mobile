@@ -112,7 +112,7 @@ public class MainActivity extends Activity {
           + "const demo=document.querySelector('.demo'),nav=document.querySelector('.bottom');if(!demo||!nav)return;"
           + "let status=document.querySelector('.hf-native-connection');if(!status){status=document.createElement('div');status.className='hf-native-connection';}"
           + "const span=demo.querySelector('span');if(span)status.replaceChildren(span);"
-          + "demo.after(nav);nav.after(status);"
+          + "demo.after(status);status.after(nav);"
           + "document.querySelector('.top > button[aria-label=\\\"처리함 열기\\\"]')?.remove();"
           + "const p=[...document.querySelectorAll('.top > button.icon')].find(b=>b.getAttribute('aria-label')!=='처리함 열기');"
           + "if(p){p.textContent='로그인';p.setAttribute('aria-label','로그인');p.onclick=()=>location.href='./login.html';}"
