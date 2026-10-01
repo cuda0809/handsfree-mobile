@@ -36,22 +36,10 @@ function isCompletedOperational(x){
  const actual=formatHfDate(x?.actualDelivery);
  return actual!=='미정'||/출고\s*완료|납품\s*완료/.test(state+' '+delivery)||masterState==='완료';
 }
-function latestUnifiedEventByOrder(){
- const out=new Map();
- notes().forEach(r=>{
-  const orderId=String(r.orderId||'').trim();
-  if(!orderId||!r.eventType||['draft','rejected'].includes(String(r.status||'')))return;
-  const at=Date.parse(r.respondedAt||r.updatedAt||r.createdAt||0)||0;
-  const prev=out.get(orderId),prevAt=prev?(Date.parse(prev.respondedAt||prev.updatedAt||prev.createdAt||0)||0):0;
-  if(!prev||at>=prevAt)out.set(orderId,r);
- });
- return out;
-}
 function operationalRows(includeCompleted=true){
  const meta=projectMetaCache()?.projects||appProjects||[];
  const plans=planOverviewCache()?.byOrder||{};
  const live=new Map(items.map(x=>[String(x.orderId||''),x]));
- const localEvents=latestUnifiedEventByOrder();
  const map=new Map();
  for(const p of meta){
   const orderId=String(p.orderId||'').trim();if(!orderId)continue;
@@ -65,22 +53,15 @@ function operationalRows(includeCompleted=true){
   if(map.has(orderId))continue;
   map.set(orderId,{orderId,...p,state:'계획',priority:2});
  }
- const rows=[...map.values()].map(x=>{
-  const event=localEvents.get(String(x.orderId||''));
-  const eventAt=event?(Date.parse(event.respondedAt||event.updatedAt||event.createdAt||0)||0):0;
-  const sourceAt=Date.parse(x.sourceLatestUpdate||x.updatedAt||0)||0;
-  const eventState=event&&eventAt>=sourceAt?String(event.displayState||unifiedStateText(event.text)||'').trim():'';
-  return {
-   ...x,
-   customer:String(x.customer||''),
-   model:String(x.model||''),
-   due:String(x.due||''),
-   state:eventState||String(x.state||'계획'),
-   nextAction:String(x.nextAction||''),
-   priority:Number(x.priority||2),
-   localEventAt:eventState?(event.respondedAt||event.updatedAt||event.createdAt||''):''
-  };
- });
+ const rows=[...map.values()].map(x=>({
+  ...x,
+  customer:String(x.customer||''),
+  model:String(x.model||''),
+  due:String(x.due||''),
+  state:String(x.state||'계획'),
+  nextAction:String(x.nextAction||''),
+  priority:Number(x.priority||2)
+ }));
  return (includeCompleted?rows:rows.filter(x=>!isCompletedOperational(x)))
    .sort((a,b)=>hybridDueKey(a.due).localeCompare(hybridDueKey(b.due))||(a.priority||9)-(b.priority||9));
 }
@@ -831,10 +812,6 @@ function renderHybridProjects(){
  el.querySelectorAll('[data-project-order]').forEach(b=>b.onclick=()=>{const x=operationalRows(true).find(v=>v.orderId===b.dataset.projectOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.projectOrder,'detail',x);});
 }
 
-function unifiedStateText(raw){
- const line=String(raw||'').split(/\r?\n|;/).map(v=>v.trim()).find(Boolean)||'';
- return line.replace(/\s+/g,' ').slice(0,80);
-}
 function classifyUnifiedEvent(raw){
  const text=String(raw||'').trim(),n=norm(text);
  const process=(()=>{
@@ -863,9 +840,8 @@ function classifyUnifiedEvent(raw){
    const state=(process==='재조립'?'재조립':process)+' 진행';
    return {type:process==='재조립'?'REWORK':'PROGRESS',state,status:'OPEN',changesState:true,label:'상태 변경 → '+state};
  }
- if(/불량|이상|간섭|누락|문제|오류|에러|고장|파손/.test(text)){const state=unifiedStateText(text);return {type:'ISSUE',state,status:'OPEN',changesState:true,label:'상태 변경 → '+state};}
- const state=unifiedStateText(text);
- return {type:'NOTE',state,status:'OPEN',changesState:true,label:'상태 변경 → '+state};
+ if(/불량|이상|간섭|누락|문제|오류|에러|고장|파손/.test(text))return {type:'ISSUE',state:'',status:'OPEN',changesState:false,label:'이력만 기록 · 현재상태 유지'};
+ return {type:'NOTE',state:'',status:'OPEN',changesState:false,label:'이력만 기록 · 현재상태 유지'};
 }
 function unifiedStageFromText(v){
  const t=norm(v);
@@ -878,28 +854,24 @@ function unifiedStageFromText(v){
 }
 function resolveUnifiedImpact(current,classification,bodyText){
  const currentState=String(current?.state||''),currentNext=String(current?.nextAction||'');
- if(!classification.changesState)return {...classification,effectiveState:currentState,effectiveNext:currentNext,label:'현재상태 유지'};
+ if(!classification.changesState)return {...classification,effectiveState:currentState,effectiveNext:currentNext,label:'이력만 기록 · 현재상태 유지'};
  if(classification.status==='CLOSED')return {...classification,effectiveState:classification.state,effectiveNext:'',label:classification.label};
- const state=String(classification.state||unifiedStateText(bodyText)||currentState).slice(0,80);
- return {...classification,effectiveState:state,effectiveNext:currentNext,label:'상태 변경 → '+state};
+ const from=unifiedStageFromText(currentState),to=unifiedStageFromText(classification.state);
+ const explicitRollback=/재작업|재조립|되돌|회귀|공정\s*복귀|다시\s*(?:조립|전장|프로그램|검수|테스트)/.test(String(bodyText||''));
+ if(from>=0&&to>=0&&to<from&&!explicitRollback){
+   const stages=['자재','조립','전장','검수','출고'];
+   const action=String(classification.state||'').replace(/\s*(?:수정대기|대기|보류|지연)$/,'').trim()+
+     (/수정대기/.test(String(classification.state||''))?' 수정':'');
+   const next=[action,stages[from]].filter(Boolean).join(' 후 ');
+   return {...classification,effectiveState:currentState,effectiveNext:next||currentNext,preserveStage:true,label:'이력 기록 · 현재 '+currentState+' 유지 · 다음 '+(next||currentNext)};
+ }
+ return {...classification,effectiveState:classification.state,effectiveNext:currentNext,label:classification.label};
 }
 function todayIssueTarget(key){
  const k=String(key||'');
  return operationalRows(false).find(x=>String(x.issueId||'')===k||String(x.orderId||'')===k)||items.find(x=>String(x.issueId||'')===k||String(x.orderId||'')===k)||null;
 }
 function todayIssueKey(x){return String(x?.issueId||x?.orderId||'');}
-function activeIssueIdForOrder(orderId){
- const id=String(orderId||'');
- const candidates=(Array.isArray(appIssues)?appIssues:[]).filter(v=>String(v.orderId||'')===id&&['OPEN','MONITOR'].includes(String(v.status||'')));
- return String(candidates.at(-1)?.issueId||'');
-}
-async function resolveUnifiedIssueId(x){
- if(x?.issueId)return String(x.issueId);
- let id=activeIssueIdForOrder(x?.orderId);
- if(id)return id;
- try{await getAppProjects();id=activeIssueIdForOrder(x?.orderId);}catch{}
- return id;
-}
 function previewUnifiedEvent(key,scope=document){
  const field=scope.querySelector('[data-unified-text="'+key+'"]'),status=scope.querySelector('[data-unified-preview="'+key+'"]');
  if(!field||!status)return;
@@ -907,7 +879,7 @@ function previewUnifiedEvent(key,scope=document){
  if(!v){status.textContent='내용을 입력하면 상태 반영 여부를 미리 보여줍니다.';return;}
  if(!x){status.textContent='입력 대상을 찾지 못했습니다.';return;}
  const base=classifyUnifiedEvent(v),impact=resolveUnifiedImpact(x,base,v);
- status.textContent='자동 판정 · '+impact.label+(x.issueId?'':' · Event 기준 현재상태 반영');
+ status.textContent='자동 판정 · '+impact.label+(x.issueId?'':' · Event 기록');
 }
 
 async function syncUnifiedStateBackground(noteId,x,classification,bodyText){
@@ -951,8 +923,7 @@ async function submitUnifiedEvent(key,text,statusEl){
  if(navigator.onLine===false)return {ok:false,error:'offline'};
  const classification=classifyUnifiedEvent(bodyText),impact=resolveUnifiedImpact(x,classification,bodyText);
  const id=crypto.randomUUID(),target=(x.orderId?x.orderId+' · ':'')+x.customer+' · '+x.model;
- const issueLookup=x.issueId?Promise.resolve(String(x.issueId)):resolveUnifiedIssueId(x);
- const note={id,submissionId:id,target,text:bodyText,status:'sending',createdAt:new Date().toISOString(),issueId:x.issueId||'',orderId:x.orderId||'',displayState:impact.effectiveState||unifiedStateText(bodyText),nextAction:x.nextAction||'',issueStatus:x.issueStatus||'',eventOnly:!x.issueId,eventType:classification.type,autoClassification:impact.label};
+ const note={id,submissionId:id,target,text:bodyText,status:'sending',createdAt:new Date().toISOString(),issueId:x.issueId||'',orderId:x.orderId||'',displayState:classification.state||'',nextAction:x.nextAction||'',issueStatus:x.issueStatus||'',eventOnly:!x.issueId||!classification.changesState,eventType:classification.type,autoClassification:impact.label};
  try{const list=notes();list.unshift(note);persist(KEY,list);}catch{return {ok:false,error:'local_store'};}
  if(statusEl)statusEl.textContent='Event 기록 중… · '+impact.label;
  try{
@@ -963,15 +934,13 @@ async function submitUnifiedEvent(key,text,statusEl){
    return {ok:false,partial:true,classification,eventSaved:false};
   }
   projectHistoryCache.delete(x.orderId);
-  const resolvedIssueId=String(x.issueId||d.matchedIssueId||await issueLookup||'');
-  updateNote(id,{issueId:resolvedIssueId,status:resolvedIssueId?'saved_unverified':'applied',requestId:d.requestId||'',ack:resolvedIssueId?'Project Event 기록 완료 · 현재상태 자동반영 중':'Project Event 기록 완료 · Event 기준 현재상태 반영',respondedAt:new Date().toISOString(),eventVerifiedAt:new Date().toISOString(),verifiedAt:resolvedIssueId?'':new Date().toISOString(),displayState:impact.effectiveState||unifiedStateText(bodyText)});
-  // Immediately let every screen use the latest Event as current state.
-  if(screen==='home')home();
-  else if(screen==='plan')productionPlan(productionPlanMode,true);
-  else if(screen==='projects')projects(filter,true);
-  else if(screen==='issues')todayIssues();
-  if(!resolvedIssueId)return {ok:true,classification,eventSaved:true,stateApplied:true,eventDerived:true,requestId:d.requestId||''};
-  setTimeout(()=>syncUnifiedStateBackground(id,{...x,issueId:resolvedIssueId},classification,bodyText),0);
+  if(!x.issueId){
+   updateNote(id,{status:'applied',requestId:d.requestId||'',ack:'Project Event 기록 완료 · 기존 이슈가 없는 계획 장비이므로 현재상태는 자동 변경하지 않음',respondedAt:new Date().toISOString(),eventVerifiedAt:new Date().toISOString(),verifiedAt:new Date().toISOString()});
+   return {ok:true,classification,eventSaved:true,stateApplied:false,planOnly:true,requestId:d.requestId||''};
+  }
+  updateNote(id,{status:classification.changesState?'saved_unverified':'applied',requestId:d.requestId||'',ack:classification.changesState?'Project Event 기록 완료 · 현재상태 자동반영 중':'Project Event 기록 완료',respondedAt:new Date().toISOString(),eventVerifiedAt:new Date().toISOString(),verifiedAt:classification.changesState?'':new Date().toISOString()});
+  if(!classification.changesState)return {ok:true,classification,eventSaved:true,stateApplied:false,requestId:d.requestId||''};
+  setTimeout(()=>syncUnifiedStateBackground(id,{...x},classification,bodyText),0);
   return {ok:true,classification,eventSaved:true,stateApplied:false,statePending:true,requestId:d.requestId||''};
  }catch(e){
   const rejected=[400,401,403].includes(e.status);
@@ -1007,10 +976,10 @@ function todayIssues(){
  (!opened?'<button class="today-issue-open" onclick="toggleTodayIssue(\''+esc(key)+'\')"><span>이 장비에 오늘 이슈 입력</span><span>＋</span></button>':
  '<div class="today-issue-editor"><div class="today-issue-target"><span>입력 대상</span><b>'+esc(x.orderId||key)+' · '+esc(x.customer)+' · '+esc(x.model)+'</b></div>'+
  (x.cause?'<p class="today-issue-cause">기존 사유 · '+esc(x.cause)+'</p>':'')+
- (!hasIssue?'<p class="note">현재 별도 OPEN 이슈가 없어도 입력한 Event를 현재상태 기준으로 표시합니다.</p>':'')+
+ (!hasIssue?'<p class="note">현재 별도 OPEN 이슈가 없는 생산계획 장비입니다. 입력 내용은 JOB NO. 기준 Event로 기록합니다.</p>':'')+
  '<label class="today-issue-label">오늘 이슈 / 진행·사유<textarea data-unified-text="'+esc(key)+'" maxlength="800" placeholder="예: 마감조립 진행 / 부품 미입고로 조립 대기 / 센서값 이상 확인" oninput="previewUnifiedEvent(\''+esc(key)+'\',main)"></textarea></label>'+
  '<p class="note today-issue-preview" data-unified-preview="'+esc(key)+'">내용을 입력하면 상태 반영 여부를 미리 보여줍니다.</p>'+
- '<div class="today-issue-actions"><button class="chip" data-today-voice="'+esc(key)+'">🎙 음성</button><button class="primary" data-today-save="'+esc(key)+'">기록 및 상태 반영</button></div>'+
+ '<div class="today-issue-actions"><button class="chip" data-today-voice="'+esc(key)+'">🎙 음성</button><button class="primary" data-today-save="'+esc(key)+'">'+(hasIssue?'기록 및 자동 반영':'Event 기록')+'</button></div>'+
  '<button class="today-issue-close" onclick="toggleTodayIssue(\''+esc(key)+'\')">입력창 닫기</button><p class="note" data-today-status="'+esc(key)+'"></p></div>')+
  '</section>';}).join(''):'<div class="empty">현재 진행 중인 생산계획 장비가 없습니다.</div>')+
  '</div>'+
