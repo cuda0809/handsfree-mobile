@@ -4,6 +4,8 @@ const PIN_SALT='lJRTC5NU6xH9XhPZDUewlA';
 const PIN_HASH='BH_vzmRjgAljPZiEz4f7vroGaegZdb-F8ExdqfaGbsk';
 const WINDOW_MS=10*60*1000;
 const MAX_FAILS=5;
+const GUEST_END_ISO='2026-10-11T01:30:00Z';
+const GUEST_END=Math.floor(Date.parse(GUEST_END_ISO)/1000);
 const attempts=globalThis.__hfSa2Attempts||(globalThis.__hfSa2Attempts=new Map());
 
 function validPin(pin){
@@ -30,18 +32,28 @@ function clearFailures(req){attempts.delete(clientKey(req));}
 export default async function handler(req,res){
  const {reply}=await import('../lib/kmt-server.mjs');
  const {sameOrigin}=await import('../lib/person-auth.mjs');
- const {sa2Person,sa2Cookie,clearSa2Cookie}=await import('../lib/sa2-auth.mjs');
+ const {sa2Person,sa2Cookie,guestCookie,clearSa2Cookie}=await import('../lib/sa2-auth.mjs');
  res.setHeader('Cache-Control','no-store, max-age=0');
 
  if(req.method==='GET'){
    const p=sa2Person(req);
-   if(p)return reply(res,200,{ok:true,user:{label:p.label||String(p.email||'').replace(/^SA2:/,''),role:'writer',auth:'sa2'}});
-   return reply(res,200,{ok:true,user:null});
+   if(p){
+     const guest=p.auth==='guest';
+     return reply(res,200,{ok:true,user:{label:p.label||String(p.email||'').replace(/^(SA2|GUEST):/,''),role:guest?'reader':'writer',auth:guest?'guest':'sa2'},expiresAt:guest?new Date(p.exp*1000).toISOString():null});
+   }
+   return reply(res,200,{ok:true,user:null,guestExpiresAt:GUEST_END_ISO});
  }
  if(req.method!=='POST')return reply(res,405,{ok:false,error:'method_not_allowed'});
  if(!sameOrigin(req))return reply(res,403,{ok:false,error:'invalid_origin'});
  const action=String(req.body?.action||'');
  if(action==='logout'){res.setHeader('Set-Cookie',clearSa2Cookie());return reply(res,200,{ok:true});}
+ if(action==='guest'){
+   const now=Math.floor(Date.now()/1000);
+   if(now>=GUEST_END){res.setHeader('Set-Cookie',clearSa2Cookie());return reply(res,410,{ok:false,error:'guest_expired',expiresAt:GUEST_END_ISO});}
+   const sub='guest-demo-20261001';
+   res.setHeader('Set-Cookie',guestCookie({sub,email:'GUEST:DEMO',label:'게스트'},GUEST_END));
+   return reply(res,200,{ok:true,user:{label:'게스트',role:'reader',auth:'guest'},expiresAt:GUEST_END_ISO});
+ }
  if(action!=='activate')return reply(res,400,{ok:false,error:'invalid_request'});
  if(blocked(req))return reply(res,429,{ok:false,error:'too_many_attempts'});
 
