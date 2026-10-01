@@ -29,14 +29,14 @@ jobs:
         working-directory: android
         run: >-
           gradle assembleDebug --no-daemon
-          -PHF_APP_URL="https://handsfree-mobile-alpha-02-git-codex-real-l-fbac1c-cuda0809-8210.vercel.app/kmt-sa2/?app=sa283preview"
+          -PHF_APP_URL="https://handsfree-mobile-alpha-02-git-codex-real-l-fbac1c-cuda0809-8210.vercel.app/kmt-sa2/?app=recovery288"
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk KMT-Production-Proto-FastLogin.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk KMT-Production-Proto-Recovery.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: KMT-Production-Proto-FastLogin-APK
-          path: KMT-Production-Proto-FastLogin.apk
+          name: KMT-Production-Proto-Recovery-APK
+          path: KMT-Production-Proto-Recovery.apk
           if-no-files-found: error
