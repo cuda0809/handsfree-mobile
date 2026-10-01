@@ -86,6 +86,7 @@ public class MainActivity extends Activity {
                 super.onPageFinished(view, url);
                 applyFastLoginPatch(view, url);
                 applyUiPatch(view);
+                applyDataSafetyPatch(view, url);
             }
 
             @Override
@@ -119,6 +120,33 @@ public class MainActivity extends Activity {
           + "if(setup)setup.hidden=false;"
           + "if(status&&/확인하는 중|확인 중/.test(status.textContent||''))status.textContent='이름과 4자리 PIN을 바로 입력할 수 있습니다.';"
           + "})();";
+        view.evaluateJavascript(js, null);
+    }
+
+    private void applyDataSafetyPatch(WebView view, String url) {
+        if (url == null || !url.contains("/kmt-sa2/") || url.contains("/login.html")) return;
+        String js =
+            "(()=>{const patch=()=>{"
+          + "try{"
+          + "if(typeof latestUnifiedEventByOrder==='function'&&!window.__hfOverlaySafetyPatched){"
+          + "window.__hfOverlaySafetyPatched=true;window.__hfUnsafeLatestUnifiedEventByOrder=latestUnifiedEventByOrder;latestUnifiedEventByOrder=()=>new Map();"
+          + "}"
+          + "if(typeof classifyUnifiedEvent==='function'&&!window.__hfClassifierSafetyPatched){"
+          + "window.__hfClassifierSafetyPatched=true;const base=classifyUnifiedEvent;"
+          + "classifyUnifiedEvent=(raw)=>{const lines=String(raw||'').split(/\\r?\\n|;/).map(v=>v.trim()).filter(Boolean);let fallback={type:'NOTE',state:'',status:'OPEN',changesState:false,label:'이력 기록 · 현재상태 유지'},explicit=null;"
+          + "for(const line of lines){const r=base(line);if(!r)continue;if(r.type==='ISSUE')fallback={...r,state:'',changesState:false,label:'이력 기록 · 현재상태 유지'};if(['DELIVERY','WAIT','PROGRESS','INSPECTION','REWORK'].includes(r.type)&&r.changesState)explicit=r;}return explicit||fallback;};"
+          + "}"
+          + "if(typeof api==='function'&&!window.__hfApiSafetyPatched){"
+          + "window.__hfApiSafetyPatched=true;const originalApi=api;"
+          + "api=async function(path,body,timeout){let next=body;if(path==='/api/sa2-write'&&body&&String(body.source||'').includes('UNIFIED_EVENT')&&body.targetHint&&body.text){"
+          + "const target=String(body.targetHint||'').trim();let raw=String(body.text||'');const escRe=s=>s.replace(/[.*+?^$()|[\\]\\\\]/g,'\\\\    private void applyUiPatch(WebView view) {');"
+          + "const firstRe=new RegExp('^'+escRe(target)+'\\\\s*\\\\[[^\\\\]]+\\\\]\\\\s*');const parts=raw.split(/\\r?\\n|;/).map(v=>v.trim()).filter(Boolean);if(parts.length){parts[0]=parts[0].replace(firstRe,'').trim();}"
+          + "const safe=parts.filter(Boolean).map(line=>target+' '+line).join('\\n');next={...body,text:safe};}"
+          + "return originalApi(path,next,timeout);};"
+          + "}"
+          + "if(!window.__hfSafetyRerendered&&typeof screen==='string'){window.__hfSafetyRerendered=true;setTimeout(()=>{try{if(screen==='home'&&typeof home==='function')home();else if(screen==='plan'&&typeof productionPlan==='function')productionPlan(typeof productionPlanMode==='string'?productionPlanMode:'plan',true);else if(screen==='projects'&&typeof projects==='function')projects(typeof filter==='string'?filter:'active',true);else if(screen==='issues'&&typeof todayIssues==='function')todayIssues();}catch(_){ }},80);}"
+          + "}catch(_){ }"
+          + "};patch();setTimeout(patch,300);setTimeout(patch,900);})();";
         view.evaluateJavascript(js, null);
     }
 
