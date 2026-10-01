@@ -86,6 +86,7 @@ public class MainActivity extends Activity {
                 super.onPageFinished(view, url);
                 applyFastLoginPatch(view, url);
                 applyUiPatch(view);
+                applyGuestPatch(view, url);
             }
 
             @Override
@@ -130,7 +131,7 @@ public class MainActivity extends Activity {
           + "let status=document.querySelector('.hf-native-connection');if(!status){status=document.createElement('div');status.className='hf-native-connection';}"
           + "const span=demo.querySelector('span');if(span)status.replaceChildren(span);"
           + "demo.after(status);status.after(nav);"
-          + "document.querySelector('.top > button[aria-label=\\\"처리함 열기\\\"]')?.remove();"
+          + "document.querySelector('.top > button[aria-label=\"처리함 열기\"]')?.remove();"
           + "const p=[...document.querySelectorAll('.top > button.icon')].find(b=>b.getAttribute('aria-label')!=='처리함 열기');"
           + "if(p){p.textContent='로그인';p.setAttribute('aria-label','로그인');p.onclick=()=>location.href='./login.html';}"
           + "const brand=document.querySelector('.kmt-brand small');if(brand)brand.style.whiteSpace='nowrap';"
@@ -142,6 +143,25 @@ public class MainActivity extends Activity {
           + "const demo=document.querySelector('.demo');"
           + "if(demo&&!window.__hfTopNavObserver){window.__hfTopNavObserver=new MutationObserver(()=>place());window.__hfTopNavObserver.observe(demo,{childList:true});}"
           + "place();setTimeout(place,350);setTimeout(place,1000);"
+          + "})();";
+        view.evaluateJavascript(js, null);
+    }
+
+    private void applyGuestPatch(WebView view, String url) {
+        if (url == null || !url.contains("/kmt-sa2/") || url.contains("/guest.html")) return;
+        String js =
+            "(()=>{"
+          + "const deny=()=>{if(typeof toast==='function')toast('게스트 데모는 조회 전용입니다.');else alert('게스트 데모는 조회 전용입니다.');};"
+          + "['input','editIssue','saveIssue','saveAndSendNote','sendNote'].forEach(n=>{try{window[n]=deny}catch(e){}});"
+          + "const paint=()=>{"
+          + "let b=document.getElementById('hfGuestBadge');"
+          + "if(!b){const brand=document.querySelector('.kmt-brand');if(brand){b=document.createElement('span');b.id='hfGuestBadge';b.textContent='GUEST · 10/11까지';b.style.cssText='margin-left:8px;padding:4px 7px;border-radius:999px;background:#fff3df;color:#a65a13;font-size:9px;font-weight:900;white-space:nowrap';brand.appendChild(b);}}"
+          + "const top=[...document.querySelectorAll('.top > button.icon')][0];if(top){top.textContent='게스트';top.setAttribute('aria-label','게스트 조회 전용');top.onclick=deny;}"
+          + "const n=document.querySelector('.bottom .new');if(n){n.onclick=deny;n.style.opacity='.55';n.title='게스트 조회 전용';}"
+          + "document.querySelectorAll('button').forEach(x=>{const t=(x.textContent||'').trim();if(/서버로 보내고|변경 내용 확인 후 저장|현재 상태 · 다음 행동 수정/.test(t)){x.onclick=deny;x.style.opacity='.55';}});"
+          + "};"
+          + "if(!window.__hfGuestObserver&&document.body){window.__hfGuestObserver=new MutationObserver(paint);window.__hfGuestObserver.observe(document.body,{childList:true,subtree:true});}"
+          + "paint();setTimeout(paint,400);setTimeout(paint,1200);"
           + "})();";
         view.evaluateJavascript(js, null);
     }
