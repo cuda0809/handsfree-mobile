@@ -101,7 +101,7 @@ function banner(){
  if(!status){status=document.createElement('div');status.className='hf-connection-row';}
  const span=demo.querySelector('span');
  if(span)status.replaceChildren(span);
- if(nav){demo.after(nav);nav.after(status);}else demo.after(status);
+ if(nav){demo.after(status);status.after(nav);}else demo.after(status);
 }
 async function refresh(force=true){
  if(readPending)return readPending;
