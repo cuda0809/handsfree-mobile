@@ -11,7 +11,7 @@ main{width:min(88vw,420px);background:#fff;border:1px solid #e1e9e6;border-radiu
 img{display:block;width:130px;max-height:70px;object-fit:contain;margin:0 0 20px}h1{font-size:22px;margin:0 0 8px}p{line-height:1.6;color:#667a80}.ok{color:#176956;font-weight:800}.err{color:#a74432}.bar{height:5px;background:#e7efec;border-radius:8px;overflow:hidden;margin-top:18px}.bar:after{content:"";display:block;height:100%;width:35%;background:#176956;border-radius:8px;animation:move 1.2s infinite ease-in-out}@keyframes move{0%{transform:translateX(-120%)}100%{transform:translateX(360%)}}button{width:100%;border:0;border-radius:12px;background:#176956;color:#fff;padding:13px;font:inherit;font-weight:750;margin-top:14px}
 </style>
 </head>
-<body><main><img src="./icon.svg" alt="KMT"><h1>게스트 데모 연결</h1><p id="status">10일 한도 게스트 계정으로 연결 중입니다.</p><div id="bar" class="bar"></div><button id="retry" hidden>다시 연결</button></main>
+<body data-guest-build="20261001-ready"><main><img src="./icon.svg" alt="KMT"><h1>게스트 데모 연결</h1><p id="status">10일 한도 게스트 계정으로 연결 중입니다.</p><div id="bar" class="bar"></div><button id="retry" hidden>다시 연결</button></main>
 <script>
 const statusEl=document.getElementById('status'),bar=document.getElementById('bar'),retry=document.getElementById('retry');
 async function connect(){
