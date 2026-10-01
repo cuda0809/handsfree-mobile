@@ -7,7 +7,7 @@ def releaseStorePassword = project.findProperty('HF_RELEASE_STORE_PASSWORD')
 def releaseKeyAlias = project.findProperty('HF_RELEASE_KEY_ALIAS')
 def releaseKeyPassword = project.findProperty('HF_RELEASE_KEY_PASSWORD')
 def hasReleaseSigning = releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword
-def handsFreeAppUrl = project.findProperty('HF_APP_URL') ?: 'https://handsfree-mobile-alpha-02.vercel.app/kmt-sa2/?app=mobile'
+def handsFreeAppUrl = project.findProperty('HF_APP_URL') ?: 'https://handsfree-mobile-alpha-02-git-task-guest10-9f22b9-cuda0809-8210.vercel.app/kmt-sa2/guest.html'
 
 def logoSource = rootProject.file('../kmt-sa2/icon.svg')
 def launcherIconSizes = [
@@ -37,7 +37,6 @@ tasks.register('generateLauncherIcons') {
             throw new GradleException("Unexpected KMT logo source size: ${source?.width}x${source?.height}")
         }
 
-        // Same approved crop used by the app header logo.
         def cropped = source.getSubimage(32, 47, 94, 50)
 
         launcherIconSizes.each { dirName, size ->
@@ -80,10 +79,10 @@ android {
         applicationId 'com.handsfree.mobile'
         minSdk 26
         targetSdk 35
-        versionCode 287
-        versionName '2.8.7-fast-login'
+        versionCode 288
+        versionName '2.8.8-guest10'
         buildConfigField 'String', 'APP_URL', '"' + handsFreeAppUrl + '"'
-        manifestPlaceholders = [appLabel: '케이엠텍 생산관리 프로토']
+        manifestPlaceholders = [appLabel: '케이엠텍 생산관리 프로토 · 게스트']
     }
 
     signingConfigs {
@@ -101,7 +100,7 @@ android {
         debug {
             applicationIdSuffix '.preview'
             versionNameSuffix '-preview'
-            manifestPlaceholders = [appLabel: '케이엠텍 생산관리 프로토']
+            manifestPlaceholders = [appLabel: '케이엠텍 생산관리 프로토 · 게스트']
         }
         release {
             minifyEnabled false
