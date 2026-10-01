@@ -9,10 +9,9 @@ const guestReady=(async()=>{try{const r=await fetch('./clock',{cache:'no-store'}
 async function guestApi(route,body={}){
 if(!await guestReady||!guestVerified||performance.now()>=guestDeadline)throw Object.assign(Error('guest_expired'),{status:410,data:{error:'guest_expired'}});
 if(route==='/api/sa2-real-status')return {ok:true,live:true,test:true,coreRead:true,sourceLatestDate:'2026-10-01 · 심사용 샘플',currentStatus:structuredClone(guestItems)};
-if(route==='/api/sa2-lifecycle'&&body.action==='plans'){const x=guestItems.find(i=>i.orderId===body.orderId);const stages=x?[{date:'2026-10-01',start:'2026-10-01',end:'2026-10-02',process:'조립',status:'샘플 계획',sourceMonth:'2026-10',editable:false,blockedReason:'edit_gate_closed'},{date:x.due,start:x.due,end:x.due,process:'출고',status:'샘플 계획',sourceMonth:'2026-10',editable:false,blockedReason:'edit_gate_closed'}]:[];return {ok:true,orderId:body.orderId,records:stages,plans:stages,editingAvailable:false};}
+if(route==='/api/sa2-lifecycle'&&body.action==='plans'){const x=guestItems.find(i=>i.orderId===body.orderId);const stages=x?[{date:'2026-10-01',start:'2026-10-01',end:'2026-10-02',process:'조립',status:'샘플 계획',sourceMonth:'2026-10',editable:false,blockedReason:'edit_gate_closed'},{date:x.due,start:x.due,end:x.due,process:'출고',status:'샘플 계획',sourceMonth:'2026-10',editable:false,blockedReason:'edit_gate_closed'}]:[];return {ok:true,orderId:body.orderId,records:stages,plans:stages.map(s=>{const row=Array(12).fill('');row[3]=s.date;row[10]=s.process;row[11]=s.status;return row;}),editingAvailable:false};}
 if(route==='/api/sa2-app'&&body.action==='catalog')return {ok:true,projects:structuredClone(guestItems),issues:structuredClone(guestItems)};
 if(route==='/api/sa2-app'&&body.action==='history')return {ok:true,orderId:body.orderId,events:[{at:'2026-10-01 10:30 KST',actor:'심사용 샘플',raw:'샘플 장비의 계획과 현재 상태를 연결했습니다.\n운영 기록이 아닙니다.'}]};
 if(route==='/api/sa2-app'&&body.action==='reports')return {ok:true,monthly:[['연도','월','수량'],['2026','09','3'],['2026','10','2']],annual:[['연도','종류','수량'],['2025','샘플 장비','12']],support:[['연도','월','인원'],['2026','09','2'],['2026','10','1']]};
 throw Object.assign(Error('guest_read_only'),{status:403,data:{error:'guest_read_only'}});
 }
-
