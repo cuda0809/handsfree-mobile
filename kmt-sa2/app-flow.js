@@ -137,7 +137,7 @@ function renderUnifiedHome(){
  const today=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
  const plannedToday=activeRows.filter(x=>planStagesOnDay(x,today).length);
  const urgent=activeRows.filter(x=>x.priority===1);
- const issueActive=activeRows.filter(x=>x.issueId&&x.priority!==3);
+ const issueActive=activeRows.filter(x=>(x.issueId||String(x.recentEvent||x.currentIssue||x.cause||'').trim())&&x.priority!==3);
  const attentionMap=new Map();
  urgent.forEach(x=>attentionMap.set(x.orderId,x));plannedToday.forEach(x=>attentionMap.set(x.orderId,x));
  const attention=[...attentionMap.values()].sort((a,b)=>(a.priority||9)-(b.priority||9)||hybridDueKey(a.due).localeCompare(hybridDueKey(b.due)));
@@ -150,11 +150,13 @@ function renderUnifiedHome(){
    '<div class="hf-card-line"><span>현재</span><b>'+esc(x.state||'계획')+'</b></div>'+
    '<div class="hf-card-next"><span>다음</span>'+esc(x.nextAction||'미정')+'</div></button>';
  }).join('');
- const issueCards=issueActive.sort((a,b)=>(a.priority||9)-(b.priority||9)).map(x=>
-  '<button class="hf-card '+hfCardTone(x,'issue')+'" data-home-order="'+esc(x.orderId)+'">'+hfCardIdentity(x,x.priority===1?'P1':'진행')+hfDueAlert(x)+
+ const issueCards=issueActive.sort((a,b)=>(a.priority||9)-(b.priority||9)).map(x=>{
+  const issueText=String(x.recentEvent||x.currentIssue||x.cause||'').trim();
+  return '<button class="hf-card '+hfCardTone(x,'issue')+'" data-home-order="'+esc(x.orderId)+'">'+hfCardIdentity(x,x.priority===1?'P1':'진행')+hfDueAlert(x)+
   '<div class="hf-card-meta"><div><small>현재 상태</small><b>'+esc(x.state||'미등록')+'</b></div><div><small>납기</small><b>'+esc(formatHfDate(x.due))+'</b></div></div>'+
-  '<div class="hf-card-next"><span>다음</span>'+esc(x.nextAction||'확인 필요')+'</div></button>'
- ).join('');
+  (issueText?'<div class="hf-card-issue"><span>이슈/진행</span><p>'+esc(issueText)+'</p></div>':'')+
+  '<div class="hf-card-next"><span>다음</span>'+esc(x.nextAction||'확인 필요')+'</div></button>';
+ }).join('');
  main.innerHTML=
  '<div class="hybrid-eyebrow">'+esc(new Date().toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',weekday:'long'}))+'</div>'+
  '<h1 class="hybrid-title">오늘 확인할 일<br>'+attention.length+'건이 있습니다</h1>'+
@@ -1039,6 +1041,9 @@ function todayIssues(){
  setTimeout(()=>syncProjectMeta(false),0);setTimeout(()=>syncPlanOverview(false),80);
  const merged=new Map();
  productionPlanRows().forEach(x=>merged.set(String(x.orderId||''),x));
+ operationalRows(false).filter(x=>String(x.recentEvent||x.currentIssue||x.cause||'').trim()).forEach(x=>{
+  const key=String(x.orderId||'');if(key)merged.set(key,{...(merged.get(key)||{}),...x});
+ });
  items.filter(x=>!isCompletedOperational(x)&&x.priority!==3).forEach(x=>{
   const key=String(x.orderId||'');merged.set(key,{...(merged.get(key)||{}),...x});
  });
