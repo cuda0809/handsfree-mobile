@@ -56,7 +56,7 @@ public class MainActivity extends Activity {
         settings.setAllowUniversalAccessFromFileURLs(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) settings.setSafeBrowsingEnabled(true);
-        settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
+        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setMediaPlaybackRequiresUserGesture(false);
 
         CookieManager cookies = CookieManager.getInstance();
@@ -76,8 +76,15 @@ public class MainActivity extends Activity {
         });
         webView.setWebViewClient(new WebViewClient() {
             @Override
+            public void onPageCommitVisible(WebView view, String url) {
+                super.onPageCommitVisible(view, url);
+                applyFastLoginPatch(view, url);
+            }
+
+            @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
+                applyFastLoginPatch(view, url);
                 applyUiPatch(view);
             }
 
@@ -103,6 +110,16 @@ public class MainActivity extends Activity {
         } else {
             webView.restoreState(savedInstanceState);
         }
+    }
+
+    private void applyFastLoginPatch(WebView view, String url) {
+        if (url == null || !url.contains("/login.html")) return;
+        String js =
+            "(()=>{const setup=document.getElementById('setup'),status=document.getElementById('status');"
+          + "if(setup)setup.hidden=false;"
+          + "if(status&&/확인하는 중|확인 중/.test(status.textContent||''))status.textContent='이름과 4자리 PIN을 바로 입력할 수 있습니다.';"
+          + "})();";
+        view.evaluateJavascript(js, null);
     }
 
     private void applyUiPatch(WebView view) {
