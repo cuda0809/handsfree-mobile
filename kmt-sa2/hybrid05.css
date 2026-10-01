@@ -811,3 +811,28 @@ main{padding-bottom:84px!important}
 }
 .hybrid-project-card .project-linked-issue small{color:#b9cbd4}
 .hybrid-project-card .project-linked-issue p{color:#fff!important}
+
+
+/* Linked issue/progress content must remain visible even when no issueId row exists. */
+.hf-card-issue{
+  margin:9px 0 0;
+  padding:8px 9px;
+  border-radius:9px;
+  background:#f5f7f8;
+  border:1px solid #e6eaec;
+}
+.hf-card-issue span{
+  display:block;
+  color:var(--hy-sub);
+  font-size:8px;
+  font-weight:900;
+  margin-bottom:3px;
+}
+.hf-card-issue p{
+  margin:0!important;
+  color:var(--hy-ink)!important;
+  font-size:10px!important;
+  line-height:1.5!important;
+  white-space:pre-line;
+  overflow-wrap:anywhere;
+}
