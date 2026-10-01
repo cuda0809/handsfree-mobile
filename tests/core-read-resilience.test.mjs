@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const status=fs.readFileSync(new URL('../api/sa2-real-status.js',import.meta.url),'utf8');
+const mobile=fs.readFileSync(new URL('../kmt-sa2/mobile.js',import.meta.url),'utf8');
+assert.doesNotMatch(status,/Promise\.all\(active\.map\(x=>appCall\(upstream,token,user,'issue'/);
+assert.match(status,/fanoutIssueReads:0/);
+assert.match(mobile,/readStale=true/);
+assert.match(mobile,/최근 정상값 유지/);
+assert.match(mobile,/↻ 다시 불러오기/);
+console.log('PASS Core read avoids issue fanout and Hybrid keeps last-good data with retry');

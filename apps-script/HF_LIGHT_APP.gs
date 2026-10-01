@@ -2,6 +2,17 @@
 var HF_APP={audit:'HF_LIGHT_상태감사',auditId:1907280002,issue:'HF_DATA_이슈원장'};
 function hfAppRows_(ss,name,cols){var sh=ss.getSheetByName(name);if(!sh){if(name===HF_LS.audit||name===HF_APP.audit)return [];hfLsFail_('missing_table');}return sh.getLastRow()?sh.getRange(1,1,sh.getLastRow(),Math.min(cols,sh.getMaxColumns())).getDisplayValues():[];}
 function hfAppCatalog_(ss){return hfAppRows_(ss,'제품마스터',12).slice(4).filter(function(r){return r[0];}).map(function(r){return {orderId:r[0],customer:r[1],model:r[2],due:r[3],pm:r[8],state:r[9]||'상태 미등록'};});}
+function hfAppCore_(ss){
+ var rows=hfAppRows_(ss,'HF_CORE_통합운영',40);if(rows.length<2)return [];
+ return rows.slice(1).filter(function(r){return r[1];}).map(function(r){return {
+  projectId:r[0],orderId:r[1],team:r[2],customer:r[3],model:r[4],qty:r[5],due:r[6],pm:r[7],
+  designOwner:r[8],buyer:r[9],productionOwner:r[10],qualityOwner:r[11],designState:r[12],
+  purchaseProgress:r[18],missingCount:r[19],materialState:r[20],assemblyState:r[21],electricalState:r[22],
+  programState:r[23],inspectionState:r[24],deliveryState:r[25],process:r[26],state:r[27],nextAction:r[28],
+  currentIssue:r[29],recentEvent:r[30],recentEventAt:r[31],planAssembly:r[32],planElectrical:r[33],
+  planProgram:r[34],planInspection:r[35],planDelivery:r[36],actualDelivery:r[37],confidence:r[38],updatedAt:r[39]
+ };});
+}
 function hfAppReceipt_(ss,b){
  var rows=hfAppRows_(ss,'HF_DATA_입력대기열',15).slice(1),matches=[];
  rows.forEach(function(r){if(r[3]!==b.actor.email)return;var p;try{p=JSON.parse(r[4]);}catch(e){return;}
@@ -54,6 +65,7 @@ function hfAppIssueBuild_(s,b,now){
 function hfAppIssueApply_(ss,b){var built=hfAppIssueBuild_(hfAppIssueSnapshot_(ss),b,new Date().toISOString());if(!built.requests.length)return built.receipt;hfLsBatch_(ss,built.requests);var fresh=hfAppIssueSnapshot_(ss),receipt=hfAppIssueReceipt_(fresh,b);if(!receipt||JSON.stringify(hfAppIssueRecord_(fresh,b.issueId).row)!==JSON.stringify(built.after))hfLsFail_('pending_verification');return receipt;}
 function hfLightAppDispatch_(body){
  var ss=SpreadsheetApp.openById(HF_SPREADSHEET_ID),b=hfLsActor_(body,ss);
+ if(b.action==='core')return {ok:true,projects:hfAppCore_(ss),generatedAt:new Date().toISOString()};
  if(b.action==='catalog')return {ok:true,projects:hfAppCatalog_(ss),issues:hfAppRows_(ss,HF_APP.issue,19).slice(1).filter(function(r){return r[0];}).map(function(r){return {issueId:r[0],orderId:r[3],status:r[8],state:r[16]};})};
  if(b.action==='reports')return {ok:true,annual:hfAppRows_(ss,'HF_DATA_납품집계',5),monthly:hfAppRows_(ss,'HF_DATA_납품월집계',6),support:hfAppRows_(ss,'HF_DATA_지원이력',12),generatedAt:new Date().toISOString()};
  if(b.action==='history')return hfAppHistory_(ss,b.orderId);

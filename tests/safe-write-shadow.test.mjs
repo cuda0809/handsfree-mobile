@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import crypto from 'node:crypto';
-import write from '../api/write.js';
-import unlock from '../api/unlock.js';
+import write from '../api/sa2-write.js';
+import {sa2Cookie} from '../lib/sa2-auth.mjs';
 
 // Isolated shadow fixtures: no network, credentials, or operating-sheet writes.
 const original = { env: { ...process.env }, fetch: globalThis.fetch };
@@ -15,22 +15,19 @@ const utilities = {
   computeDigest:(_,s)=>[...crypto.createHash('sha256').update(s).digest()]
 };
 try {
-  Object.assign(process.env,{HF_REAL_READ_URL:'https://example.invalid/canonical',HF_REAL_READ_TOKEN:'shadow-token',HF_REAL_APP_KEY:'shadow-key'});
+  Object.assign(process.env,{HF_REAL_READ_URL:'https://example.invalid/canonical',HF_REAL_READ_TOKEN:'shadow-token',HF_REAL_APP_KEY:'shadow-key',HF_REAL_ALLOWED_USERS:JSON.stringify({'writer@test':'writer'})});
   let calls=[];
   globalThis.fetch=async(url,options)=>{ calls.push({url,options});return {ok:true,status:200,text:async()=>JSON.stringify({ok:true,status:'EXCLUDED',applied:false,requestId:'shadow-1'})}; };
   assert.equal((await call(write,{method:'GET',headers:{}})).code,405);
-  assert.equal((await call(write,{method:'POST',headers:{},body:{text:'test'}})).code,401);
+  const sameOrigin={origin:'https://preview.example',host:'preview.example'};
+  assert.equal((await call(write,{method:'POST',headers:sameOrigin,body:{text:'test'}})).code,401);
   assert.equal(calls.length,0);
-  assert.equal((await call(unlock,{method:'POST',body:{key:'wrong'}})).code,401);
-  const login=await call(unlock,{method:'POST',body:{key:'shadow-key'}});
-  assert.equal(login.code,200);
-  assert.match(login.headers['Set-Cookie'],/HttpOnly; Secure; SameSite=Strict/);
-  const headers={cookie:login.headers['Set-Cookie'].split(';')[0]};
+  const headers={...sameOrigin,cookie:sa2Cookie({sub:'shadow-user',email:'SA2:검증',label:'검증'},'shadow-key').split(';')[0]};
   assert.equal((await call(write,{method:'POST',headers,body:{text:'  '}})).code,400);
   const res=await call(write,{method:'POST',headers,body:{text:'2026-09-14 shadow',targetHint:'ORDER-2'}});
   assert.equal(res.body.status,'EXCLUDED'); assert.equal(res.body.applied,false);
   assert.equal(calls[0].url,process.env.HF_REAL_READ_URL);
-  const payload=JSON.parse(calls[0].options.body); assert.equal(payload.targetHint,'ORDER-2'); assert.equal(payload.op,'safe_write');
+  const payload=JSON.parse(calls[0].options.body); assert.equal(payload.targetHint,'ORDER-2'); assert.equal(payload.op,'safe_write');assert.equal(payload.requester,'writer@test');assert.match(payload.source,/SA2:검증/);
   globalThis.fetch=async()=>({ok:true,status:200,text:async()=>'<html>sign in</html>'});
   assert.equal((await call(write,{method:'POST',headers,body:{text:'test'}})).body.error,'upstream_invalid_json');
   console.log('WRITE/auth/cookie/canonical routing/error: PASS');

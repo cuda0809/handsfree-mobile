@@ -7,17 +7,20 @@ def releaseStorePassword = project.findProperty('HF_RELEASE_STORE_PASSWORD')
 def releaseKeyAlias = project.findProperty('HF_RELEASE_KEY_ALIAS')
 def releaseKeyPassword = project.findProperty('HF_RELEASE_KEY_PASSWORD')
 def hasReleaseSigning = releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword
+def handsFreeAppUrl = project.findProperty('HF_APP_URL') ?: 'https://handsfree-mobile-alpha-02.vercel.app/kmt-sa2/?app=mobile'
 
 android {
     namespace 'com.handsfree.mobile'
     compileSdk 35
 
     defaultConfig {
-        applicationId 'com.handsfree.mobile.preview8'
+        applicationId 'com.handsfree.mobile'
         minSdk 26
         targetSdk 35
-        versionCode 1
-        versionName '2026.09.29.5-prod'
+        versionCode 283
+        versionName '2.8.3'
+        buildConfigField 'String', 'APP_URL', '"' + handsFreeAppUrl + '"'
+        manifestPlaceholders = [appLabel: '핸즈프리 REAL']
     }
 
     signingConfigs {
@@ -33,7 +36,9 @@ android {
 
     buildTypes {
         debug {
-            // Existing test/debug APK path remains unchanged.
+            applicationIdSuffix '.preview'
+            versionNameSuffix '-preview'
+            manifestPlaceholders = [appLabel: '핸즈프리 REAL Preview']
         }
         release {
             minifyEnabled false
@@ -41,5 +46,9 @@ android {
                 signingConfig signingConfigs.release
             }
         }
+    }
+
+    buildFeatures {
+        buildConfig true
     }
 }

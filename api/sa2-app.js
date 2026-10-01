@@ -7,7 +7,7 @@ export default async function handler(req,res){
  if(!sameOrigin(req))return reply(res,403,{ok:false,error:'invalid_origin'});
  const p=authUser(req);if(!p)return reply(res,401,{ok:false,error:'activation_required'});
  const role=p.role;
- const b=req.body||{};if(!['catalog','reports','history','receipt','issue','edit'].includes(b.action))return reply(res,400,{ok:false,error:'invalid_request'});
+ const b=req.body||{};if(!['core','catalog','reports','history','receipt','issue','edit'].includes(b.action))return reply(res,400,{ok:false,error:'invalid_request'});
  if(b.action==='edit'&&!['owner','writer'].includes(role))return reply(res,403,{ok:false,error:'forbidden'});
  const payload={action:b.action,actor:{sub:p.sub,email:p.email,exp:Math.min(p.exp,Math.floor(Date.now()/1000)+120)}};
  for(const key of ['orderId','issueId','expected','state','nextAction','status','reason','requestId','submissionId','text','targetHint']){
@@ -17,6 +17,16 @@ export default async function handler(req,res){
  if(!process.env.HF_REAL_READ_TOKEN)return reply(res,503,{ok:false,error:'not_configured'});
  const signed=JSON.stringify(payload),signature=crypto.createHmac('sha256',process.env.HF_REAL_READ_TOKEN).update(signed).digest('base64url');
  try{return reply(res,200,await upstream({op:'light_app',signed,signature}));}
- catch(e){const known=/^(forbidden|busy|target_missing|ambiguous_record|ambiguous_receipt|stale_record|project_mismatch|invalid_request_id|invalid_reason|invalid_state|invalid_status|invalid_next_action|request_conflict|no_change|formula_cell|edit_gate_closed|pending_verification|schedule_write_failed)$/;
+ catch(e){
+  if(b.action==='core'&&e.message==='unsupported_operation'){
+   const fallbackPayload={action:'catalog',actor:payload.actor};
+   const fallbackSigned=JSON.stringify(fallbackPayload);
+   const fallbackSignature=crypto.createHmac('sha256',process.env.HF_REAL_READ_TOKEN).update(fallbackSigned).digest('base64url');
+   try{
+    const fallback=await upstream({op:'light_app',signed:fallbackSigned,signature:fallbackSignature});
+    return reply(res,200,{...fallback,coreFallback:true});
+   }catch(_){}
+  }
+  const known=/^(forbidden|busy|target_missing|ambiguous_record|ambiguous_receipt|stale_record|project_mismatch|invalid_request_id|invalid_reason|invalid_state|invalid_status|invalid_next_action|request_conflict|no_change|formula_cell|edit_gate_closed|pending_verification|schedule_write_failed|unsupported_operation)$/;
  const error=known.test(e.message)?e.message:'app_unavailable';return reply(res,error==='forbidden'?403:/stale|conflict|ambiguous|mismatch/.test(error)?409:502,{ok:false,error,requestId:payload.requestId||''});}
 }
