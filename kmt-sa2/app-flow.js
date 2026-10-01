@@ -907,7 +907,7 @@ function previewUnifiedEvent(key,scope=document){
  if(!v){status.textContent='내용을 입력하면 상태 반영 여부를 미리 보여줍니다.';return;}
  if(!x){status.textContent='입력 대상을 찾지 못했습니다.';return;}
  const base=classifyUnifiedEvent(v),impact=resolveUnifiedImpact(x,base,v);
- status.textContent='자동 판정 · '+impact.label+(x.issueId?'':' · Event 기록');
+ status.textContent='자동 판정 · '+impact.label+(x.issueId?'':' · Event 기준 현재상태 반영');
 }
 
 async function syncUnifiedStateBackground(noteId,x,classification,bodyText){
