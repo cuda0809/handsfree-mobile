@@ -76,6 +76,12 @@ public class MainActivity extends Activity {
         });
         webView.setWebViewClient(new WebViewClient() {
             @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                applyUiPatch(view);
+            }
+
+            @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 super.onReceivedError(view, request, error);
                 if (request != null && request.isForMainFrame()) {
@@ -97,6 +103,21 @@ public class MainActivity extends Activity {
         } else {
             webView.restoreState(savedInstanceState);
         }
+    }
+
+    private void applyUiPatch(WebView view) {
+        String js =
+            "(()=>{const apply=()=>{"
+          + "let s=document.getElementById('hfNativeUiPatch');"
+          + "if(!s){s=document.createElement('style');s.id='hfNativeUiPatch';"
+          + "s.textContent='.bottom{bottom:92px!important}.hybrid-voice-fab{bottom:183px!important}.app{padding-bottom:225px!important}main{padding-bottom:215px!important}.kmt-brand small{white-space:nowrap!important;letter-spacing:0!important}.top>button.icon{min-width:58px!important;width:auto!important;padding:0 10px!important;font-size:11px!important;font-weight:800!important}';"
+          + "document.head.appendChild(s);}"
+          + "document.querySelector('.top > button[aria-label=\\\"처리함 열기\\\"]')?.remove();"
+          + "const p=[...document.querySelectorAll('.top > button.icon')].find(b=>b.getAttribute('aria-label')!=='처리함 열기');"
+          + "if(p){p.textContent='로그인';p.setAttribute('aria-label','로그인');p.onclick=()=>location.href='./login.html';}"
+          + "const brand=document.querySelector('.kmt-brand small');if(brand)brand.style.whiteSpace='nowrap';"
+          + "};apply();setTimeout(apply,350);setTimeout(apply,1000);})();";
+        view.evaluateJavascript(js, null);
     }
 
     private boolean isTrustedOrigin(Uri origin) {
