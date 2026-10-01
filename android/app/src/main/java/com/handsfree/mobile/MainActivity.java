@@ -132,17 +132,6 @@ public class MainActivity extends Activity {
         view.evaluateJavascript(js, null);
     }
 
-    private void applyUiPatch(WebView view) {');"
-          + "const firstRe=new RegExp('^'+escRe(target)+'\\\\s*\\\\[[^\\\\]]+\\\\]\\\\s*');const parts=raw.split(/\\r?\\n|;/).map(v=>v.trim()).filter(Boolean);if(parts.length){parts[0]=parts[0].replace(firstRe,'').trim();}"
-          + "const safe=parts.filter(Boolean).map(line=>target+' '+line).join('\\n');next={...body,text:safe};}"
-          + "return originalApi(path,next,timeout);};"
-          + "}"
-          + "if(!window.__hfSafetyRerendered&&typeof screen==='string'){window.__hfSafetyRerendered=true;setTimeout(()=>{try{if(screen==='home'&&typeof home==='function')home();else if(screen==='plan'&&typeof productionPlan==='function')productionPlan(typeof productionPlanMode==='string'?productionPlanMode:'plan',true);else if(screen==='projects'&&typeof projects==='function')projects(typeof filter==='string'?filter:'active',true);else if(screen==='issues'&&typeof todayIssues==='function')todayIssues();}catch(_){ }},80);}"
-          + "}catch(_){ }"
-          + "};patch();setTimeout(patch,300);setTimeout(patch,900);})();";
-        view.evaluateJavascript(js, null);
-    }
-
     private void applyUiPatch(WebView view) {
         String js =
             "(()=>{"
