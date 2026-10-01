@@ -37,7 +37,7 @@ main{padding:0 14px 84px!important}.date{font-size:11px!important}.lead{font-siz
 
 /* Bottom navigation v3: keep all four tabs fully above the Android system area. */
 .bottom{
-  bottom:26px!important;
+  bottom:84px!important;
   width:min(calc(100% - 20px),500px)!important;
   min-height:72px!important;
   padding:8px 10px max(8px,env(safe-area-inset-bottom))!important;
@@ -73,10 +73,11 @@ main{padding:0 14px 84px!important}.date{font-size:11px!important}.lead{font-siz
   background:#fff0e9!important;
 }
 .hybrid-voice-fab{
-  bottom:117px!important;
+  bottom:175px!important;
   right:16px!important;
 }
-.app{padding-bottom:140px!important}
+.app{padding-bottom:220px!important}
+main{padding-bottom:210px!important}
 
 .today-issue-list{display:grid;gap:14px;margin-top:14px}
 .today-issue-card{background:#fff;border:1px solid var(--hy-line);border-radius:16px;padding:15px;box-shadow:0 4px 14px rgba(21,35,45,.04)}
