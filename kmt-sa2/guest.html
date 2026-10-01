@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>케이엠텍 생산관리 프로토 · 게스트</title>
+<meta name="theme-color" content="#176956">
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f4f7f6;color:#17323a;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+main{width:min(88vw,420px);background:#fff;border:1px solid #e1e9e6;border-radius:22px;padding:28px;box-shadow:0 16px 48px #17323a12}
+img{display:block;width:130px;max-height:70px;object-fit:contain;margin:0 0 20px}h1{font-size:22px;margin:0 0 8px}p{line-height:1.6;color:#667a80}.ok{color:#176956;font-weight:800}.err{color:#a74432}.bar{height:5px;background:#e7efec;border-radius:8px;overflow:hidden;margin-top:18px}.bar:after{content:"";display:block;height:100%;width:35%;background:#176956;border-radius:8px;animation:move 1.2s infinite ease-in-out}@keyframes move{0%{transform:translateX(-120%)}100%{transform:translateX(360%)}}button{width:100%;border:0;border-radius:12px;background:#176956;color:#fff;padding:13px;font:inherit;font-weight:750;margin-top:14px}
+</style>
+</head>
+<body><main><img src="./icon.svg" alt="KMT"><h1>게스트 데모 연결</h1><p id="status">10일 한도 게스트 계정으로 연결 중입니다.</p><div id="bar" class="bar"></div><button id="retry" hidden>다시 연결</button></main>
+<script>
+const statusEl=document.getElementById('status'),bar=document.getElementById('bar'),retry=document.getElementById('retry');
+async function connect(){
+ retry.hidden=true;bar.hidden=false;statusEl.className='';
+ try{
+  const r=await fetch('/api/sa2-auth',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'guest'})});
+  let d={};try{d=await r.json();}catch{}
+  if(r.status===410||d.error==='guest_expired'){
+    bar.hidden=true;statusEl.className='err';statusEl.textContent='게스트 사용기간이 종료되었습니다. 정식 사용자 연결이 필요합니다.';return;
+  }
+  if(!r.ok||d.ok!==true)throw Error(d.error||'guest_unavailable');
+  statusEl.className='ok';statusEl.textContent='게스트 연결 완료 · 조회 전용';setTimeout(()=>location.replace('./?guest=1'),180);
+ }catch{
+  bar.hidden=true;statusEl.className='err';statusEl.textContent='게스트 연결을 확인하지 못했습니다. 네트워크를 확인한 뒤 다시 시도하세요.';retry.hidden=false;
+ }
+}
+retry.onclick=connect;connect();
+</script></body></html>
