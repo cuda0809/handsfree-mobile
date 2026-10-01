@@ -756,3 +756,22 @@ main{padding-bottom:210px!important}
 @media(max-width:380px){
  .project-plan-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
+
+
+/* Main navigation belongs directly under the CORE/HYBRID build row. */
+.demo{display:block!important;margin:0 17px!important;padding:8px 0 6px!important;border-bottom:0!important}
+.demo>b{display:block!important}
+.hf-connection-row{margin:0 17px 8px;padding:2px 0 8px;border-bottom:1px solid var(--hy-line);color:var(--hy-sub);font-size:10px;line-height:1.35}
+.bottom{
+ position:relative!important;
+ left:auto!important;
+ bottom:auto!important;
+ transform:none!important;
+ width:calc(100% - 28px)!important;
+ min-height:68px!important;
+ margin:0 14px 6px!important;
+ z-index:4!important;
+}
+.app{padding-bottom:100px!important}
+main{padding-bottom:84px!important}
+.hybrid-voice-fab{bottom:18px!important;right:16px!important}
