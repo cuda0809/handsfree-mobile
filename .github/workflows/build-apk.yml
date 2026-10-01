@@ -29,14 +29,14 @@ jobs:
         working-directory: android
         run: >-
           gradle assembleDebug --no-daemon
-          -PHF_APP_URL="https://handsfree-mobile-alpha-02-git-codex-real-l-fbac1c-cuda0809-8210.vercel.app/kmt-sa2/?app=natural289"
+          -PHF_APP_URL="https://handsfree-mobile-alpha-02-git-codex-real-l-fbac1c-cuda0809-8210.vercel.app/kmt-sa2/?app=issuevisible290"
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk KMT-Production-Proto-Natural.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk KMT-Production-Proto-IssueVisible.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: KMT-Production-Proto-Natural-APK
-          path: KMT-Production-Proto-Natural.apk
+          name: KMT-Production-Proto-IssueVisible-APK
+          path: KMT-Production-Proto-IssueVisible.apk
           if-no-files-found: error
