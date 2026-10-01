@@ -1,6 +1,7 @@
 'use strict';
 const BUILD='PC.0.3',content=document.getElementById('content'),detail=document.getElementById('detailDialog'),detailBody=document.getElementById('detailBody');
-const state={items:[],projects:[],reports:null,view:'dashboard',connected:false,personal:false,sourceDate:'',lastRead:'',query:'',installPrompt:null,renderRun:0};\nlet catalogPending=null;
+const state={items:[],projects:[],reports:null,view:'dashboard',connected:false,personal:false,sourceDate:'',lastRead:'',query:'',installPrompt:null,renderRun:0};
+let catalogPending=null;
 const $=id=>document.getElementById(id);
 const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const norm=value=>String(value||'').toLowerCase().replace(/[\s\-‐‑–—]/g,'');
