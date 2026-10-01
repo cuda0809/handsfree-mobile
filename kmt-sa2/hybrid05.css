@@ -775,3 +775,7 @@ main{padding-bottom:210px!important}
 .app{padding-bottom:100px!important}
 main{padding-bottom:84px!important}
 .hybrid-voice-fab{bottom:18px!important;right:16px!important}
+
+/* Order: build/version -> connection status -> main navigation. */
+.hf-connection-row{margin-bottom:5px!important;padding-bottom:7px!important}
+.bottom{margin-top:0!important}
