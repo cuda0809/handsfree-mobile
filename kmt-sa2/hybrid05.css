@@ -35,9 +35,9 @@ main{padding:0 14px 84px!important}.date{font-size:11px!important}.lead{font-siz
 .hybrid-flow-now{grid-area:bar;margin-top:38px;padding-top:7px;border-top:1px solid #eef1f2;color:var(--hy-sub);font-size:9px}
 .hybrid-flow-now b{display:inline!important;color:var(--hy-ink);font-size:10px!important}
 
-/* Bottom navigation v2: separate icon/label lanes and float the whole dock slightly upward. */
+/* Bottom navigation v3: keep all four tabs fully above the Android system area. */
 .bottom{
-  bottom:10px!important;
+  bottom:26px!important;
   width:min(calc(100% - 20px),500px)!important;
   min-height:72px!important;
   padding:8px 10px max(8px,env(safe-area-inset-bottom))!important;
@@ -73,10 +73,10 @@ main{padding:0 14px 84px!important}.date{font-size:11px!important}.lead{font-siz
   background:#fff0e9!important;
 }
 .hybrid-voice-fab{
-  bottom:101px!important;
+  bottom:117px!important;
   right:16px!important;
 }
-.app{padding-bottom:124px!important}
+.app{padding-bottom:140px!important}
 
 .today-issue-list{display:grid;gap:14px;margin-top:14px}
 .today-issue-card{background:#fff;border:1px solid var(--hy-line);border-radius:16px;padding:15px;box-shadow:0 4px 14px rgba(21,35,45,.04)}
