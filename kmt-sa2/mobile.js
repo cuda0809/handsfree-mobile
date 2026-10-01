@@ -93,7 +93,16 @@ async function refreshCachedCore(){
  return {changed:changed.length};
 }
 function active(name){screen=name;document.querySelectorAll('.bottom button').forEach(b=>b.classList.toggle('selected',b.dataset.page===name));}
-function banner(){document.querySelector('.demo').innerHTML=`<b>${BUILD} · HYBRID 0.5</b><span>${live?'연결됨 · ':''}${esc(readMessage)}</span>`;}
+function banner(){
+ const demo=document.querySelector('.demo');
+ demo.innerHTML=`<b>${BUILD} · HYBRID 0.5</b><span>${live?'연결됨 · ':''}${esc(readMessage)}</span>`;
+ const nav=document.querySelector('.bottom');
+ let status=document.querySelector('.hf-connection-row');
+ if(!status){status=document.createElement('div');status.className='hf-connection-row';}
+ const span=demo.querySelector('span');
+ if(span)status.replaceChildren(span);
+ if(nav){demo.after(nav);nav.after(status);}else demo.after(status);
+}
 async function refresh(force=true){
  if(readPending)return readPending;
  if(!force&&Date.now()-lastCoreAttempt<60000)return items.length;
@@ -178,7 +187,7 @@ function settings(){open(heading('MY HANDSFREE','사용자와 설정',`버전 ${
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;});
 async function installApp(){if(installPrompt){await installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;return;}open(heading('INSTALL','휴대폰에 설치','한 번 설치하면 홈 화면에서 열 수 있습니다')+'<p>아이폰: Safari에서 이 주소를 연 뒤 공유 → 홈 화면에 추가.</p><p>안드로이드: Chrome에서 이 주소를 연 뒤 메뉴 → 앱 설치 또는 홈 화면에 추가.</p><p class="note">이미 설치했거나 설치를 지원하지 않는 브라우저에서는 설치 버튼이 나타나지 않을 수 있습니다.</p>');}
 async function checkUpdate(){try{const r=await navigator.serviceWorker?.getRegistration('/kmt-sa2/');if(!r)return toast('현재 브라우저에서 업데이트 서비스를 사용할 수 없습니다.');await r.update();toast(r.waiting?'새 버전이 준비되었습니다. 앱 창을 모두 닫고 다시 여세요.':'업데이트 확인 완료. 새 버전은 앱을 다시 열 때 적용됩니다.');}catch{toast('업데이트 확인 실패. 네트워크를 확인하세요.');}}
-const nav=document.querySelector('.bottom');nav.style.gridTemplateColumns='repeat(4,1fr)';nav.innerHTML=`<button data-page="home" id="homeNav" onclick="home()"><span class="nav-icon">⌂</span>오늘</button><button data-page="plan" id="planNav" onclick="productionPlan()"><span class="nav-icon">◫</span>계획</button><button data-page="projects" id="projectsNav" onclick="projects()"><span class="nav-icon">▦</span>프로젝트</button><button data-page="issues" id="issuesNav" onclick="todayIssues()"><span class="nav-icon">▤</span>오늘 이슈</button>`;
+const nav=document.querySelector('.bottom');nav.style.gridTemplateColumns='repeat(4,1fr)';nav.innerHTML=`<button data-page="home" id="homeNav" onclick="home()"><span class="nav-icon">⌂</span>오늘</button><button data-page="plan" id="planNav" onclick="productionPlan()"><span class="nav-icon">◫</span>계획</button><button data-page="projects" id="projectsNav" onclick="projects()"><span class="nav-icon">▦</span>프로젝트</button><button data-page="issues" id="issuesNav" onclick="todayIssues()"><span class="nav-icon">▤</span>오늘 이슈</button>`;document.querySelector('.demo')?.after(nav);
 document.querySelector('.top > button.icon')?.remove();
 const profile=document.createElement('button');profile.className='icon login-button';profile.textContent='로그인';profile.setAttribute('aria-label','로그인');profile.onclick=login;document.querySelector('.top').append(profile);
 const style=document.createElement('style');style.textContent=`label{display:block;margin:16px 0;font-size:13px}label input{display:block;width:100%;padding:13px;border:1px solid var(--line);border-radius:12px;margin-top:8px}label textarea{margin-top:8px}input,textarea,select{font-size:16px!important}.item-detail{width:100%;text-align:left;background:none;border:0;padding:0}.item-status{display:flex;align-items:center;gap:6px}.schedule-button{background:white;border:1px solid var(--line);border-radius:6px;padding:8px;font-size:11px}.plan-list li{display:flex;flex-wrap:wrap;gap:12px;padding:12px 0}.brief button{gap:8px;text-align:left}.brief button strong{white-space:nowrap}.top .icon{min-width:58px;width:auto!important;padding:0 10px;font-size:11px;font-weight:800}.kmt-brand small{white-space:nowrap!important}.demo{flex-wrap:wrap}.sheet{padding-bottom:calc(26px + env(safe-area-inset-bottom))}.item,.action-box,p{overflow-wrap:anywhere}@media(max-width:380px){.top{padding-left:12px!important;padding-right:12px!important}.kmt-brand{gap:5px!important}.kmt-brand strong{font-size:14px!important}}`;document.head.append(style);
