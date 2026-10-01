@@ -1,18 +1,24 @@
 {
-  "id": "/",
-  "name": "KMT HandsFree REAL",
-  "short_name": "HandsFree REAL",
-  "description": "케이엠텍 HandsFree 생산 운영 REAL",
-  "start_url": "/",
-  "scope": "/",
+  "id": "./",
+  "name": "KMT HandsFree Hybrid 0.5 · 심사용 게스트",
+  "short_name": "Hybrid 0.5",
+  "description": "KMT 생산관리 · 경진대회 조회 전용 게스트 데모",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#f5f7fa",
-  "theme_color": "#102a4a",
-  "orientation": "portrait-primary",
+  "background_color": "#f2f5f3",
+  "theme_color": "#205bbb",
   "icons": [
     {
-      "src": "/kmt-logo.png",
-      "sizes": "1130x544",
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     }

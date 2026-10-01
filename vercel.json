@@ -1,9 +1,0 @@
-{
-  "version": 2,
-  "builds": [
-    {"src":"api/competition-pwa.js","use":"@vercel/node","config":{"includeFiles":"submission/pc-pwa/**"}}
-  ],
-  "routes": [
-    {"src":"/(.*)","dest":"/api/competition-pwa?path=$1"}
-  ]
-}

@@ -1,5 +1,0 @@
-const CACHE='handsfree-pc-icons-v1';
-self.addEventListener('install',event=>{self.skipWaiting()});
-self.addEventListener('activate',event=>{event.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))]))});
-// Never cache documents, application code or the server clock: expiry must fail closed offline.
-self.addEventListener('fetch',event=>{const url=new URL(event.request.url);if(url.origin!==self.location.origin||event.request.method!=='GET')return;if(/\/icon-(192|512)\.png$/.test(url.pathname)){event.respondWith(caches.open(CACHE).then(async cache=>{const hit=await cache.match(event.request);if(hit)return hit;const response=await fetch(event.request);if(response.ok)await cache.put(event.request,response.clone());return response;}));}else{event.respondWith(fetch(event.request,{cache:'no-store'}));}});
