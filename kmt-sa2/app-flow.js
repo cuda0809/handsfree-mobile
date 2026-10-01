@@ -125,8 +125,8 @@ function renderUnifiedHome(){
  plannedToday.forEach(rememberProjectDetail);issueActive.forEach(rememberProjectDetail);
  const planCards=plannedToday.map(x=>{
   const stages=planStagesOnDay(x,today);
-  return '<button class="hf-card '+hfCardTone(x,'plan')+'" data-home-order="'+esc(x.orderId)+'">'+hfCardIdentity(x,stages.join(' · '))+
-   '<div class="hf-card-meta"><div><small>오늘 계획</small><b>'+esc(stages.join(' · '))+'</b></div><div><small>납기</small><b>'+esc(formatHfDate(x.due))+'</b></div></div>'+hfDueAlert(x)+
+  return '<button class="hf-card '+hfCardTone(x,'plan')+'" data-home-order="'+esc(x.orderId)+'">'+hfCardIdentity(x,stages.join(' · '))+hfDueAlert(x)+
+   '<div class="hf-card-meta"><div><small>오늘 계획</small><b>'+esc(stages.join(' · '))+'</b></div><div><small>납기</small><b>'+esc(formatHfDate(x.due))+'</b></div></div>'+
    '<div class="hf-card-line"><span>현재</span><b>'+esc(x.state||'계획')+'</b></div>'+
    '<div class="hf-card-next"><span>다음</span>'+esc(x.nextAction||'미정')+'</div></button>';
  }).join('');
