@@ -130,6 +130,11 @@ public class MainActivity extends Activity {
             java.nio.charset.StandardCharsets.UTF_8
         );
         view.evaluateJavascript(js, null);
+        String issueVisibilityJs = new String(
+            android.util.Base64.decode("CigoKT0+ewogIGNvbnN0IHBhdGNoPSgpPT57CiAgICB0cnl7CiAgICAgIGlmKHR5cGVvZiByZW5kZXJVbmlmaWVkSG9tZSE9PSdmdW5jdGlvbic8fHR5cGVvZiBvcGVyYXRpb25hbFJvd3MhPT0nZnVuY3Rpb24nfHx3aW5kb3cuX19oZkhvbWVJc3N1ZVZpc2liaWxpdHlQYXRjaGVkKXJldHVybjsKICAgICAgd2luZG93Ll9faGZIb21lSXNzdWVWaXNpYmlsaXR5UGF0Y2hlZD10cnVlOwogICAgICBjb25zdCBiYXNlSG9tZT1yZW5kZXJVbmlmaWVkSG9tZTsKICAgICAgcmVuZGVyVW5pZmllZEhvbWU9ZnVuY3Rpb24oKXsKICAgICAgICBjb25zdCBiYXNlUm93cz1vcGVyYXRpb25hbFJvd3M7CiAgICAgICAgb3BlcmF0aW9uYWxSb3dzPWZ1bmN0aW9uKGluY2x1ZGVDb21wbGV0ZWQ9dHJ1ZSl7CiAgICAgICAgICByZXR1cm4gYmFzZVJvd3MoaW5jbHVkZUNvbXBsZXRlZCkubWFwKHg9PnsKICAgICAgICAgICAgY29uc3QgaXNzdWVUZXh0PVN0cmluZyh4Py5yZWNlbnRFdmVudHx8eD8uY3VycmVudElzc3VlfHx4Py5jYXVzZXx8JycpLnRyaW0oKTsKICAgICAgICAgICAgcmV0dXJuIGlzc3VlVGV4dCYmIXguaXNzdWVJZD97Li4ueCxpc3N1ZUlkOidfX0RJU1BMQVlfT05MWV9fJ306eDsKICAgICAgICAgIH0pOwogICAgICAgIH07CiAgICAgICAgdHJ5e3JldHVybiBiYXNlSG9tZSgpO30KICAgICAgICBmaW5hbGx5e29wZXJhdGlvbmFsUm93cz1iYXNlUm93czt9CiAgICAgIH07CiAgICAgIGlmKHR5cGVvZiBob21lPT09J2Z1bmN0aW9uJyYmaG9tZT09PWJhc2VIb21lKWhvbWU9cmVuZGVyVW5pZmllZEhvbWU7CiAgICAgIGlmKHR5cGVvZiBzY3JlZW49PT0nc3RyaW5nJyYmc2NyZWVuPT09J2hvbWUnKXJlbmRlclVuaWZpZWRIb21lKCk7CiAgICB9Y2F0Y2goXyl7fQogIH07CiAgcGF0Y2goKTtzZXRUaW1lb3V0KHBhdGNoLDMwMCk7c2V0VGltZW91dChwYXRjaCw5MDApOwp9KSgpOwo=", android.util.Base64.DEFAULT),
+            java.nio.charset.StandardCharsets.UTF_8
+        );
+        view.evaluateJavascript(issueVisibilityJs, null);
     }
 
     private void applyUiPatch(WebView view) {
