@@ -780,3 +780,34 @@ main{padding-bottom:84px!important}
 /* Order: build/version -> connection status -> main navigation. */
 .hf-connection-row{margin-bottom:5px!important;padding-bottom:7px!important}
 .bottom{margin-top:0!important}
+
+
+/* Natural-language issue linkage */
+.today-issue-linked,.project-linked-issue{
+  margin-top:9px;
+  padding:9px 10px;
+  border-radius:9px;
+  background:#f4f7f8;
+  border:1px solid #e4e9eb;
+}
+.today-issue-linked small,.project-linked-issue small{
+  display:block;
+  color:var(--hy-sub);
+  font-size:8px;
+  font-weight:900;
+  margin-bottom:4px;
+}
+.today-issue-linked p,.project-linked-issue p{
+  margin:0!important;
+  color:var(--hy-ink)!important;
+  font-size:10px!important;
+  line-height:1.55!important;
+  white-space:pre-line;
+  overflow-wrap:anywhere;
+}
+.hybrid-project-card .project-linked-issue{
+  background:rgba(255,255,255,.12);
+  border-color:rgba(255,255,255,.12);
+}
+.hybrid-project-card .project-linked-issue small{color:#b9cbd4}
+.hybrid-project-card .project-linked-issue p{color:#fff!important}
