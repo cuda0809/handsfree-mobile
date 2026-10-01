@@ -80,8 +80,8 @@ android {
         applicationId 'com.handsfree.mobile'
         minSdk 26
         targetSdk 35
-        versionCode 285
-        versionName '2.8.5-topnav'
+        versionCode 286
+        versionName '2.8.6-status-topnav'
         buildConfigField 'String', 'APP_URL', '"' + handsFreeAppUrl + '"'
         manifestPlaceholders = [appLabel: '케이엠텍 생산관리 프로토']
     }
