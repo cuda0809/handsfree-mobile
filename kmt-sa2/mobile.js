@@ -25,8 +25,11 @@ async function liveAssetHash(){
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
  }catch{return '';}
 }
+let assetCheckTimer=0,lastAssetCheck=0;
 async function checkForLiveUpdate(){
  if(document.visibilityState==='hidden'||navigator.onLine===false)return;
+ if(readPending){scheduleLiveUpdateCheck(5000);return;}
+ lastAssetCheck=Date.now();
  const hash=await liveAssetHash();if(!hash)return;
  const prior=sessionStorage.getItem(APP_ASSET_HASH_KEY)||'';
  if(!prior){sessionStorage.setItem(APP_ASSET_HASH_KEY,hash);return;}
@@ -36,9 +39,16 @@ async function checkForLiveUpdate(){
   setTimeout(()=>location.reload(),350);
  }
 }
-setTimeout(checkForLiveUpdate,2500);
-setInterval(checkForLiveUpdate,60000);
-window.addEventListener('focus',()=>setTimeout(checkForLiveUpdate,300));
+function scheduleLiveUpdateCheck(delay=12000){
+ clearTimeout(assetCheckTimer);
+ assetCheckTimer=setTimeout(()=>{
+  const run=()=>checkForLiveUpdate();
+  if('requestIdleCallback' in window)requestIdleCallback(run,{timeout:5000});else setTimeout(run,0);
+ },delay);
+}
+scheduleLiveUpdateCheck(12000);
+setInterval(()=>scheduleLiveUpdateCheck(0),180000);
+window.addEventListener('focus',()=>{if(Date.now()-lastAssetCheck>60000)scheduleLiveUpdateCheck(5000);});
 function coreCacheRead(){const v=readStore(CORE_CACHE_KEY,null);return v&&Array.isArray(v.items)&&v.items.length?v:null;}
 function coreCacheSave(){
  try{persist(CORE_CACHE_KEY,{cachedAt:new Date().toISOString(),sourceDate,items:items.map(({id,...x})=>x)});}catch{}
