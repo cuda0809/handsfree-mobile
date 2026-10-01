@@ -1,0 +1,1 @@
+{"name":"handsfree-competition-pc-pwa","private":true,"type":"module","scripts":{"build":"node build.mjs","test":"node verify.mjs"}}
