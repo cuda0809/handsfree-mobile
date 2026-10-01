@@ -36,11 +36,10 @@ function isCompletedOperational(x){
  const actual=formatHfDate(x?.actualDelivery);
  return actual!=='미정'||/출고\s*완료|납품\s*완료/.test(state+' '+delivery)||masterState==='완료';
 }
-function latestExplicitStateByOrder(){
+function latestUnifiedInputByOrder(){
  const out=new Map();
  notes().forEach(r=>{
-  if(r.stateSyncVersion!=='explicit-v2'||!r.displayState)return;
-  if(!['applied','saved_unverified','partial','received'].includes(String(r.status||'')))return;
+  if(!r.eventType||['draft','rejected','sending','unknown'].includes(String(r.status||'')))return;
   const orderId=String(r.orderId||'').trim();if(!orderId)return;
   const at=Date.parse(r.respondedAt||r.updatedAt||r.createdAt||0)||0;
   const prior=out.get(orderId),priorAt=prior?(Date.parse(prior.respondedAt||prior.updatedAt||prior.createdAt||0)||0):0;
@@ -52,7 +51,7 @@ function operationalRows(includeCompleted=true){
  const meta=projectMetaCache()?.projects||appProjects||[];
  const plans=planOverviewCache()?.byOrder||{};
  const live=new Map(items.map(x=>[String(x.orderId||''),x]));
- const explicitStates=latestExplicitStateByOrder();
+ const localInputs=latestUnifiedInputByOrder();
  const map=new Map();
  for(const p of meta){
   const orderId=String(p.orderId||'').trim();if(!orderId)continue;
@@ -67,16 +66,20 @@ function operationalRows(includeCompleted=true){
   map.set(orderId,{orderId,...p,state:'계획',priority:2});
  }
  const rows=[...map.values()].map(x=>{
-  const local=explicitStates.get(String(x.orderId||''));
-  const localState=String(local?.displayState||'').trim();
+  const local=localInputs.get(String(x.orderId||''));
+  const naturalState=local?.stateSyncVersion==='natural-v3'?String(local.displayState||'').trim():'';
+  const localIssue=String(local?.text||'').trim();
   return {
    ...x,
    customer:String(x.customer||''),
    model:String(x.model||''),
    due:String(x.due||''),
-   state:localState||String(x.state||'계획'),
+   state:naturalState||String(x.state||'계획'),
    nextAction:String(x.nextAction||''),
-   priority:Number(x.priority||2)
+   priority:Number(x.priority||2),
+   cause:localIssue||String(x.recentEvent||x.cause||''),
+   recentEvent:localIssue||String(x.recentEvent||''),
+   recentEventAt:localIssue?String(local.respondedAt||local.updatedAt||local.createdAt||''):String(x.recentEventAt||'')
   };
  });
  return (includeCompleted?rows:rows.filter(x=>!isCompletedOperational(x)))
@@ -188,7 +191,11 @@ function applyProjectMeta(projects,source='catalog'){
     if(p.process)patch.process=String(p.process);
     if(p.state)patch.state=String(p.state);
     if(p.nextAction!==undefined)patch.nextAction=String(p.nextAction||'');
-    if(p.currentIssue)patch.cause=String(p.currentIssue);
+    if(p.currentIssue!==undefined)patch.currentIssue=String(p.currentIssue||'');
+    if(p.recentEvent!==undefined)patch.recentEvent=String(p.recentEvent||'');
+    if(p.recentEventAt!==undefined)patch.recentEventAt=String(p.recentEventAt||'');
+    if(p.recentEvent)patch.cause=String(p.recentEvent);
+    else if(p.currentIssue)patch.cause=String(p.currentIssue);
     for(const key of ['planAssembly','planElectrical','planProgram','planInspection','planDelivery','confidence','updatedAt'])if(p[key]!==undefined)patch[key]=String(p[key]||'');
    }
    if(Object.keys(patch).some(k=>String(patch[k]||'')!==String(x[k]||'')))changed=true;
@@ -454,7 +461,9 @@ async function openProject(orderId,purpose='detail',sourceSnapshot=null){
    const label=closed||i<currentStage?'종료':i===currentStage?(planDate!=='미정'?planDate:currentDate):planDate;
    return '<div class="hybrid-step '+cls+'"><i></i><b>'+name+'</b><small>'+esc(label)+'</small></div>';
   }).join('')+'</div><div class="project-schedule-status '+(closed?'closed':'active')+'">'+(closed?'<b>제작 종료</b><span>실납기 '+esc(actualDay)+'</span>':'<b>진행중</b><span>'+esc(currentState)+' · 기준 '+esc(currentDate)+'</span>')+'</div>';
-  el.innerHTML='<div class="hybrid-project-card"><small>JOB NO. '+esc(p.orderId)+' · PM '+esc(p.pm||'미등록')+'</small><h2>'+esc(p.customer)+' · '+esc(p.model)+'</h2><div class="project-date-grid"><div><small>납기</small><b>'+esc(summaryDue)+'</b></div><div><small>실납기일</small><b>'+esc(summaryActual)+'</b></div></div>'+(closed?'<div class="project-delivery-result '+deliveryPerformance(linked).tone+'">'+esc(deliveryPerformance(linked).label)+'</div>':'')+'<div class="hybrid-state"><span>현재 상태 · '+esc(currentState)+'</span><span>'+esc(closed?'완료':linked.priority===1?'우선 확인':'진행')+'</span></div></div><div class="hybrid-section"><b>전체 제작 일정</b><span>현장 기준</span></div>'+scheduleBlock+'<div class="hybrid-section"><b>최근 라이프사이클</b><span>'+esc(historyState)+'</span></div><div class="lifecycle-preview">'+(shownHistory?lifecyclePreview(shownHistory,4,linked):lifecyclePreview({events:[],changes:[]},4,linked))+'</div><button id="projectLifecycleButton" class="primary">전체 라이프사이클 보기</button><button id="projectHistoryButton" class="secondary">변경 근거 · RAW 이력</button><button id="projectPlanButton" class="secondary">원본 계획일정 확인</button>';
+  el.innerHTML='<div class="hybrid-project-card"><small>JOB NO. '+esc(p.orderId)+' · PM '+esc(p.pm||'미등록')+'</small><h2>'+esc(p.customer)+' · '+esc(p.model)+'</h2><div class="project-date-grid"><div><small>납기</small><b>'+esc(summaryDue)+'</b></div><div><small>실납기일</small><b>'+esc(summaryActual)+'</b></div></div>'+(closed?'<div class="project-delivery-result '+deliveryPerformance(linked).tone+'">'+esc(deliveryPerformance(linked).label)+'</div>':'')+'<div class="hybrid-state"><span>현재 상태 · '+esc(currentState)+'</span><span>'+esc(closed?'완료':linked.priority===1?'우선 확인':'진행')+'</span></div>'+
+ (String(linked.recentEvent||linked.cause||'').trim()?'<div class="project-linked-issue"><small>최근 이슈/진행</small><p>'+esc(linked.recentEvent||linked.cause)+'</p></div>':'')+
+ '</div><div class="hybrid-section"><b>전체 제작 일정</b><span>현장 기준</span></div>'+scheduleBlock+'<div class="hybrid-section"><b>최근 라이프사이클</b><span>'+esc(historyState)+'</span></div><div class="lifecycle-preview">'+(shownHistory?lifecyclePreview(shownHistory,4,linked):lifecyclePreview({events:[],changes:[]},4,linked))+'</div><button id="projectLifecycleButton" class="primary">전체 라이프사이클 보기</button><button id="projectHistoryButton" class="secondary">변경 근거 · RAW 이력</button><button id="projectPlanButton" class="secondary">원본 계획일정 확인</button>';
   $('projectLifecycleButton').onclick=()=>projectLifecycle(p.orderId);
   $('projectHistoryButton').onclick=()=>projectHistory(p.orderId);
   $('projectPlanButton').onclick=()=>openProjectPlan(p.orderId,linked);
@@ -829,43 +838,72 @@ function renderHybridProjects(){
  el.querySelectorAll('[data-project-order]').forEach(b=>b.onclick=()=>{const x=operationalRows(true).find(v=>v.orderId===b.dataset.projectOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.projectOrder,'detail',x);});
 }
 
-function classifyUnifiedEventLine(raw){
+function naturalProcess(text){
+ const pairs=[
+  [/재검수/,'재검수'],[/마감조립/,'마감조립'],[/재조립/,'재조립'],[/갭세팅/,'갭세팅'],[/장비세팅|장비셋팅/,'장비세팅'],
+  [/프로그램|프로그래밍/,'프로그램'],[/전장|배선|전기/,'전장'],[/검수/,'검수'],[/구동테스트|테스트|시험/,'테스트'],
+  [/본체|기구|프레임|선조립|조립/,'조립'],[/출고|납품|포장/,'출고'],[/자재|부품|가공품|입고/,'자재']
+ ];
+ return pairs.find(([re])=>re.test(text))?.[1]||'';
+}
+function naturalStateCandidate(raw,index=0){
  const text=String(raw||'').trim(),n=norm(text);
- const process=(()=>{
-   const pairs=[
-    [/마감조립/,'마감조립'],[/재조립/,'재조립'],[/갭세팅/,'갭세팅'],[/장비세팅|세팅/,'장비세팅'],
-    [/본체|기구|프레임|조립/,'조립'],[/전장|배선|전기/,'전장'],[/프로그램|프로그래밍/,'프로그램'],
-    [/검수/,'검수'],[/점검/,'점검'],[/테스트|시험/,'테스트'],[/포장/,'포장'],[/출고|납품/,'출고'],
-    [/자재|부품|입고/,'자재']
-   ];
-   return pairs.find(([re])=>re.test(text))?.[1]||'';
- })();
- const waitProcess=(()=>{
-   const before=(text.match(/^(.*?)(?:대기|보류|지연)/)||[])[1]||text;
-   const pairs=[[/프로그램|프로그래밍/,'프로그램'],[/출고|납품|포장/,'출고'],[/검수/,'검수'],[/점검/,'점검'],[/테스트|시험/,'테스트'],[/전장|배선|전기/,'전장'],[/마감조립/,'마감조립'],[/재조립/,'재조립'],[/조립|기구|프레임/,'조립'],[/자재|부품|입고/,'자재']];
-   let best='',pos=-1;pairs.forEach(([re,name])=>{const m=[...before.matchAll(new RegExp(re.source,'g'))].at(-1);if(m&&m.index>=pos){pos=m.index;best=name;}});
-   return best||process;
- })();
- if(/출고완료|납품완료/.test(n))return {type:'DELIVERY',state:'출고 완료',status:'CLOSED',changesState:true,label:'상태 변경 → 출고 완료'};
- if(/대기|보류|지연/.test(text)){
-   let state=waitProcess?(waitProcess==='자재'?'자재 대기':waitProcess+' 대기'):'대기';
-   if(/수정대기/.test(text)&&waitProcess)state=waitProcess+' 수정대기';
-   return {type:'WAIT',state,status:'OPEN',changesState:true,label:'상태 변경 → '+state};
+ if(!text)return null;
+ if(/출고완료|납품완료|출고s*완료|납품s*완료/.test(n))return {score:100,index,type:'DELIVERY',state:'출고 완료',status:'CLOSED'};
+ if(/재검수s*(?:진행|진행중|중)|재검수중/.test(text))return {score:88,index,type:'INSPECTION',state:'재검수 진행',status:'OPEN'};
+ if(/마감조립s*(?:진행|진행중|중)|마감조립중/.test(text))return {score:88,index,type:'PROGRESS',state:'마감조립 진행',status:'OPEN'};
+ if(/조립s*(?:진행|진행중|중)|조립진행중|조립중/.test(text))return {score:86,index,type:'PROGRESS',state:'조립 진행',status:'OPEN'};
+ if(/전장s*(?:진행|진행중|중)|배선s*(?:진행|진행중|중)|전장중/.test(text))return {score:86,index,type:'PROGRESS',state:'전장 진행',status:'OPEN'};
+ if(/프로그램(?:밍)?s*(?:진행|진행중|중)|프로그램중/.test(text))return {score:86,index,type:'PROGRESS',state:'프로그램 진행',status:'OPEN'};
+ if(/검수s*(?:진행|진행중|중)|검수진행중|검수중/.test(text))return {score:86,index,type:'INSPECTION',state:'검수 진행',status:'OPEN'};
+ if(/(?:구동)?테스트s*(?:진행|진행중|중)|테스트중/.test(text))return {score:84,index,type:'INSPECTION',state:'테스트 진행',status:'OPEN'};
+ if(/갭세팅s*(?:진행|진행중|중)|갭세팅중/.test(text))return {score:84,index,type:'PROGRESS',state:'갭세팅 진행',status:'OPEN'};
+ if(/장비세팅s*(?:진행|진행중|중)|장비셋팅s*(?:진행|진행중|중)|세팅중|셋팅중/.test(text))return {score:84,index,type:'PROGRESS',state:'장비세팅 진행',status:'OPEN'};
+ if(/재조립s*(?:진행|진행중|중)|재조립중/.test(text))return {score:90,index,type:'REWORK',state:'재조립 진행',status:'OPEN'};
+ if(/재작업s*(?:진행|진행중|중)|재작업중/.test(text))return {score:90,index,type:'REWORK',state:'재작업 진행',status:'OPEN'};
+
+ if(/프로그램(?:밍)?s*수정s*(?:대기|보류)/.test(text))return {score:78,index,type:'WAIT',state:'프로그램 수정대기',status:'OPEN'};
+ if(/재제작s*(?:요청|대기|진행대기)/.test(text))return {score:74,index,type:'REWORK',state:'재제작 대기',status:'OPEN'};
+ if(/재가공s*(?:요청|대기)/.test(text))return {score:74,index,type:'REWORK',state:'재가공 대기',status:'OPEN'};
+ if(/출고s*(?:대기|보류)|납품s*(?:대기|보류)/.test(text))return {score:76,index,type:'WAIT',state:'출고 대기',status:'OPEN'};
+ if(/검수s*(?:대기|보류)/.test(text))return {score:75,index,type:'WAIT',state:'검수 대기',status:'OPEN'};
+ if(/조립s*(?:대기|보류)/.test(text))return {score:75,index,type:'WAIT',state:'조립 대기',status:'OPEN'};
+ if(/전장s*(?:대기|보류)/.test(text))return {score:75,index,type:'WAIT',state:'전장 대기',status:'OPEN'};
+ if(/입고s*(?:대기|지연)|미입고|입고대기/.test(text)){
+   const compact=text.replace(/s+/g,' ').replace(/^.*?\]\s*/,'').trim();
+   const state=compact.length<=42?compact:'자재 입고대기';
+   return {score:72,index,type:'WAIT',state,status:'OPEN'};
  }
- if(/완료/.test(text)&&process)return {type:process==='출고'?'DELIVERY':process==='검수'||process==='점검'||process==='테스트'?'INSPECTION':'PROGRESS',state:process+' 완료',status:'OPEN',changesState:true,label:'상태 변경 → '+process+' 완료'};
- if(/재개|착수|시작|진행/.test(text)&&process){
-   const state=(process==='재조립'?'재조립':process)+' 진행';
-   return {type:process==='재조립'?'REWORK':'PROGRESS',state,status:'OPEN',changesState:true,label:'상태 변경 → '+state};
+ if(/(?:대기|보류|지연)/.test(text)){
+   const p=naturalProcess(text),state=p?(p==='자재'?'자재 대기':p+' 대기'):'대기';
+   return {score:68,index,type:'WAIT',state,status:'OPEN'};
  }
- if(/불량|이상|간섭|누락|문제|오류|에러|고장|파손/.test(text))return {type:'ISSUE',state:'',status:'OPEN',changesState:false,label:'이력 기록 · 현재상태 유지'};
- return {type:'NOTE',state:'',status:'OPEN',changesState:false,label:'이력 기록 · 현재상태 유지'};
+
+ if(/재검수s*예정/.test(text))return {score:58,index,type:'INSPECTION',state:'재검수 예정',status:'OPEN'};
+ if(/검수s*예정/.test(text))return {score:56,index,type:'INSPECTION',state:'검수 예정',status:'OPEN'};
+ if(/(?:구동)?테스트s*예정/.test(text))return {score:55,index,type:'INSPECTION',state:'테스트 예정',status:'OPEN'};
+ if(/출고s*예정|납품s*예정/.test(text))return {score:56,index,type:'PROGRESS',state:'출고 예정',status:'OPEN'};
+ if(/입고s*예정/.test(text))return {score:48,index,type:'WAIT',state:'자재 입고 예정',status:'OPEN'};
+
+ const process=naturalProcess(text);
+ if(/완료/.test(text)&&process){
+   const state=process==='출고'?'출고 완료':process+' 완료';
+   return {score:70,index,type:process==='출고'?'DELIVERY':process==='검수'||process==='재검수'||process==='테스트'?'INSPECTION':'PROGRESS',state,status:process==='출고'?'CLOSED':'OPEN'};
+ }
+ if(/완성품/.test(text))return {score:35,index,type:'PROGRESS',state:'제작 완료',status:'OPEN'};
+ return null;
 }
 function classifyUnifiedEvent(raw){
  const lines=String(raw||'').split(/\r?\n|;/).map(v=>v.trim()).filter(Boolean);
- let fallback={type:'NOTE',state:'',status:'OPEN',changesState:false,label:'이력 기록 · 현재상태 유지'};
- let explicit=null;
- lines.forEach(line=>{const r=classifyUnifiedEventLine(line);if(r.type==='ISSUE')fallback=r;if(r.changesState)explicit=r;});
- return explicit||fallback;
+ let best=null,hasIssue=false;
+ lines.forEach((line,index)=>{
+  if(/불량|이상|간섭|누락|문제|오류|에러|고장|파손|수정s*필요|납기s*수정|연기/.test(line))hasIssue=true;
+  const c=naturalStateCandidate(line,index);
+  if(c&&(!best||c.score>best.score||(c.score===best.score&&c.index>best.index)))best=c;
+ });
+ if(best)return {...best,changesState:true,natural:true,label:'자연어 판정 · 현재상태 → '+best.state};
+ if(hasIssue)return {type:'ISSUE',state:'',status:'OPEN',changesState:false,natural:true,label:'자연어 판정 · 이슈내용 연결 · 현재상태 유지'};
+ return {type:'NOTE',state:'',status:'OPEN',changesState:false,natural:true,label:'자연어 판정 · 내용 연결 · 현재상태 유지'};
 }
 function unifiedStageFromText(v){
  const t=norm(v);
@@ -878,8 +916,9 @@ function unifiedStageFromText(v){
 }
 function resolveUnifiedImpact(current,classification,bodyText){
  const currentState=String(current?.state||''),currentNext=String(current?.nextAction||'');
- if(!classification.changesState)return {...classification,effectiveState:currentState,effectiveNext:currentNext,label:'이력만 기록 · 현재상태 유지'};
+ if(!classification.changesState)return {...classification,effectiveState:currentState,effectiveNext:currentNext,label:classification.label||'현재상태 유지'};
  if(classification.status==='CLOSED')return {...classification,effectiveState:classification.state,effectiveNext:'',label:classification.label};
+ if(classification.natural)return {...classification,effectiveState:classification.state,effectiveNext:currentNext,label:classification.label};
  const from=unifiedStageFromText(currentState),to=unifiedStageFromText(classification.state);
  const explicitRollback=/재작업|재조립|되돌|회귀|공정\s*복귀|다시\s*(?:조립|전장|프로그램|검수|테스트)/.test(String(bodyText||''));
  if(from>=0&&to>=0&&to<from&&!explicitRollback){
@@ -903,7 +942,7 @@ function previewUnifiedEvent(key,scope=document){
  if(!v){status.textContent='내용을 입력하면 상태 반영 여부를 미리 보여줍니다.';return;}
  if(!x){status.textContent='입력 대상을 찾지 못했습니다.';return;}
  const base=classifyUnifiedEvent(v),impact=resolveUnifiedImpact(x,base,v);
- status.textContent='자동 판정 · '+impact.label+(x.issueId?'':' · Event 기록');
+ status.textContent=impact.label+(x.issueId?'':' · JOB NO. 기준 연결');
 }
 
 async function syncUnifiedStateBackground(noteId,x,classification,bodyText){
@@ -917,6 +956,17 @@ async function syncUnifiedStateBackground(noteId,x,classification,bodyText){
    if(targetState===current.state&&targetNext===current.nextAction&&targetStatus===current.status){
      updateNote(noteId,{status:'applied',verifiedAt:new Date().toISOString(),issueVerifiedAt:new Date().toISOString(),ack:'Event 기록 완료 · 현재상태 유지'});
      projectHistoryCache.delete(x.orderId);
+  const nowIso=new Date().toISOString();
+  const localIdx=items.findIndex(v=>String(v.orderId||'')===String(x.orderId||''));
+  if(localIdx>=0){
+    const prev=items[localIdx],state=classification.changesState?(impact.effectiveState||classification.state):prev.state;
+    items[localIdx]={...prev,cause:bodyText,recentEvent:bodyText,recentEventAt:nowIso,state,
+      process:classification.changesState?coreProcessFromState(state,prev.nextAction,prev.process):prev.process,
+      priority:classification.changesState?corePriorityFromState(state,prev.nextAction,prev.issueStatus,prev.priority):prev.priority,
+      sourceLatestUpdate:classification.changesState?nowIso:prev.sourceLatestUpdate,
+      since:classification.changesState?new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'}):prev.since};
+    items=items.map((v,id)=>({...v,id}));if(typeof coreCacheSave==='function')coreCacheSave();
+  }
      toast('Event 기록 완료 · 현재상태 유지');
      return;
    }
@@ -947,7 +997,7 @@ async function submitUnifiedEvent(key,text,statusEl){
  if(navigator.onLine===false)return {ok:false,error:'offline'};
  const classification=classifyUnifiedEvent(bodyText),impact=resolveUnifiedImpact(x,classification,bodyText);
  const id=crypto.randomUUID(),target=(x.orderId?x.orderId+' · ':'')+x.customer+' · '+x.model;
- const note={id,submissionId:id,target,text:bodyText,status:'sending',createdAt:new Date().toISOString(),issueId:x.issueId||'',orderId:x.orderId||'',displayState:classification.state||'',nextAction:x.nextAction||'',issueStatus:x.issueStatus||'',eventOnly:!x.issueId||!classification.changesState,eventType:classification.type,autoClassification:impact.label,stateSyncVersion:classification.changesState?'explicit-v2':''};
+ const note={id,submissionId:id,target,text:bodyText,status:'sending',createdAt:new Date().toISOString(),issueId:x.issueId||'',orderId:x.orderId||'',displayState:classification.state||'',nextAction:x.nextAction||'',issueStatus:x.issueStatus||'',eventOnly:!x.issueId||!classification.changesState,eventType:classification.type,autoClassification:impact.label,stateSyncVersion:classification.changesState?'natural-v3':'',issueContent:bodyText};
  try{const list=notes();list.unshift(note);persist(KEY,list);}catch{return {ok:false,error:'local_store'};}
  if(statusEl)statusEl.textContent='Event 기록 중… · '+impact.label;
  try{
@@ -960,11 +1010,11 @@ async function submitUnifiedEvent(key,text,statusEl){
   }
   projectHistoryCache.delete(x.orderId);
   if(!x.issueId){
-   updateNote(id,{status:'applied',requestId:d.requestId||'',ack:classification.changesState?'Project Event 기록 완료 · 명확한 상태문구를 현재 화면에 반영':'Project Event 기록 완료',respondedAt:new Date().toISOString(),eventVerifiedAt:new Date().toISOString(),verifiedAt:new Date().toISOString()});
+   updateNote(id,{status:'applied',requestId:d.requestId||'',ack:classification.changesState?'Project Event 기록 완료 · 자연어 판정 상태를 현재 화면에 반영':'Project Event 기록 완료',respondedAt:new Date().toISOString(),eventVerifiedAt:new Date().toISOString(),verifiedAt:new Date().toISOString()});
    if(classification.changesState){if(screen==='home')home();else if(screen==='plan')productionPlan(productionPlanMode,true);else if(screen==='projects')projects(filter,true);else if(screen==='issues')todayIssues();}
    return {ok:true,classification,eventSaved:true,stateApplied:classification.changesState,planOnly:true,requestId:d.requestId||''};
   }
-  updateNote(id,{status:classification.changesState?'saved_unverified':'applied',requestId:d.requestId||'',ack:classification.changesState?'Project Event 기록 완료 · 명확한 상태문구만 현재상태 반영':'Project Event 기록 완료',respondedAt:new Date().toISOString(),eventVerifiedAt:new Date().toISOString(),verifiedAt:classification.changesState?'':new Date().toISOString()});
+  updateNote(id,{status:classification.changesState?'saved_unverified':'applied',requestId:d.requestId||'',ack:classification.changesState?'Project Event 기록 완료 · 자연어 판정 상태를 현재상태 반영':'Project Event 기록 완료',respondedAt:new Date().toISOString(),eventVerifiedAt:new Date().toISOString(),verifiedAt:classification.changesState?'':new Date().toISOString()});
   if(classification.changesState){
     if(screen==='home')home();else if(screen==='plan')productionPlan(productionPlanMode,true);else if(screen==='projects')projects(filter,true);else if(screen==='issues')todayIssues();
   }
@@ -1002,6 +1052,7 @@ function todayIssues(){
  '<div class="today-issue-head"><div class="today-issue-ident"><small>JOB NO.</small><b>'+esc(x.orderId||key)+'</b><h3>'+esc(x.customer)+' · '+esc(x.model)+'</h3></div><span class="today-issue-priority '+(hasIssue?'p'+esc(x.priority||2):'plan')+'">'+(hasIssue?(x.priority===1?'P1':'진행'):'계획')+'</span></div>'+
  hfDueAlert(x)+
  '<div class="today-issue-summary"><div><small>현재 상태</small><b>'+esc(x.state||'계획')+'</b></div><div><small>다음 행동</small><b>'+esc(x.nextAction||'미정')+'</b></div></div>'+
+ (String(x.recentEvent||x.cause||'').trim()?'<div class="today-issue-linked"><small>최근 이슈/진행</small><p>'+esc(x.recentEvent||x.cause)+'</p></div>':'')+
  (!opened?'<button class="today-issue-open" onclick="toggleTodayIssue(\''+esc(key)+'\')"><span>이 장비에 오늘 이슈 입력</span><span>＋</span></button>':
  '<div class="today-issue-editor"><div class="today-issue-target"><span>입력 대상</span><b>'+esc(x.orderId||key)+' · '+esc(x.customer)+' · '+esc(x.model)+'</b></div>'+
  (x.cause?'<p class="today-issue-cause">기존 사유 · '+esc(x.cause)+'</p>':'')+
