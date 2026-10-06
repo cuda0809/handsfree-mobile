@@ -6,7 +6,7 @@ const source=fs.readFileSync('kmt-sa2/app-flow.js','utf8');
 const code=source.slice(source.indexOf('async function syncPlanOverview('),source.indexOf('function productionPlanRows('));
 function harness(response){
  const prior={completePlan:true,cachedAt:'2000-01-01',byOrder:{OLD:{planTimeline:[{date:'2026-10-06',process:'조립'}]}}};
- const ctx={Date,Map,JSON,Error,screen:'home',planReadStale:true,planOverviewPending:null,PLAN_OVERVIEW_KEY:'fixture',calls:[],saved:null,rendered:0,
+ const ctx={Date,Map,JSON,Error,items:[],coreSnapshot:true,screen:'home',planReadStale:true,planOverviewPending:null,PLAN_OVERVIEW_KEY:'fixture',calls:[],saved:null,rendered:0,
   planOverviewCache:()=>prior,applyPlanOverview:()=>true,summarizePlanRecords:r=>({planTimeline:r}),
   persist:(k,v)=>{ctx.saved=v;},home:()=>ctx.rendered++,toast(){},
   appCall:async b=>{ctx.calls.push(b);if(response instanceof Error)throw response;return response;}};
