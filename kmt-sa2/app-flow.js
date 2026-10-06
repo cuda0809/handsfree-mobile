@@ -1100,7 +1100,7 @@ function todayIssues(){
 
 function generalIssueForm(){
  const d=readStore('hf-general-issue-draft','');
- return '<section class="today-issue-card"><h2>일반 이슈 · 인원지원</h2><p>장비 선택 없이 인원지원, 타팀 지원, 공통 업무를 기록합니다. 장비 상태는 변경하지 않습니다.</p><label>내용<textarea id="generalIssueText" maxlength="800" placeholder="예: 10/6 B팀 2명 A팀 조립 지원 · 참여자와 지원 업무를 적어주세요" oninput="persist(\'hf-general-issue-draft\',this.value)">'+esc(d)+'</textarea></label><button id="generalIssueSave" class="primary" onclick="saveGeneralIssue()">일반 이슈 기록</button><p id="generalIssueStatus" role="status"></p></section>';
+ return '<section class="today-issue-card"><h2>일반 이슈 · 인원지원</h2><p>장비 선택 없이 인원지원, 타팀 지원, 공통 업무를 기록합니다. 장비 상태는 변경하지 않습니다.</p><label class="today-issue-label">내용<textarea id="generalIssueText" maxlength="800" placeholder="예: 10/6 B팀 2명 A팀 조립 지원 · 참여자와 지원 업무를 적어주세요" oninput="persist(\'hf-general-issue-draft\',this.value)">'+esc(d)+'</textarea></label><button id="generalIssueSave" class="primary" onclick="saveGeneralIssue()">일반 이슈 기록</button><p id="generalIssueStatus" role="status"></p></section>';
 }
 async function saveGeneralIssue(){
  const field=$('generalIssueText'),status=$('generalIssueStatus'),button=$('generalIssueSave');
@@ -1118,7 +1118,7 @@ async function saveGeneralIssue(){
   if(d.applied){
    const receipt=await appCall({action:'receipt',requestId:d.requestId,submissionId:id});
    if(!await verifyEventNote(id,receipt))throw Error('unconfirmed');
-   persist('hf-general-issue-draft','');field.value='';status.textContent='일반 업무이력 저장을 확인했습니다. 장비 상태는 변경하지 않았습니다.';
+   persist('hf-general-issue-draft','');field.value='';toast('일반 업무이력 저장 확인 · 장비 상태 변경 없음');todayIssues();
   }else status.textContent='서버 접수 · '+(labels[state]||state)+'입니다. 오늘 기록에서 결과를 확인하세요.';
  }catch(e){updateNote(id,{status:'unknown',ack:'저장 결과 확인 필요 · 자동 재전송 안 함'});status.textContent='저장 결과를 확인하지 못했습니다. 원문은 보관했습니다. 전체 입력 이력에서 먼저 확인하세요.';}
  // Prevent a second click after an uncertain response; a new entry starts on re-opening this screen.
