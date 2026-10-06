@@ -21,7 +21,13 @@ function hfAppDeliveryDay_(v){
  return Number.isFinite(Date.parse(d))&&new Date(d).toISOString().slice(0,10)===d?d:'';
 }
 function hfAppDeliveryEvidence_(projects,events,journal,today){
- var candidates={},byId={};projects.forEach(function(p){byId[p.orderId]=p;byId[p.projectId]=p;});
+ var candidates={},blocked={},byId={};projects.forEach(function(p){byId[p.orderId]=p;byId[p.projectId]=p;});
+ function cancellation(raw,linked){
+  if(!/(?:출고|납품).*(?:취소|철회|아님|오류)|(?:취소|철회).*(?:출고|납품)/.test(String(raw||'')))return;
+  var jobs=String(raw||'').match(/(?:[A-Z]{2,4}-)?\d{6}[A-Z]-\d{3}(?:-\d+)?/g)||[];jobs=jobs.filter(function(j,i,a){return a.indexOf(j)===i;});
+  var p=byId[linked]||(jobs.length===1?byId[jobs[0]]:null);
+  if(p&&p.team==='B'&&jobs.length<=1&&(!jobs.length||jobs[0]===p.orderId))blocked[p.orderId]=true;
+ }
  function inspect(raw,linked,businessDay,source,sourceRef,manual){
   raw=String(raw||'');
   if(!/(?:출고|납품)\s*완료/.test(raw)||/예정|계획|대기|미완료|미출고|취소|철회|반품|재출고|부분|일부|외주|입고|반출|아직|아님|하지\s*않|안\s*됨|테스트\s*입력|검증용|\d{3}-\*/.test(raw))return;
@@ -37,13 +43,14 @@ function hfAppDeliveryEvidence_(projects,events,journal,today){
   if(dates.length!==1||dates[0]>today)return;
   (candidates[p.orderId]||(candidates[p.orderId]=[])).push({date:dates[0],source:source,sourceRef:sourceRef});
  }
- events.forEach(function(r,i){if(r[17]!=='WRITTEN'||r[14]!=='확정'||String(r[6]||'').slice(0,10)==='2026-09-14')return;inspect(r[3],r[20]||r[15],r[6],'Event','HF_DATA_입력정규화!'+(i+2)+' · '+r[0],false);});
- journal.forEach(function(r,i){if(r[8]!=='확정'||r[7]==='현장입력'||String(r[0]||'').slice(0,10)==='2026-09-14')return;inspect(String(r[4]||'')+' '+String(r[6]||'')+(r[1]==='출고완료'?' 출고완료':''),'',r[0],'일지','업무이력!'+(i+8),true);});
+ events.forEach(function(r,i){if(r[17]!=='WRITTEN'||r[14]!=='확정'||String(r[6]||'').slice(0,10)==='2026-09-14')return;cancellation(r[3],r[20]||r[15]);inspect(r[3],r[20]||r[15],r[6],'Event','HF_DATA_입력정규화!'+(i+2)+' · '+r[0],false);});
+ journal.forEach(function(r,i){if(r[8]!=='확정'||r[7]==='현장입력'||String(r[0]||'').slice(0,10)==='2026-09-14')return;var raw=String(r[4]||'')+' '+String(r[6]||'')+(r[1]==='출고완료'?' 출고완료':'');cancellation(raw,'');inspect(raw,'',r[0],'일지','업무이력!'+(i+8),true);});
  return projects.map(function(p){
   if(p.team!=='B')return p;
   var evidence=candidates[p.orderId]||[],dates=evidence.map(function(e){return e.date;}).filter(function(d,i,a){return a.indexOf(d)===i;}),current=hfAppDeliveryDay_(p.actualDelivery),review='';
   if(dates.length>1||(current&&dates.some(function(d){return d!==current;})))review='실출고일 기록 충돌 · 원본 확인 필요';
   if(!current&&dates.length===1&&/출고\s*대기|보관\s*중/.test(String(p.state||'')+' '+String(p.deliveryState||'')))review='출고완료 기록과 현재 대기 상태 충돌 · 확인 필요';
+  if(blocked[p.orderId])review='출고 취소·정정 기록 존재 · 실제 출고일 확인 필요';
   var actual=current||(!review&&dates.length===1?dates[0]:p.actualDelivery);
   return Object.assign({},p,{actualDelivery:actual,actualDeliveryEvidence:evidence,actualDeliveryReview:review});
  });

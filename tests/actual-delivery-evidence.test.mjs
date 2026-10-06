@@ -23,6 +23,7 @@ test('conflicts and current shipping-wait require review; existing dates stay au
  assert.match(run({...project,actualDelivery:'2026-09-30'},[event('출고완료 10/1')]).actualDeliveryReview,/충돌/);
  const p=run(project,[event('출고완료 10/1'),event('출고완료 10/2')]);assert.equal(p.actualDelivery,'');assert.match(p.actualDeliveryReview,/충돌/);
  const wait=run({...project,state:'출고대기'},[event('출고완료 10/1')]);assert.equal(wait.actualDelivery,'');assert.match(wait.actualDeliveryReview,/충돌/);
+ const canceled=run(project,[event('출고완료 10/1'),event('출고완료 취소')]);assert.equal(canceled.actualDelivery,'');assert.match(canceled.actualDeliveryReview,/취소/);
  assert.equal(run({...project,team:'A'},[event('출고완료 10/1')]).actualDelivery,'');
 });
 test('confirmed journal business date is accepted only with exact job; auto-stamped event mirrors are excluded',()=>{
