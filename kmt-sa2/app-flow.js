@@ -255,12 +255,24 @@ function appQuantity(v){const n=Number(String(v).replaceAll(',',''));if(!String(
 reports=function(){return '<section><div class="section-title"><h2>생산 · 지원 집계</h2></div><div class="report-links compact"><button onclick="productionReport()">▥ 생산 실적<small>월별 누적 · 과거 연도 합계 ›</small></button><button onclick="supportReport()">⇄ 타부서 지원<small>월별 인원 · 연간 합계 ›</small></button></div></section>';};
 productionReport=async function(){await loadAppReport('production');};
 supportReport=async function(){await loadAppReport('support');};
-async function loadAppReport(mode){const title=mode==='support'?'타부서 지원':'생산 실적';open(heading('생산 · 지원 집계',title)+'<div id="appReportResult">원본 집계를 불러오는 중…</div>');const el=$('appReportResult');try{const d=await appCall({action:'reports'});if(!el.isConnected)return;appReport={mode,data:d};renderAppReport();}catch(e){appFailure(el,e);}}
+async function loadAppReport(mode){const title=mode==='support'?'타부서 지원':'생산 실적';open(heading('생산 · 지원 집계',title)+'<div id="appReportResult">원본 집계를 불러오는 중…</div>');const el=$('appReportResult');try{const d=await appCall({action:'reports'});if(mode==='production'){const core=await appCall({action:'core'});if(!Array.isArray(core.projects))throw Error('invalid_core');d.projects=core.projects;}if(!el.isConnected)return;appReport={mode,data:d};renderAppReport();}catch(e){appFailure(el,e);}}
+function productionReportMonths(data){
+ const old=(data.monthly||[]).slice(1).filter(r=>r[0]&&r[1]);
+ if(!Array.isArray(data.projects))return old;
+ const today=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'}),year=today.slice(0,4),counts=new Map(),seen=new Set();
+ for(const p of data.projects){
+  const date=HfProductionRules.day(p.actualDelivery),job=String(p.orderId||'');
+  if(p.team!=='B'||!date||date>today||!date.startsWith(year)||/REPARE|REPAIR|수리|^PT-/i.test(job+' '+String(p.model||''))||seen.has(job))continue;
+  seen.add(job);const qty=appQuantity(p.qty);if(qty<=0)throw Error('invalid_report');
+  const month=Number(date.slice(5,7));counts.set(month,(counts.get(month)||0)+qty);
+ }
+ return old.filter(r=>String(r[0])!==year).concat([...counts].map(([month,qty])=>[year,String(month),'Core 실제 납품',qty]));
+}
 function renderAppReport(){
  const el=$('appReportResult');if(!el||!appReport)return;const {mode,data}=appReport;
  try{
-  const support=mode==='support',monthly=(data.monthly||[]).slice(1).filter(r=>r[0]&&r[1]),annual=(data.annual||[]).slice(1).filter(r=>r[0]&&r[1]),supportRows=(data.support||[]).slice(1).filter(r=>r[0]);
-  const years=[...new Set((support?supportRows.map(r=>appDay(r[0]).slice(0,4)):monthly.map(r=>String(r[0]))).filter(Boolean))].sort().reverse();
+  const support=mode==='support',monthly=productionReportMonths(data),annual=(data.annual||[]).slice(1).filter(r=>r[0]&&r[1]),supportRows=(data.support||[]).slice(1).filter(r=>r[0]);
+  const years=[...new Set((support?supportRows.map(r=>appDay(r[0]).slice(0,4)):monthly.map(r=>String(r[0])).concat(data.projects?[String(new Date().getFullYear())]:[])).filter(Boolean))].sort().reverse();
   const year=$('reportYear')?.value||years[0]||String(new Date().getFullYear());
   let body='';
   if(support){
@@ -273,7 +285,7 @@ function renderAppReport(){
    const monthRows=Array.from({length:lastMonth},(_,i)=>i+1).map(m=>{const qty=byMonth.get(m)||0;cumulative+=qty;return '<tr><td>'+m+'월</td><td>'+qty+'대</td><td><b>'+cumulative+'대</b></td></tr>';}).join('');
    const annualTotals=new Map();annual.forEach(r=>{const y=String(r[0]);annualTotals.set(y,(annualTotals.get(y)||0)+appQuantity(r[2]));});
    const past=[...annualTotals].filter(([y])=>y<year).sort((a,b)=>b[0].localeCompare(a[0]));
-   body='<div class="action-box"><small>'+esc(year)+'년 실제 납품 누적</small><strong>'+cumulative+'대</strong><span>'+lastMonth+'월까지</span></div><h3>월별 · 연간 누적</h3><table class="report-table"><thead><tr><th>월</th><th>월 생산</th><th>연간 누적</th></tr></thead><tbody>'+monthRows+'</tbody></table><h3>과거 연도 합계</h3>'+(past.length?'<div class="year-totals">'+past.map(([y,v])=>'<div><b>'+esc(y)+'년</b><strong>'+v+'대</strong></div>').join('')+'</div>':'<p>과거 연도 집계 기록이 없습니다.</p>')+'<p class="note">원본 납품 집계표 기준 · B팀 · 실제 납품일 · 수리/PT 제외. 계획 진행률은 생산 실적으로 계산하지 않습니다.</p>';
+   body='<div class="action-box"><small>'+esc(year)+'년 실제 납품 누적</small><strong>'+cumulative+'대</strong><span>'+lastMonth+'월까지</span></div><h3>월별 · 연간 누적</h3><table class="report-table"><thead><tr><th>월</th><th>월 생산</th><th>연간 누적</th></tr></thead><tbody>'+monthRows+'</tbody></table><h3>과거 연도 합계</h3>'+(past.length?'<div class="year-totals">'+past.map(([y,v])=>'<div><b>'+esc(y)+'년</b><strong>'+v+'대</strong></div>').join('')+'</div>':'<p>과거 연도 집계 기록이 없습니다.</p>')+'<p class="note">올해: 운영DB 실납기일 기준 · 과거: 원본 납품 집계표 · B팀 · 수리/PT 제외. 계획 진행률은 실적으로 계산하지 않습니다.</p>';
   }
   el.innerHTML='<div class="report-controls"><label>기준 연도<select id="reportYear" onchange="renderAppReport()">'+years.map(y=>'<option '+(y===year?'selected':'')+'>'+esc(y)+'</option>').join('')+'</select></label></div>'+body;
  }catch(e){appFailure(el,e);}

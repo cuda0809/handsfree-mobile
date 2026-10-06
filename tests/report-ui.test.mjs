@@ -1,15 +1,18 @@
 import vm from 'node:vm';
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+const HfProductionRules=createRequire(import.meta.url)('../kmt-sa2/production-rules.js');
 
 const src=fs.readFileSync(new URL('../kmt-sa2/app-flow.js',import.meta.url),'utf8');
 const result={isConnected:true,innerHTML:''};
 const data={ok:true,
+ projects:[{orderId:'B1',team:'B',actualDelivery:'2026-08-02',qty:'2'},{orderId:'B2',team:'B',actualDelivery:'2026-09-03',qty:'3'},{orderId:'B1',team:'B',actualDelivery:'2026-08-02',qty:'2'},{orderId:'PT-1',team:'B',actualDelivery:'2026-09-03',qty:'9'},{orderId:'A1',team:'A',actualDelivery:'2026-09-03',qty:'9'}],
  annual:[['연도','장비명','대수'],['2025','Mixer','2'],['2025','Tank','4'],['2026','Mill','5']],
  monthly:[['연도','월','장비명','대수'],['2026','8','Mixer','2'],['2026','9','Mill','3'],['2025','12','Tank','4']],
  support:[['일자','구분','고객/현장','모델','업무내용','참여자','원문','등록경로','확정여부','지원분류','분류기준','운영현황표시'],['2026-08-02','타팀지원','A','','조립','김, 이','','','확정','PT지원','','Y'],['2026-09-03','타팀지원','B','','설치','이, 박','','','확정','A/S지원','','Y'],['2026-09-04','타팀지원','C','','검토','최','','','미확정','A/S지원','','Y']]
 };
-const context=vm.createContext({personalConnected:true,login(){throw Error('unexpected_login');},api:async()=>data,open(){result.isConnected=true;},heading:()=>'',esc:String,scheduleErrors:{},$:id=>id==='appReportResult'?result:null});
+const context=vm.createContext({HfProductionRules,personalConnected:true,login(){throw Error('unexpected_login');},api:async()=>data,open(){result.isConnected=true;},heading:()=>'',esc:String,scheduleErrors:{},$:id=>id==='appReportResult'?result:null});
 vm.runInContext(src.slice(0,src.indexOf('const appWorkBase=')),context);
 
 await context.productionReport();
