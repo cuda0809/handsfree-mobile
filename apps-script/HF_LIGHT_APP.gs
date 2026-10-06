@@ -43,7 +43,7 @@ function hfAppDeliveryEvidence_(projects,events,journal,today){
   if(dates.length!==1||dates[0]>today)return;
   (candidates[p.orderId]||(candidates[p.orderId]=[])).push({date:dates[0],source:source,sourceRef:sourceRef});
  }
- events.forEach(function(r,i){if(r[17]!=='WRITTEN'||r[14]!=='확정'||String(r[6]||'').slice(0,10)==='2026-09-14')return;cancellation(r[3],r[20]||r[15]);inspect(r[3],r[20]||r[15],r[6],'Event','HF_DATA_입력정규화!'+(i+2)+' · '+r[0],false);});
+ events.forEach(function(r,i){if(r[7]==='일반이슈'||(r[7]==='타팀지원'&&!r[20]&&!r[15])||r[17]!=='WRITTEN'||r[14]!=='확정'||String(r[6]||'').slice(0,10)==='2026-09-14')return;cancellation(r[3],r[20]||r[15]);inspect(r[3],r[20]||r[15],r[6],'Event','HF_DATA_입력정규화!'+(i+2)+' · '+r[0],false);});
  journal.forEach(function(r,i){if(r[8]!=='확정'||r[7]==='현장입력'||String(r[0]||'').slice(0,10)==='2026-09-14')return;var raw=String(r[4]||'')+' '+String(r[6]||'')+(r[1]==='출고완료'?' 출고완료':'');cancellation(raw,'');inspect(raw,'',r[0],'일지','업무이력!'+(i+8),true);});
  return projects.map(function(p){
   if(p.team!=='B')return p;

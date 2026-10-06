@@ -127,6 +127,7 @@ function processField_(ss,p,id){
 function splitEvents_(raw){const a=String(raw).split(/\r?\n|;/).map(x=>x.trim()).filter(Boolean);return a.length?a:[String(raw).trim()];}
 
 function normalEvent_(ss,line,index,p){
+  if(String(p.channel||'').split('|').includes('GENERAL_EVENT')&&p.targetHint==='GENERAL_ISSUE')return generalEvent_(ss,line,index,p);
   const now=new Date(),project=resolveProject_(ss,line),type=workType_(line),people=extractPeople_(line),date=parseDate_(line,now),excludedDate=safety_(ss,'Excluded Actual Date')||'2026-09-14',dateKey=Utilities.formatDate(date,HF_SW.TZ,'yyyy-MM-dd');
   const excluded=dateKey===excludedDate,conf=confidence_(type,project,people,line),safe=!excluded&&highConfidence_(type,project,people,conf),reason=excluded?`EXCLUDED_DATE:${excludedDate}`:safe?'':'LOW_CONFIDENCE_OR_AMBIGUOUS_TARGET';
   return {receivedAt:now,source:'FIELD_INPUT',raw:line,eventIndex:index,target:type==='재입고완료'?'반출일지':'업무이력',date,type,customer:project.customer||'',model:project.model||'',orderId:project.orderId||'',actor:String(p.requester||'UNKNOWN'),work:workContent_(line,project,people),people:people.join(', '),link:project.orderId||'',confidence:conf,safe,excluded,reason,inputSheet:p.inputSheet,inputRow:p.inputRow};
@@ -136,6 +137,15 @@ function workType_(raw){const t=norm_(HF_SW.PEOPLE.reduce((s,n)=>s.split(n).join
 
 function resolveProject_(ss,raw){
   return resolveEventProject_(getSheet_(ss,HF_SW.SHEET.PRODUCT,null),raw);
+}
+
+// Explicit non-equipment input still passes Queue, normalization and the existing safety gate.
+// Never resolve customer/model text in this lane to an equipment record.
+function generalEvent_(ss,line,index,p){
+ const now=new Date(),date=parseDate_(line,now),dateKey=Utilities.formatDate(date,HF_SW.TZ,'yyyy-MM-dd');
+ const excluded=dateKey===(safety_(ss,'Excluded Actual Date')||'2026-09-14');
+ const valid=String(line||'').trim().length>=2&&String(p.requester||'').trim()!=='';
+ return {receivedAt:now,source:'FIELD_INPUT',raw:line,eventIndex:index,target:'업무이력',date,type:/지원/.test(line)?'타팀지원':'일반이슈',customer:'',model:'',orderId:'',actor:String(p.requester||'UNKNOWN'),work:String(line).trim(),people:extractPeople_(line).join(', '),link:'',confidence:valid?1:0,safe:valid&&!excluded,excluded,reason:excluded?'EXCLUDED_DATE:'+dateKey:valid?'':'GENERAL_INPUT_INVALID',inputSheet:p.inputSheet,inputRow:p.inputRow};
 }
 function resolveEventProject_(sh,raw){
   const rows=sh.getRange(5,1,Math.max(sh.getLastRow()-4,1),3).getDisplayValues().filter(r=>String(r[0]||'').trim());

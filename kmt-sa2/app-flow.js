@@ -32,11 +32,10 @@ function formatHfDate(v){
  return s;
 }
 function isCompletedOperational(x){
- const state=String(x?.state||''),delivery=String(x?.deliveryState||''),masterState=String(x?.masterState||'').trim();
- if(String(x?.team||'').trim()==='B')return productionClass(x)==='출고완료';
- const actual=formatHfDate(x?.actualDelivery);
- return actual!=='미정'||/출고\s*완료|납품\s*완료/.test(state+' '+delivery)||masterState==='완료';
+ return productionClass(x)==='출고완료';
 }
+function currentProductionRows(){return operationalRows(true).filter(x=>!isCompletedOperational(x)&&productionClass(x)==='진행 중');}
+function projectBucket(x){if(isCompletedOperational(x))return 'completed';const c=productionClass(x);return c==='출고대기'?'waiting':c==='확인 필요'?'review':'active';}
 function latestUnifiedInputByOrder(){
  const out=new Map();
  notes().forEach(r=>{
@@ -149,7 +148,7 @@ function renderUnifiedHome(){
  const today=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
  const plannedToday=workingRows.filter(x=>planStagesOnDay(x,today).length);
  const urgent=activeRows.filter(x=>x.priority===1);
- const issueActive=activeRows.filter(x=>(x.issueId||String(x.recentEvent||x.currentIssue||x.cause||'').trim())&&x.priority!==3);
+ const issueActive=currentProductionRows().filter(x=>(x.issueId||String(x.recentEvent||x.currentIssue||x.cause||'').trim())&&x.priority!==3);
  const attentionMap=new Map();
  urgent.forEach(x=>attentionMap.set(x.orderId,x));plannedToday.forEach(x=>attentionMap.set(x.orderId,x));
  const attention=[...attentionMap.values()].sort((a,b)=>(a.priority||9)-(b.priority||9)||hybridDueKey(a.due).localeCompare(hybridDueKey(b.due)));
@@ -183,7 +182,7 @@ function renderUnifiedHome(){
  '<div class="hybrid-section"><b>현장 이슈</b><span>'+(currentConfirmed?issueActive.length+'대':'확인 불가')+'</span></div>'+
  '<div class="hf-card-list">'+(currentConfirmed?(issueCards||'<div class="empty">현재 진행 이슈가 없습니다.</div>'):'<div class="empty">최신 이슈를 확인하지 못했습니다.</div>')+'</div>'+
  '<button class="hybrid-quick hf-quick-card" onclick="todayIssues()"><span>🎙 오늘 이슈 입력</span><span>＋</span></button>'+
- '<p class="source">통합 운영 · 계획 + 현재상태 · 조회 '+esc(lastRead||'확인 전')+'</p>';
+ reports()+'<p class="source">통합 운영 · 계획 + 현재상태 · 조회 '+esc(lastRead||'확인 전')+'</p>';
  main.querySelectorAll('[data-home-order]').forEach(b=>b.onclick=()=>{const x=operationalRows(true).find(v=>v.orderId===b.dataset.homeOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.homeOrder,'detail',x);});
  banner();
 }
@@ -564,6 +563,11 @@ async function verifyEventNote(id,receipt){
  try{
   const d=receipt||await appCall({action:'receipt',requestId:r.requestId||'',submissionId:r.submissionId||r.id});
   if(receiptState(d)!=='saved_unverified'){updateNote(id,{status:receiptState(d),verifiedAt:''});return false;}
+  if(r.eventType==='GENERAL'){
+   const lines=r.text.split(/\r?\n|;/).map(v=>v.trim()).filter(Boolean);
+   if(!d.requestId||(r.requestId&&r.requestId!==d.requestId)||!Array.isArray(d.events)||d.events.length!==lines.length||d.events.some((e,i)=>e.status!=='WRITTEN'||e.orderId||e.raw!==lines[i]))throw Error('general_receipt_unconfirmed');
+   updateNote(id,{status:'applied',requestId:d.requestId,verifiedAt:new Date().toISOString(),eventVerifiedAt:new Date().toISOString(),ack:'일반 업무이력 저장 확인 · 장비 상태 변경 없음'});return true;
+  }
   // /api/sa2-write returns applied=true only after SAFE WRITE has finished and the
   // normalized event is WRITTEN. On that known-success path, do not run a second
   // receipt/history verification chain before moving to the current-state readback.
@@ -794,14 +798,14 @@ function productionPlan(mode='plan',skipMeta=false){
 }
 function delivery(skipMeta=false){return productionPlan('delivery',skipMeta);}
 function projects(mode='active',skipMeta=false){
- if(mode!=='completed')mode='active';
+ if(!['active','waiting','review','completed'].includes(mode))mode='active';
  active('projects');screen='projects';filter=mode;
  if(!skipMeta){setTimeout(()=>syncProjectMeta(false),0);setTimeout(()=>syncPlanOverview(false),80);}
- const all=operationalRows(true),activeCount=all.filter(x=>!isCompletedOperational(x)).length,completedCount=all.filter(isCompletedOperational).length;
+ const all=operationalRows(true);
  main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">PROJECT LIFECYCLE</div><h1>프로젝트</h1></div></div>'+
- '<p class="hybrid-desc">진행 중인 프로젝트를 기본으로 보고, 완료 프로젝트는 필요할 때만 열어봅니다.</p>'+
+ '<p class="hybrid-desc">작업번호 연도가 아닌 확인된 상태로 분류합니다. 제작·예정, 출고대기, 확인 필요, 출고완료를 구분합니다.</p>'+reports()+
  '<input id="hybridProjectSearch" class="hybrid-search" placeholder="고객명 · 장비명 · JOB NO." oninput="renderHybridProjects()">'+
- '<div class="tabs project-state-tabs"><button class="chip '+(mode==='active'?'active':'')+'" onclick="projects(\'active\')">진행중 '+activeCount+'</button><button class="chip '+(mode==='completed'?'active':'')+'" onclick="projects(\'completed\')">완료 '+completedCount+'</button></div>'+
+ '<div class="tabs project-state-tabs">'+[['active','제작 · 예정'],['waiting','출고대기'],['review','확인 필요'],['completed','출고완료']].map(([key,label])=>'<button class="chip '+(mode===key?'active':'')+'" onclick="projects(\''+key+'\')">'+label+' '+(readStale||planReadStale?'확인 중':all.filter(x=>projectBucket(x)===key).length)+'</button>').join('')+'</div>'+
  '<div id="hybridProjectList" class="hybrid-project-list"></div>';
  renderHybridProjects();
 }
@@ -829,7 +833,7 @@ function projectStageLabel(x){
 function renderHybridProjects(){
  const el=$('hybridProjectList');if(!el)return;
  const q=norm($('hybridProjectSearch')?.value||'');
- let rows=operationalRows(true).filter(x=>(filter==='completed'?isCompletedOperational(x):!isCompletedOperational(x)));rows.forEach(rememberProjectDetail);
+ let rows=operationalRows(true).filter(x=>projectBucket(x)===filter);rows.forEach(rememberProjectDetail);
  if(q)rows=rows.filter(x=>norm([x.orderId,x.customer,x.model,x.state,x.pm,x.nextAction].join(' ')).includes(q));
  if(!rows.length){el.innerHTML='<p class="empty">'+(filter==='completed'?'완료 프로젝트가 없습니다.':'현재 진행 중인 프로젝트가 없습니다.')+'</p>';return;}
 
@@ -1056,25 +1060,18 @@ function toggleTodayIssue(key){
 function todayIssues(){
  active('issues');screen='issues';
  setTimeout(()=>syncProjectMeta(false),0);setTimeout(()=>syncPlanOverview(false),80);
- const merged=new Map();
- productionPlanRows().forEach(x=>merged.set(String(x.orderId||''),x));
- operationalRows(false).filter(x=>String(x.recentEvent||x.currentIssue||x.cause||'').trim()).forEach(x=>{
-  const key=String(x.orderId||'');if(key)merged.set(key,{...(merged.get(key)||{}),...x});
- });
- items.filter(x=>!isCompletedOperational(x)&&x.priority!==3).forEach(x=>{
-  const key=String(x.orderId||'');merged.set(key,{...(merged.get(key)||{}),...x});
- });
- const activeRows=[...merged.values()].filter(x=>x.orderId&&!isCompletedOperational(x)).sort((a,b)=>(a.priority||9)-(b.priority||9)||hybridDueKey(a.due).localeCompare(hybridDueKey(b.due)));activeRows.forEach(rememberProjectDetail);
+ const activeRows=currentProductionRows().filter(x=>x.orderId).sort((a,b)=>(a.priority||9)-(b.priority||9)||hybridDueKey(a.due).localeCompare(hybridDueKey(b.due)));activeRows.forEach(rememberProjectDetail);
  const todayKey=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
  const todayLocal=notes().filter(r=>{try{return new Date(r.createdAt).toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'})===todayKey&&(r.eventType||r.eventOnly);}catch{return false;}});
  main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">TODAY ISSUES</div><h1>오늘 이슈</h1></div></div>'+
- '<p class="hybrid-desc">생산계획의 진행중 장비 전체에서 오늘 생긴 진행·문제·사유를 기록합니다.</p>'+
+ '<p class="hybrid-desc">현재 제작 중인 장비에 오늘 이슈를 기록합니다. 작업 예정·출고대기·완료·확인 필요 장비는 프로젝트에서 확인하세요.</p>'+
+ (readStale||planReadStale?'<p class="alert">최신 조회 미확인 · 이전 목록은 참고용입니다.</p>':'')+
  '<div class="today-issue-list">'+
  (activeRows.length?activeRows.map(x=>{const key=todayIssueKey(x),opened=todayIssueOpenId===key,hasIssue=!!x.issueId;return '<section class="today-issue-card hf-card '+hfCardTone(x,hasIssue?'issue':'plan')+' '+(opened?'open':'')+'">'+
  '<div class="today-issue-head"><div class="today-issue-ident"><small>JOB NO.</small><b>'+esc(x.orderId||key)+'</b><h3>'+esc(x.customer)+' · '+esc(x.model)+'</h3></div><span class="today-issue-priority '+(hasIssue?'p'+esc(x.priority||2):'plan')+'">'+(hasIssue?(x.priority===1?'P1':'진행'):'계획')+'</span></div>'+
  hfDueAlert(x)+
  '<div class="today-issue-summary"><div><small>현재 상태</small><b>'+esc(x.state||'계획')+'</b></div><div><small>다음 행동</small><b>'+esc(x.nextAction||'미정')+'</b></div></div>'+
- (String(x.recentEvent||x.cause||'').trim()?'<div class="today-issue-linked"><small>최근 이슈/진행</small><p>'+esc(x.recentEvent||x.cause)+'</p></div>':'')+
+ (String(x.recentEventAt||'').slice(0,10)===todayKey&&String(x.recentEvent||x.cause||'').trim()?'<div class="today-issue-linked"><small>오늘 이슈/진행</small><p>'+esc(x.recentEvent||x.cause)+'</p></div>':'')+
  (!opened?'<button class="today-issue-open" onclick="toggleTodayIssue(\''+esc(key)+'\')"><span>이 장비에 오늘 이슈 입력</span><span>＋</span></button>':
  '<div class="today-issue-editor"><div class="today-issue-target"><span>입력 대상</span><b>'+esc(x.orderId||key)+' · '+esc(x.customer)+' · '+esc(x.model)+'</b></div>'+
  (x.cause?'<p class="today-issue-cause">기존 사유 · '+esc(x.cause)+'</p>':'')+
@@ -1084,7 +1081,7 @@ function todayIssues(){
  '<div class="today-issue-actions"><button class="chip" data-today-voice="'+esc(key)+'">🎙 음성</button><button class="primary" data-today-save="'+esc(key)+'">'+(hasIssue?'기록 및 자동 반영':'Event 기록')+'</button></div>'+
  '<button class="today-issue-close" onclick="toggleTodayIssue(\''+esc(key)+'\')">입력창 닫기</button><p class="note" data-today-status="'+esc(key)+'"></p></div>')+
  '</section>';}).join(''):'<div class="empty">현재 진행 중인 생산계획 장비가 없습니다.</div>')+
- '</div>'+
+ '</div>'+generalIssueForm()+
  '<div class="hybrid-section today-records-head"><b>오늘 기록</b><span>'+todayLocal.length+'건</span></div>'+
  (todayLocal.length?todayLocal.slice(0,12).map(r=>'<button class="hybrid-record hf-card tone-neutral" data-note="'+esc(r.id)+'"><b>'+esc(r.target)+'</b><p>'+esc(r.text)+'</p><small>'+esc(new Date(r.createdAt).toLocaleString('ko-KR'))+' · '+esc(r.autoClassification||labels[r.status]||r.status)+'</small></button>').join(''):'<p class="empty">오늘 입력한 이슈가 없습니다.</p>')+
  '<button id="allInputHistory" class="secondary">전체 입력 이력 보기</button>';
@@ -1094,6 +1091,31 @@ function todayIssues(){
  const history=$('allInputHistory');if(history)history.onclick=showInbox;
 }
 
+function generalIssueForm(){
+ const d=readStore('hf-general-issue-draft','');
+ return '<section class="today-issue-card"><h2>일반 이슈 · 인원지원</h2><p>장비 선택 없이 인원지원, 타팀 지원, 공통 업무를 기록합니다. 장비 상태는 변경하지 않습니다.</p><label>내용<textarea id="generalIssueText" maxlength="800" placeholder="예: 10/6 B팀 2명 A팀 조립 지원 · 참여자와 지원 업무를 적어주세요" oninput="persist(\'hf-general-issue-draft\',this.value)">'+esc(d)+'</textarea></label><button id="generalIssueSave" class="primary" onclick="saveGeneralIssue()">일반 이슈 기록</button><p id="generalIssueStatus" role="status"></p></section>';
+}
+async function saveGeneralIssue(){
+ const field=$('generalIssueText'),status=$('generalIssueStatus'),button=$('generalIssueSave');
+ const text=String(field?.value||'').trim();if(!text){status.textContent='내용을 입력하세요.';return;}
+ if(button.disabled)return;
+ if(navigator.onLine===false){status.textContent='오프라인입니다. 내용은 기기에 보관했습니다.';return;}
+ const id=crypto.randomUUID(),target='일반 이슈 · 인원지원';
+ const note={id,submissionId:id,target,text,status:'sending',createdAt:new Date().toISOString(),eventOnly:true,eventType:'GENERAL',orderId:'',issueId:''};
+ try{const list=notes();list.unshift(note);persist(KEY,list);}catch{status.textContent='기기 보관에 실패해 전송하지 않았습니다.';return;}
+ button.disabled=true;status.textContent='일반 이슈를 기록하는 중…';
+ try{
+  const d=await api('/api/sa2-write',{submissionId:id,text,targetHint:'GENERAL_ISSUE',source:'MOBILE|GENERAL_EVENT'},55000);
+  const state=d.applied?'saved_unverified':/REVIEW/i.test(d.status)?'review':/EXCLUDED/i.test(d.status)?'excluded':/DUPLICATE/i.test(d.status)?'duplicate':'received';
+  updateNote(id,{status:state,requestId:d.requestId||'',ack:d.ack||'서버 접수 결과 확인 필요',respondedAt:new Date().toISOString()});
+  if(d.applied){
+   const receipt=await appCall({action:'receipt',requestId:d.requestId,submissionId:id});
+   if(!await verifyEventNote(id,receipt))throw Error('unconfirmed');
+   persist('hf-general-issue-draft','');field.value='';status.textContent='일반 업무이력 저장을 확인했습니다. 장비 상태는 변경하지 않았습니다.';
+  }else status.textContent='서버 접수 · '+(labels[state]||state)+'입니다. 오늘 기록에서 결과를 확인하세요.';
+ }catch(e){updateNote(id,{status:'unknown',ack:'저장 결과 확인 필요 · 자동 재전송 안 함'});status.textContent='저장 결과를 확인하지 못했습니다. 원문은 보관했습니다. 전체 입력 이력에서 먼저 확인하세요.';}
+ // Prevent a second click after an uncertain response; a new entry starts on re-opening this screen.
+}
 let todayIssueRecognition=null;
 function voiceTodayIssue(key){
  const Speech=window.SpeechRecognition||window.webkitSpeechRecognition;

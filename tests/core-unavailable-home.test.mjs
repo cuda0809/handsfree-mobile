@@ -9,7 +9,7 @@ function render(confirmed,stale){
  const ctx={main,coreSnapshot:confirmed,readStale:stale,screen:'home',lastRead:'',Date,Map,planReadStale:false,planOverviewCache:()=>({completePlan:true}),
   setTimeout:()=>0,active(){},syncProjectMeta(){},syncPlanOverview(){},operationalRows:()=>[],
   isCompletedOperational:()=>false,planStagesOnDay:()=>[],hybridDueKey:()=>'',rememberProjectDetail(){},
-  esc:String,banner(){}};
+  currentProductionRows:()=>[],reports:()=>'',esc:String,banner(){}};
  vm.createContext(ctx);vm.runInContext(home+';renderUnifiedHome();',ctx);return main.innerHTML;
 }
 test('unavailable or stale Core never presents zero issues as a confirmed result',()=>{

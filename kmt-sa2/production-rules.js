@@ -11,11 +11,12 @@
  }
  function classify(x,today){
   const state=String(x.state||''),delivery=String(x.deliveryState||'');
-  if(day(x.actualDelivery)||/출고\s*완료|납품\s*완료/.test(state+' '+delivery))return '출고완료';
+  const actual=day(x.actualDelivery),complete=[state,delivery].some(s=>/출고\s*완료|납품\s*완료/.test(s)&&!/예정|계획|취소|미완료|아님|철회/.test(s));
+  if((actual&&actual<=today)||complete)return '출고완료';
   if(/출고\s*대기|납품\s*대기|보관\s*중/.test(state+' '+delivery))return '출고대기';
   if(x.productionEvidence&&['진행 중','작업 예정','출고대기','확인 필요'].includes(x.productionEvidence.status))return x.productionEvidence.status;
   // Only explicit current work is evidence; a calendar entry or a due date is not.
-  if(/(?:조립|전장|프로그램|검수|테스트|시험|작업).*(?:진행|작업\s*중)/.test(state)&&!/예정|진행\s*예정/.test(state))return '진행 중';
+  if(/(?:조립|전장|프로그램|검수|테스트|시험|작업|마무리).*(?:진행|작업\s*중)/.test(state)&&!/예정|진행\s*예정/.test(state))return '진행 중';
   const dates=(x.planTimeline||[]).filter(r=>!/출고|납품/.test(r.process||'')).map(r=>day(r.date)).filter(Boolean);
   if(dates.some(d=>d>=today))return '작업 예정';
   return '확인 필요';
