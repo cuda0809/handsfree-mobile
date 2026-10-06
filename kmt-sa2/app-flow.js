@@ -1080,7 +1080,7 @@ function todayIssues(){
  (readStale||planReadStale?'<p class="alert">최신 조회 미확인 · 이전 목록은 참고용입니다.</p>':'')+
  '<div class="today-issue-list">'+
  (activeRows.length?activeRows.map(x=>{const key=todayIssueKey(x),opened=todayIssueOpenId===key,hasIssue=!!x.issueId;return '<section class="today-issue-card hf-card '+hfCardTone(x,hasIssue?'issue':'plan')+' '+(opened?'open':'')+'">'+
- '<div class="today-issue-head"><div class="today-issue-ident"><small>JOB NO.</small><b>'+esc(x.orderId||key)+'</b><h3>'+esc(x.customer)+' · '+esc(x.model)+'</h3></div><span class="today-issue-priority '+(hasIssue?'p'+esc(x.priority||2):'plan')+'">'+(hasIssue?(x.priority===1?'P1':'진행'):'계획')+'</span></div>'+
+ '<div class="today-issue-head"><div class="today-issue-ident"><small>JOB NO.</small><b>'+esc(x.orderId||key)+'</b><h3>'+esc(x.customer)+' · '+esc(x.model)+'</h3></div><span class="today-issue-priority '+(hasIssue?'p'+esc(x.priority||2):'plan')+'">'+(hasIssue?(x.priority===1?'P1':'제작 중'):'제작 중')+'</span></div>'+
  hfDueAlert(x)+
  '<div class="today-issue-summary"><div><small>현재 상태</small><b>'+esc(x.state||'계획')+'</b></div><div><small>다음 행동</small><b>'+esc(x.nextAction||'미정')+'</b></div></div>'+
  (String(x.recentEventAt||'').slice(0,10)===todayKey&&String(x.recentEvent||x.cause||'').trim()?'<div class="today-issue-linked"><small>오늘 이슈/진행</small><p>'+esc(x.recentEvent||x.cause)+'</p></div>':'')+
