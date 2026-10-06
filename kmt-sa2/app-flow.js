@@ -414,6 +414,8 @@ function rememberProjectDetail(x){
 function projectDetailRow(orderId,fallback={}){
  const snap=PROJECT_DETAIL_SNAPSHOT.get(String(orderId))||{};
  const canonical=operationalRows(true).find(x=>x.orderId===orderId)||{};
+ // An authoritative empty field is a deletion, not a reason to revive a prior value.
+ if(coreSnapshot||lastReadErrorStatus===401||lastReadErrorStatus===403)return {...canonical,orderId};
  const valid=v=>{const s=String(v??'').trim();return s&&s!=='미정';};
  const pick=(...vals)=>{for(const v of vals)if(valid(v))return String(v);return '';};
  return {...canonical,...fallback,...snap,orderId,
