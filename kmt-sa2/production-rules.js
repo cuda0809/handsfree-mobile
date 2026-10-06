@@ -53,6 +53,20 @@
    return /(?:조립|전장|배선|프로그램|검수|가공|용접|구동테스트)\s*(?:작업\s*)?(?:진행(?:\s*중)?|중)(?!\s*(?:예정|계획|아님|취소|중단))/.test(line)&&!/진행\s*(?:예정|계획|아님|취소|중단)/.test(line);
   }));
  }
- const rules={day,classify,resolve,manufacturingNow};root.HfProductionRules=rules;
+ function nextAction(x,today){
+  const manual=String(x.nextAction||'').trim();
+  if(manual&&manual!=='미정'&&manual!=='미등록')return manual;
+  if(classify(x,today)==='출고완료')return '출고완료 · 이력 확인';
+  if(!x.planSourceVerified)return '다음 행동 확인 필요';
+  const stage=v=>/출고|납품/.test(v)?5:/검수|테스트|시험|FAT/.test(v)?4:/프로그램/.test(v)?3:/전장|배선|전기/.test(v)?2:/조립/.test(v)?1:0;
+  const current=String(x.state||''),level=stage(current),complete=/완료/.test(current)&&!/미완료|예정|계획|아님/.test(current);
+  const floor=/출고\s*대기|보관\s*중/.test(current)?5:level+(complete?1:0);
+  const rows=(x.planTimeline||[]).filter(r=>day(r.date)&&stage(r.process)>=floor)
+   .sort((a,b)=>stage(a.process)-stage(b.process)||day(a.date).localeCompare(day(b.date)));
+  const r=rows[0];if(!r)return '다음 행동 확인 필요';
+  const date=day(r.date);
+  return '계획상 · '+r.process+' · '+date+(date<today?' (일정 경과 · 진행 확인)':'');
+ }
+ const rules={day,classify,resolve,manufacturingNow,nextAction};root.HfProductionRules=rules;
  if(typeof module==='object'&&module.exports)module.exports=rules;
 })(typeof window==='object'?window:globalThis);

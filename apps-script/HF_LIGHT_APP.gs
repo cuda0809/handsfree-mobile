@@ -12,7 +12,34 @@ function hfAppCore_(ss){
   currentIssue:r[29],recentEvent:r[30],recentEventAt:r[31],planAssembly:r[32],planElectrical:r[33],
   planProgram:r[34],planInspection:r[35],planDelivery:r[36],actualDelivery:r[37],confidence:r[38],updatedAt:r[39]
  };});
- return hfAppDeliveryEvidence_(projects,hfAppRows_(ss,'HF_DATA_입력정규화',23).slice(1),hfAppRows_(ss,'업무이력',9).slice(7),Utilities.formatDate(new Date(),'Asia/Seoul','yyyy-MM-dd'));
+ var events=hfAppRows_(ss,'HF_DATA_입력정규화',23).slice(1),today=Utilities.formatDate(new Date(),'Asia/Seoul','yyyy-MM-dd');
+ return hfAppCurrentEvidence_(hfAppDeliveryEvidence_(projects,events,hfAppRows_(ss,'업무이력',9).slice(7),today),events,today);
+}
+// Confirmed, precisely linked field events are operational evidence, not local drafts.
+// This read projection preserves Core/RAW, manual Next_Action, and shipping history.
+function hfAppCurrentEvidence_(projects,events,today){
+ var byJob={},latest={};projects.forEach(function(p){byJob[p.orderId]=p;});
+ events.forEach(function(e){
+  if(e[17]!=='WRITTEN'||e[2]!=='FIELD_INPUT'||e[7]!=='일일작업'||!e[20]||e[15]!==e[20])return;
+  var p=byJob[e[20]],date=hfAppDeliveryDay_(e[6]);if(!p||p.team!=='B'||!date||date>today||date==='2026-09-14')return;
+  var raw=String(e[3]||''),jobs=raw.match(/(?:[A-Z]{2,4}-)?\d{6}[A-Z]-\d{3}(?:-\d+)?/g)||[];
+  if(!jobs.length||jobs.some(function(j){return j!==p.orderId;}))return;
+  var text=String(e[10]||'').replace(/^[·\s]+/,'').trim();
+  var match=text.match(/^(조립|마감조립|전장|배선|프로그램|검수)\s*(완료|진행(?:\s*중)?|중)(?:\s+(?:20\d{2}[-/.])?\d{1,2}[-/.]\d{1,2})?\s*$/);
+  if(!match)return;
+  var stamp=String(e[1]||''),prior=latest[p.orderId];
+  if(!prior||date>prior.date||date===prior.date&&stamp>prior.stamp)latest[p.orderId]={date:date,stamp:stamp,state:match[1]+' '+match[2],process:/전장|배선/.test(match[1])?'전장':match[1],id:e[0],raw:text};
+ });
+ return projects.map(function(p){
+  var e=latest[p.orderId];if(!e||p.actualDelivery||/출고\s*완료|납품\s*완료|출고\s*대기/.test(p.state||''))return p;
+  var currentDay=hfAppDeliveryDay_(String(p.updatedAt||'').slice(0,10)),eventDay=String(p.recentEventAt||'').slice(0,10);
+  if(currentDay>e.date||eventDay>e.date)return p;
+  // A newer explicit Core state remains authoritative (including same-day edits).
+  if(String(p.recentEventAt||'')>e.stamp)return p;
+  var out={};Object.keys(p).forEach(function(k){out[k]=p[k];});
+  out.state=e.state;out.process=e.process;out.since=e.date;out.recentEvent=e.raw;out.recentEventAt=e.stamp;out.updatedAt=e.stamp;
+  out.stateEvidence={source:'확정 Event',entryId:e.id,businessDate:e.date};return out;
+ });
 }
 // READ projection only: keep the Core value and raw journals intact.
 function hfAppDeliveryDay_(v){
@@ -103,9 +130,10 @@ function hfAppIssueBuild_(s,b,now){
  if(!/^[a-zA-Z0-9-]{16,80}$/.test(b.requestId||''))hfLsFail_('invalid_request_id');var receipt=hfAppIssueReceipt_(s,b);if(receipt)return {requests:[],receipt:receipt};
  if(typeof b.reason!=='string'||!b.reason.trim()||b.reason.length>500)hfLsFail_('invalid_reason');
  if(typeof b.state!=='string'||!b.state.trim()||b.state.length>80)hfLsFail_('invalid_state');
- if(typeof b.nextAction!=='string'||b.nextAction.length>500||(b.status!=='CLOSED'&&!b.nextAction.trim()))hfLsFail_('invalid_next_action');
+ if(typeof b.nextAction!=='string'||b.nextAction.length>500)hfLsFail_('invalid_next_action');
  if(['OPEN','MONITOR','CLOSED'].indexOf(b.status)<0)hfLsFail_('invalid_status');
  var p=hfAppIssueRecord_(s,b.issueId),before=p.row;if(before[3]!==b.orderId)hfLsFail_('project_mismatch');if(hfLsHash_(before)!==b.expected)hfLsFail_('stale_record');
+ if(b.status!=='CLOSED'&&!b.nextAction.trim()&&String(before[18]||'').trim())hfLsFail_('invalid_next_action');
  var after=before.slice(),day=Utilities.formatDate(new Date(now),'Asia/Seoul','yyyy-MM-dd');
  after[16]=b.state.trim();after[18]=b.nextAction.trim();after[8]=b.status;if(after[16]===before[16]&&after[18]===before[18]&&after[8]===before[8])hfLsFail_('no_change');
  after[9]=day;if(after[16]!==before[16])after[17]=day;after[11]=b.status==='CLOSED'?day:'';after[13]=b.status==='CLOSED'?false:true;

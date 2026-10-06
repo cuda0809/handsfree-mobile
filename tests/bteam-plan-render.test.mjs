@@ -12,7 +12,7 @@ function render(stale,mode='plan',view='active'){
  const main={innerHTML:'',querySelectorAll:()=>[]};
  const ctx=vm.createContext({main,Date,screen:'home',readStale:stale,planReadStale:stale,
   operationalRows:all=>all?fixture:fixture.filter(x=>x.state!=='출고완료'),productionClass:x=>rules.classify(x,'2026-10-06'),formatHfDate:v=>rules.day(v)||'미정',isCompletedOperational:x=>x.state==='출고완료',$:()=>main,hybridStageFlow:()=>'',
-  active(){},rememberProjectDetail(){},esc:v=>String(v||''),hfCardTone:()=>'',hfDueAlert:()=>''});
+  displayedNextAction:x=>rules.nextAction(x,'2026-10-07'),active(){},rememberProjectDetail(){},esc:v=>String(v||''),hfCardTone:()=>'',hfDueAlert:()=>''});
  vm.runInContext(code+';deliveryView='+JSON.stringify(view)+';productionPlan('+JSON.stringify(mode)+',true);',ctx);return main.innerHTML;
 }
 test('plan current count excludes shipping wait, needs-check and actual shipment; ID-less equipment stays visible',()=>{
