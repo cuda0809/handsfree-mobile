@@ -13,3 +13,11 @@ test('authenticated plan contract preserves state and explicit source evidence w
  assert.equal(result[0].status,'진행 중');assert.equal(result[0].sourceRef,'생산B팀!R1540');assert.equal(result[0].recordId,row[0]);assert.equal(writes,0);
  assert.throws(()=>ctx.hfAppPlanOverview_({getSheetByName:()=>({...sheet,getSheetId:()=>1})}),/invalid_structure/);
 });
+test('native Sheets month dates have the same sortable contract as text months',()=>{
+ const rows=[['old',2026,8,'2026-08-01','JOB','','','','','','조립','',new Date('2026-07-31T15:00:00Z')],['new',2026,10,'2026-10-12','JOB','','','','','','조립','','2026-10']];
+ const sheet={getSheetId:()=>1167293203,getLastRow:()=>3,getRange:()=>({getValues:()=>rows})};
+ const ctx=vm.createContext({String,Utilities:{formatDate:(d,tz,format)=>{assert.equal(tz,'Asia/Seoul');assert.equal(format,'yyyy-MM');return new Date(d.getTime()+9*3600000).toISOString().slice(0,7);}},hfLsDay_:String,hfLsFail_:s=>{throw Error(s);}});
+ vm.runInContext(code,ctx);const records=ctx.hfAppPlanOverview_({getSheetByName:()=>sheet});
+ assert.deepEqual(Array.from(records,r=>r.sourceMonth),['2026-08','2026-10']);
+ rows[0][12]='unrecognized';assert.throws(()=>ctx.hfAppPlanOverview_({getSheetByName:()=>sheet}),/invalid_source_month/);
+});

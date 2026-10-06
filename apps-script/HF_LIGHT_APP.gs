@@ -18,7 +18,9 @@ function hfAppPlanOverview_(ss){
  if(!sh||sh.getSheetId()!==1167293203)hfLsFail_('invalid_structure');
  var rows=sh.getLastRow()>1?sh.getRange(2,1,sh.getLastRow()-1,16).getValues():[];
  return rows.filter(function(r){return r[0]&&r[4];}).map(function(r){
-  return {recordId:String(r[0]),orderId:String(r[4]),date:hfLsDay_(r[3]),process:String(r[10]||''),sourceMonth:String(r[12]||''),
+  var month=Object.prototype.toString.call(r[12])==='[object Date]'?Utilities.formatDate(r[12],'Asia/Seoul','yyyy-MM'):String(r[12]||'').trim();
+  if(month&&!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month))hfLsFail_('invalid_source_month');
+  return {recordId:String(r[0]),orderId:String(r[4]),date:hfLsDay_(r[3]),process:String(r[10]||''),sourceMonth:month,
    status:String(r[11]||''),source:String(r[13]||''),sourceRef:String(r[14]||''),updatedAt:String(r[15]||'')};
  });
 }
