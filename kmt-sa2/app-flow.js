@@ -34,7 +34,7 @@ function formatHfDate(v){
 function isCompletedOperational(x){
  return productionClass(x)==='출고완료';
 }
-function currentProductionRows(){return operationalRows(true).filter(x=>!isCompletedOperational(x)&&productionClass(x)==='진행 중');}
+function currentProductionRows(){const today=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});return operationalRows(true).filter(x=>String(x.team||'').trim()==='B'&&HfProductionRules.manufacturingNow(x,today));}
 function projectBucket(x){if(isCompletedOperational(x))return 'completed';const c=productionClass(x);return c==='출고대기'?'waiting':c==='확인 필요'?'review':'active';}
 function latestUnifiedInputByOrder(){
  const out=new Map();
@@ -1071,7 +1071,7 @@ function todayIssues(){
  const todayKey=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
  const todayLocal=notes().filter(r=>{try{return new Date(r.createdAt).toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'})===todayKey&&(r.eventType||r.eventOnly);}catch{return false;}});
  main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">TODAY ISSUES</div><h1>오늘 이슈</h1></div></div>'+
- '<p class="hybrid-desc">현재 제작 중인 장비에 오늘 이슈를 기록합니다. 작업 예정·출고대기·완료·확인 필요 장비는 프로젝트에서 확인하세요.</p>'+
+ '<p class="hybrid-desc">B팀에서 실제 제작 중인 장비만 표시합니다. 타팀·작업 예정·자재 대기만 하는 장비·출고대기·완료 장비는 제외합니다.</p>'+
  (readStale||planReadStale?'<p class="alert">최신 조회 미확인 · 이전 목록은 참고용입니다.</p>':'')+
  '<div class="today-issue-list">'+
  (activeRows.length?activeRows.map(x=>{const key=todayIssueKey(x),opened=todayIssueOpenId===key,hasIssue=!!x.issueId;return '<section class="today-issue-card hf-card '+hfCardTone(x,hasIssue?'issue':'plan')+' '+(opened?'open':'')+'">'+

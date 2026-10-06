@@ -43,6 +43,16 @@
    planSourceVerified:verified.length>0,
    productionEvidence:verified.find(r=>!r.process&&['진행 중','작업 예정','출고대기','확인 필요'].includes(r.status))||null};
  }
- const rules={day,classify,resolve};root.HfProductionRules=rules;
+ function manufacturingNow(x,today){
+  const c=classify(x,today);
+  if(c==='출고완료'||c==='출고대기'||x.productionEvidence?.status==='확인 필요')return false;
+  // A schedule label or generic pre-delivery finishing is not evidence of fabrication.
+  // Partial assembly can continue while other parts are awaited.
+  return [x.state,x.currentIssue,x.recentEvent].some(v=>String(v||'').split(/[\n;]+/).some(line=>{
+   if(/연구소|출고\s*완료|납품\s*완료/.test(line))return false;
+   return /(?:조립|전장|배선|프로그램|검수|가공|용접|구동테스트)\s*(?:작업\s*)?(?:진행(?:\s*중)?|중)(?!\s*(?:예정|계획|아님|취소|중단))/.test(line)&&!/진행\s*(?:예정|계획|아님|취소|중단)/.test(line);
+  }));
+ }
+ const rules={day,classify,resolve,manufacturingNow};root.HfProductionRules=rules;
  if(typeof module==='object'&&module.exports)module.exports=rules;
 })(typeof window==='object'?window:globalThis);

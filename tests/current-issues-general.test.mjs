@@ -10,7 +10,8 @@ test('current issue filter uses evidence, not job year; storage and history cann
  {orderId:'25-REAL-WORK',state:'조립 진행'}, {orderId:'26-DONE',actualDelivery:'2026-09-22'},
  {orderId:'26-FUTURE',state:'조립 예정',planTimeline:[{date:'2026-10-12',process:'조립'}]},
  {orderId:'26-UNKNOWN',state:'상태 확인'}, {orderId:'26-WORK',state:'조립 진행'}];
- const c=vm.createContext({operationalRows:()=>rows,productionClass:x=>rules.classify(x,'2026-10-06')});
+ rows.forEach(x=>x.team='B');rows.push({orderId:'260319A-020',team:'A',state:'조립 진행'},{orderId:'260319A-021',team:'A',state:'납품 전 마무리 작업 중'});
+ const c=vm.createContext({HfProductionRules:rules,operationalRows:()=>rows,productionClass:x=>rules.classify(x,'2026-10-06')});
  vm.runInContext(src.slice(src.indexOf('function isCompletedOperational('),src.indexOf('function latestUnifiedInputByOrder(')),c);
  assert.deepEqual(Array.from(c.currentProductionRows(),x=>x.orderId),['25-REAL-WORK','26-WORK']);
  assert.equal(c.projectBucket(rows[0]),'waiting');assert.equal(c.projectBucket(rows[2]),'completed');assert.equal(c.projectBucket(rows[4]),'review');
