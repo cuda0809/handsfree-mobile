@@ -34,6 +34,7 @@ export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store, max-age=0');
 
  if(req.method==='GET'){
+   if(!process.env.HF_REAL_APP_KEY)return reply(res,503,{ok:false,error:'not_configured'});
    const p=sa2Person(req);
    if(p)return reply(res,200,{ok:true,user:{label:p.label||String(p.email||'').replace(/^SA2:/,''),role:'writer',auth:'sa2'}});
    return reply(res,200,{ok:true,user:null});
@@ -43,6 +44,7 @@ export default async function handler(req,res){
  const action=String(req.body?.action||'');
  if(action==='logout'){res.setHeader('Set-Cookie',clearSa2Cookie());return reply(res,200,{ok:true});}
  if(action!=='activate')return reply(res,400,{ok:false,error:'invalid_request'});
+ if(!process.env.HF_REAL_APP_KEY)return reply(res,503,{ok:false,error:'not_configured'});
  if(blocked(req))return reply(res,429,{ok:false,error:'too_many_attempts'});
 
  const name=String(req.body?.name||'').replace(/[\r\n\t]/g,' ').trim().slice(0,30);
