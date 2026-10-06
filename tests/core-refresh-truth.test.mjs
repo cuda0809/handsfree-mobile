@@ -57,3 +57,15 @@ const nextOnly=harness(responder([{...row,nextAction:'next-only'}]),cache);await
 const stateOnly=harness(responder([{...row,state:'검수 진행'}]),cache);await stateOnly.run('refresh()');assert.equal(stateOnly.run('items[0].since'),row.since);assert.equal(stateOnly.run('items[0].sourceLatestUpdate'),row.sourceLatestUpdate);
 const cleared=harness(responder([{...row,nextAction:'',currentIssue:'',recentEvent:''}]),cache);await cleared.run('refresh()');installRows(cleared);cleared.run('const PROJECT_DETAIL_SNAPSHOT=new Map([["JOB-A",{nextAction:"stale",recentEvent:"stale"}]]);');cleared.run(app.slice(app.indexOf('function projectDetailRow('),app.indexOf('async function openProject(')));assert.equal(cleared.run('projectDetailRow("JOB-A",{nextAction:"stale"}).nextAction'),'');assert.equal(cleared.run('projectDetailRow("JOB-A").recentEvent'),'');
 console.log('PASS nextAction-only, cleared detail fields and state-only reads never create business timestamps');
+
+const historical=harness(responder([row],[{issueId:'old',orderId:'JOB-A',status:'CLOSED'},{issueId:'cancelled',orderId:'JOB-A',status:'CANCELLED'},{issueId:'ISS-A',orderId:'JOB-A',status:'MONITOR'}]),cache);assert.equal(await historical.run('refresh()'),true);assert.equal(historical.run('items[0].issueId'),'ISS-A');
+const ambiguous=harness(responder([row],[{issueId:'one',orderId:'JOB-A',status:'OPEN'},{issueId:'two',orderId:'JOB-A',status:'MONITOR'}]),cache);assert.equal(await ambiguous.run('refresh()'),false);assert.equal(ambiguous.run('readStale'),true);
+console.log('PASS canonical catalog includes historical duplicates; active issue wins, multiple active issues fail closed');
+if(process.env.CORE_LEDGER_FIXTURE){
+ const real=JSON.parse(fs.readFileSync(process.env.CORE_LEDGER_FIXTURE,'utf8'));
+ const actual=harness(responder(real.projects,real.issues),cache);assert.equal(await actual.run('refresh()'),true);installRows(actual);
+ assert.equal(actual.run('items.length'),192);assert.equal(actual.run('operationalRows(false).length'),62);
+ assert.equal(actual.run('operationalRows(false).filter(x=>(x.issueId||String(x.recentEvent||x.currentIssue||x.cause||"").trim())&&x.priority!==3).length'),16);
+ assert.equal(actual.run('operationalRows(false).find(x=>x.orderId==="260728A-064").currentIssue.includes("10/15")'),true);
+ console.log('PASS current read-only ledger fixture: 192 projects / 62 active / 16 meaningful issues; latest 10/15 material note retained');
+}

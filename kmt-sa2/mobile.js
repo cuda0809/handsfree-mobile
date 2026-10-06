@@ -92,8 +92,9 @@ async function refreshCachedCore(){
  for(const v of catalog.issues){
   if(!v||typeof v.issueId!=='string'||!v.issueId||typeof v.orderId!=='string'||typeof v.status!=='string')throw Error('invalid_catalog');
   const prior=byOrder.get(v.orderId);
-  if(prior&&prior.issueId!==v.issueId)throw Error('ambiguous_issue');
-  byOrder.set(v.orderId,v);
+  const active=v.status==='OPEN'||v.status==='MONITOR',priorActive=prior&&(prior.status==='OPEN'||prior.status==='MONITOR');
+  if(priorActive&&active&&prior.issueId!==v.issueId)throw Error('ambiguous_issue');
+  if(!prior||active&&!priorActive)byOrder.set(v.orderId,v);
  }
  const next=d.projects.map(p=>{
   const issue=byOrder.get(p.orderId),status=String(issue?.status||'');
