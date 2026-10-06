@@ -4,7 +4,7 @@ function hfAppRows_(ss,name,cols){var sh=ss.getSheetByName(name);if(!sh){if(name
 function hfAppCatalog_(ss){return hfAppRows_(ss,'제품마스터',12).slice(4).filter(function(r){return r[0];}).map(function(r){return {orderId:r[0],customer:r[1],model:r[2],due:r[3],pm:r[8],state:r[9]||'상태 미등록'};});}
 function hfAppCore_(ss){
  var rows=hfAppRows_(ss,'HF_CORE_통합운영',40);if(rows.length<2)return [];
- return rows.slice(1).filter(function(r){return r[1];}).map(function(r){return {
+ var projects=rows.slice(1).filter(function(r){return r[1];}).map(function(r){return {
   projectId:r[0],orderId:r[1],team:r[2],customer:r[3],model:r[4],qty:r[5],due:r[6],pm:r[7],
   designOwner:r[8],buyer:r[9],productionOwner:r[10],qualityOwner:r[11],designState:r[12],
   purchaseProgress:r[18],missingCount:r[19],materialState:r[20],assemblyState:r[21],electricalState:r[22],
@@ -12,6 +12,41 @@ function hfAppCore_(ss){
   currentIssue:r[29],recentEvent:r[30],recentEventAt:r[31],planAssembly:r[32],planElectrical:r[33],
   planProgram:r[34],planInspection:r[35],planDelivery:r[36],actualDelivery:r[37],confidence:r[38],updatedAt:r[39]
  };});
+ return hfAppDeliveryEvidence_(projects,hfAppRows_(ss,'HF_DATA_입력정규화',23).slice(1),hfAppRows_(ss,'업무이력',9).slice(7),Utilities.formatDate(new Date(),'Asia/Seoul','yyyy-MM-dd'));
+}
+// READ projection only: keep the Core value and raw journals intact.
+function hfAppDeliveryDay_(v){
+ var s=String(v||'').trim(),m=s.match(/^(\d{2}|20\d{2})[-/.]\s*(\d{1,2})[-/.]\s*(\d{1,2})$/);if(!m)return '';
+ var d=(m[1].length===2?'20'+m[1]:m[1])+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);
+ return Number.isFinite(Date.parse(d))&&new Date(d).toISOString().slice(0,10)===d?d:'';
+}
+function hfAppDeliveryEvidence_(projects,events,journal,today){
+ var candidates={},byId={};projects.forEach(function(p){byId[p.orderId]=p;byId[p.projectId]=p;});
+ function inspect(raw,linked,businessDay,source,sourceRef,manual){
+  raw=String(raw||'');
+  if(!/(?:출고|납품)\s*완료/.test(raw)||/예정|계획|대기|미완료|미출고|취소|철회|반품|재출고|부분|일부|외주|입고|반출|아직|아님|하지\s*않|안\s*됨|테스트\s*입력|검증용|\d{3}-\*/.test(raw))return;
+  var jobs=raw.match(/(?:[A-Z]{2,4}-)?\d{6}[A-Z]-\d{3}(?:-\d+)?/g)||[];
+  jobs=jobs.filter(function(j,i,a){return a.indexOf(j)===i;});
+  var p=byId[linked]||(jobs.length===1?byId[jobs[0]]:null);
+  if(!p||p.team!=='B'||jobs.length>1||(jobs.length===1&&jobs[0]!==p.orderId))return;
+  if(Number(p.qty)>1&&!/전량|전체/.test(raw))return;
+  var business=hfAppDeliveryDay_(businessDay),clean=raw.replace(/(?:[A-Z]{2,4}-)?\d{6}[A-Z]-\d{3}(?:-\d+)?/g,'').replace(/(20\d{2})년\s*/g,'$1-').replace(/(\d{1,2})월\s*(\d{1,2})일/g,'$1-$2'),dates=[],re=/(?:^|[^\d])(?:(20\d{2}|\d{2})[-/.]\s*)?(\d{1,2})[-/.]\s*(\d{1,2})(?!\d)/g,match;
+  while((match=re.exec(clean))){var year=match[1]||(business?business.slice(0,4):'');if(!year)return;var date=hfAppDeliveryDay_(year+'-'+match[2]+'-'+match[3]);if(!date)return;dates.push(date);}
+  if(!dates.length&&manual&&business)dates.push(business);
+  dates=dates.filter(function(d,i,a){return a.indexOf(d)===i;});
+  if(dates.length!==1||dates[0]>today)return;
+  (candidates[p.orderId]||(candidates[p.orderId]=[])).push({date:dates[0],source:source,sourceRef:sourceRef});
+ }
+ events.forEach(function(r,i){if(r[17]!=='WRITTEN'||r[14]!=='확정'||String(r[6]||'').slice(0,10)==='2026-09-14')return;inspect(r[3],r[20]||r[15],r[6],'Event','HF_DATA_입력정규화!'+(i+2)+' · '+r[0],false);});
+ journal.forEach(function(r,i){if(r[8]!=='확정'||r[7]==='현장입력'||String(r[0]||'').slice(0,10)==='2026-09-14')return;inspect(String(r[4]||'')+' '+String(r[6]||'')+(r[1]==='출고완료'?' 출고완료':''),'',r[0],'일지','업무이력!'+(i+8),true);});
+ return projects.map(function(p){
+  if(p.team!=='B')return p;
+  var evidence=candidates[p.orderId]||[],dates=evidence.map(function(e){return e.date;}).filter(function(d,i,a){return a.indexOf(d)===i;}),current=hfAppDeliveryDay_(p.actualDelivery),review='';
+  if(dates.length>1||(current&&dates.some(function(d){return d!==current;})))review='실출고일 기록 충돌 · 원본 확인 필요';
+  if(!current&&dates.length===1&&/출고\s*대기|보관\s*중/.test(String(p.state||'')+' '+String(p.deliveryState||'')))review='출고완료 기록과 현재 대기 상태 충돌 · 확인 필요';
+  var actual=current||(!review&&dates.length===1?dates[0]:p.actualDelivery);
+  return Object.assign({},p,{actualDelivery:actual,actualDeliveryEvidence:evidence,actualDeliveryReview:review});
+ });
 }
 function hfAppPlanOverview_(ss){
  var sh=ss.getSheetByName('HF_DATA_계획원장');
