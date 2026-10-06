@@ -7,7 +7,7 @@ export default async function handler(req,res){
  if(!sameOrigin(req))return reply(res,403,{ok:false,error:'invalid_origin'});
  const p=authUser(req);if(!p)return reply(res,401,{ok:false,error:'activation_required'});
  const role=p.role;
- const b=req.body||{};if(!['core','catalog','reports','history','receipt','issue','edit'].includes(b.action))return reply(res,400,{ok:false,error:'invalid_request'});
+ const b=req.body||{};if(!['core','plans','catalog','reports','history','receipt','issue','edit'].includes(b.action))return reply(res,400,{ok:false,error:'invalid_request'});
  if(b.action==='edit'&&!['owner','writer'].includes(role))return reply(res,403,{ok:false,error:'forbidden'});
  const payload={action:b.action,actor:{sub:p.sub,email:p.email,exp:Math.min(p.exp,Math.floor(Date.now()/1000)+120)}};
  for(const key of ['orderId','issueId','expected','state','nextAction','status','reason','requestId','submissionId','text','targetHint']){

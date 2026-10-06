@@ -13,6 +13,14 @@ function hfAppCore_(ss){
   planProgram:r[34],planInspection:r[35],planDelivery:r[36],actualDelivery:r[37],confidence:r[38],updatedAt:r[39]
  };});
 }
+function hfAppPlanOverview_(ss){
+ var sh=ss.getSheetByName('HF_DATA_계획원장');
+ if(!sh||sh.getSheetId()!==1167293203)hfLsFail_('invalid_structure');
+ var rows=sh.getLastRow()>1?sh.getRange(2,1,sh.getLastRow()-1,16).getValues():[];
+ return rows.filter(function(r){return r[0]&&r[4];}).map(function(r){
+  return {recordId:String(r[0]),orderId:String(r[4]),date:hfLsDay_(r[3]),process:String(r[10]||''),sourceMonth:String(r[12]||'')};
+ });
+}
 function hfAppReceipt_(ss,b){
  var rows=hfAppRows_(ss,'HF_DATA_입력대기열',15).slice(1),matches=[];
  rows.forEach(function(r){if(r[3]!==b.actor.email)return;var p;try{p=JSON.parse(r[4]);}catch(e){return;}
@@ -66,6 +74,7 @@ function hfAppIssueApply_(ss,b){var built=hfAppIssueBuild_(hfAppIssueSnapshot_(s
 function hfLightAppDispatch_(body){
  var ss=SpreadsheetApp.openById(HF_SPREADSHEET_ID),b=hfLsActor_(body,ss);
  if(b.action==='core')return {ok:true,projects:hfAppCore_(ss),generatedAt:new Date().toISOString()};
+ if(b.action==='plans')return {ok:true,records:hfAppPlanOverview_(ss),generatedAt:new Date().toISOString()};
  if(b.action==='catalog')return {ok:true,projects:hfAppCatalog_(ss),issues:hfAppRows_(ss,HF_APP.issue,19).slice(1).filter(function(r){return r[0];}).map(function(r){return {issueId:r[0],orderId:r[3],status:r[8],state:r[16]};})};
  if(b.action==='reports')return {ok:true,annual:hfAppRows_(ss,'HF_DATA_납품집계',5),monthly:hfAppRows_(ss,'HF_DATA_납품월집계',6),support:hfAppRows_(ss,'HF_DATA_지원이력',12),generatedAt:new Date().toISOString()};
  if(b.action==='history')return hfAppHistory_(ss,b.orderId);

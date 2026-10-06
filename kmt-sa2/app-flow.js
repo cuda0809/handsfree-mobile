@@ -145,6 +145,7 @@ function renderUnifiedHome(){
  const attention=[...attentionMap.values()].sort((a,b)=>(a.priority||9)-(b.priority||9)||hybridDueKey(a.due).localeCompare(hybridDueKey(b.due)));
  const top=urgent[0]||null,done=all.filter(isCompletedOperational);
  const currentConfirmed=coreSnapshot&&!readStale;
+ const plansConfirmed=planOverviewCache()?.completePlan===true&&!planReadStale;
  plannedToday.forEach(rememberProjectDetail);issueActive.forEach(rememberProjectDetail);
  const planCards=plannedToday.map(x=>{
   const stages=planStagesOnDay(x,today);
@@ -154,7 +155,7 @@ function renderUnifiedHome(){
    '<div class="hf-card-next"><span>다음</span>'+esc(x.nextAction||'미정')+'</div></button>';
  }).join('');
  const issueCards=issueActive.sort((a,b)=>(a.priority||9)-(b.priority||9)).map(x=>{
-  const issueText=String(x.recentEvent||x.currentIssue||x.cause||'').trim();
+  const issueText=String(x.currentIssue||x.recentEvent||x.cause||'').trim();
   return '<button class="hf-card '+hfCardTone(x,'issue')+'" data-home-order="'+esc(x.orderId)+'">'+hfCardIdentity(x,x.priority===1?'P1':'진행')+hfDueAlert(x)+
   '<div class="hf-card-meta"><div><small>현재 상태</small><b>'+esc(x.state||'미등록')+'</b></div><div><small>납기</small><b>'+esc(formatHfDate(x.due))+'</b></div></div>'+
   (issueText?'<div class="hf-card-issue"><span>이슈/진행</span><p>'+esc(issueText)+'</p></div>':'')+
@@ -162,13 +163,13 @@ function renderUnifiedHome(){
  }).join('');
  main.innerHTML=
  '<div class="hybrid-eyebrow">'+esc(new Date().toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',weekday:'long'}))+'</div>'+
- '<h1 class="hybrid-title">오늘 확인할 일<br>'+(currentConfirmed?attention.length+'건이 있습니다':'최신 상태 확인 필요')+'</h1>'+
+ '<h1 class="hybrid-title">오늘 확인할 일<br>'+(currentConfirmed&&plansConfirmed?attention.length+'건이 있습니다':'최신 상태 확인 필요')+'</h1>'+
  (!currentConfirmed?'<div class="alert" role="status">현재 상태와 이슈 조회를 완료하지 못했습니다. 아래 계획은 참고용이며, 이슈가 없다는 뜻이 아닙니다.<button class="secondary" onclick="refresh()">최신 상태 다시 확인</button></div>':'')+
  '<p class="hybrid-desc">생산계획과 현장 이슈를 같은 카드 규칙으로 보여줍니다.</p>'+
  '<div class="hf-stat-grid"><button class="hf-stat-card tone-active" onclick="productionPlan()"><small>관리중</small><b>'+activeRows.length+'</b><span>통합 운영</span></button><button class="hf-stat-card tone-urgent" onclick="projects(\'active\')"><small>우선순위 1</small><b>'+(currentConfirmed?urgent.length:'확인 불가')+'</b><span>먼저 확인</span></button><button class="hf-stat-card tone-complete" onclick="projects(\'completed\')"><small>완료</small><b>'+done.length+'</b><span>이력 보존</span></button></div>'+
  (top?'<div class="hybrid-section"><b>우선 확인 이슈</b><span>P1</span></div><button class="hf-card hf-feature-card '+hfCardTone(top,'issue')+'" data-home-order="'+esc(top.orderId)+'">'+hfCardIdentity(top,'우선 확인')+hfDueAlert(top)+'<div class="hf-card-meta"><div><small>현재 상태</small><b>'+esc(top.state||'미등록')+'</b></div><div><small>납기</small><b>'+esc(formatHfDate(top.due))+'</b></div></div><div class="hf-card-next"><span>다음</span>'+esc(top.nextAction||'확인 필요')+'</div></button>':'')+
- '<div class="hybrid-section"><b>오늘 생산계획</b><span>'+plannedToday.length+'대</span></div>'+
- '<div class="hf-card-list">'+(planCards||'<div class="empty">오늘로 잡힌 생산계획이 없습니다.</div>')+'</div>'+
+ '<div class="hybrid-section"><b>오늘 생산계획</b><span>'+(plansConfirmed?plannedToday.length+'대':'확인 중 / 확인 불가')+'</span></div>'+
+ '<div class="hf-card-list">'+(plansConfirmed?(planCards||'<div class="empty">오늘로 잡힌 생산계획이 없습니다.</div>'):'<div class="empty">생산계획 최신 조회를 확인하지 못했습니다.</div>')+'</div>'+
  '<div class="hybrid-section"><b>현장 이슈</b><span>'+(currentConfirmed?issueActive.length+'대':'확인 불가')+'</span></div>'+
  '<div class="hf-card-list">'+(currentConfirmed?(issueCards||'<div class="empty">현재 진행 이슈가 없습니다.</div>'):'<div class="empty">최신 이슈를 확인하지 못했습니다.</div>')+'</div>'+
  '<button class="hybrid-quick hf-quick-card" onclick="todayIssues()"><span>🎙 오늘 이슈 입력</span><span>＋</span></button>'+
@@ -655,7 +656,7 @@ function hybridStageFlow(x){
  }).join('')+'</div><div class="hybrid-flow-now">현재 공정 · <b>'+HYBRID_FLOW_STAGES[current]+'</b>'+(complete?' · 완료':'')+'</div>';
 }
 const PLAN_OVERVIEW_KEY='hf-production-plan-overview-v1';
-let planOverviewPending=null;
+let planOverviewPending=null,planReadStale=true;
 function planOverviewCache(){const v=readStore(PLAN_OVERVIEW_KEY,null);return v&&v.byOrder? v:null;}
 function summarizePlanRecords(records){
  const list=(records||[]).filter(r=>r&&r.date&&r.process);
@@ -689,7 +690,7 @@ function summarizePlanRecords(records){
 function applyPlanOverview(byOrder){
  let changed=false;
  items=items.map((x,id)=>{
-  const p=byOrder?.[x.orderId];if(!p)return {...x,id:itemIdentity(x)};
+  const p=byOrder?.[x.orderId];if(!p){if(x.planTimeline?.length)changed=true;return {...x,planTimeline:[],id:itemIdentity(x)};}
   const patch={...p};
   if(Object.keys(patch).some(k=>String(patch[k]||'')!==String(x[k]||'')))changed=true;
   return {...x,...patch,id:itemIdentity(x)};
@@ -700,45 +701,30 @@ function applyPlanOverview(byOrder){
 async function syncPlanOverview(force=false){
  const cached=planOverviewCache();
  if(cached)applyPlanOverview(cached.byOrder);
- const fresh=cached&&Date.now()-Date.parse(cached.cachedAt||0)<15*60*1000;
- if(!force&&fresh)return cached;
+ const fresh=cached&&cached.completePlan===true&&Date.now()-Date.parse(cached.cachedAt||0)<15*60*1000;
+ if(!force&&fresh){planReadStale=false;return cached;}
  if(planOverviewPending)return planOverviewPending;
  planOverviewPending=(async()=>{
-  await syncProjectMeta(false);
-  const meta=coreSnapshot?items:(projectMetaCache()?.projects||appProjects||[]);
-  const today=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Seoul'}));
-  const from=new Date(today);from.setDate(from.getDate()-45);
-  const to=new Date(today);to.setDate(to.getDate()+210);
-  const iso=d=>d.toISOString().slice(0,10);
-  const fromDay=iso(from),toDay=iso(to);
-  const currentIds=new Set(items.map(x=>String(x.orderId||'')));
-  const seen=new Set(),targets=[];
-  for(const p of meta){
-   const orderId=String(p.orderId||'').trim();if(!orderId||/-\*$/.test(orderId)||seen.has(orderId))continue;
-   const due=formatHfDate(p.due);
-   const inWindow=/^\d{4}-\d{2}-\d{2}$/.test(due)&&due>=fromDay&&due<=toDay;
-   const activeState=!/^(완료|출고완료|납품완료)$/.test(String(p.state||'').trim());
-   if((inWindow&&activeState)||currentIds.has(orderId)){seen.add(orderId);targets.push(p);}
+  const d=await appCall({action:'plans'});
+  if(!Array.isArray(d.records)||!d.generatedAt)throw Error('invalid_plans');
+  const grouped=new Map();
+  for(const r of d.records){
+   if(!r||typeof r.orderId!=='string'||!r.orderId||typeof r.process!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(r.date||''))throw Error('invalid_plans');
+   if(!grouped.has(r.orderId))grouped.set(r.orderId,[]);
+   grouped.get(r.orderId).push(r);
   }
-  const byOrder={...(cached?.byOrder||{})};
-  for(let i=0;i<targets.length;i+=6){
-   const batch=targets.slice(i,i+6);
-   const settled=await Promise.allSettled(batch.map(x=>api('/api/sa2-lifecycle',{action:'plans',orderId:x.orderId},30000)));
-   batch.forEach((x,j)=>{
-    const s=settled[j];if(s.status!=='fulfilled')return;
-    const d=s.value,records=Array.isArray(d.records)?d.records:Array.isArray(d.plans)?d.plans:[];
-    byOrder[x.orderId]=summarizePlanRecords(records);
-   });
-  }
+  const byOrder={};
+  for(const [orderId,records] of grouped)byOrder[orderId]=summarizePlanRecords(records);
+  planReadStale=false;
   const cacheChanged=JSON.stringify(byOrder)!==JSON.stringify(cached?.byOrder||{});
-  persist(PLAN_OVERVIEW_KEY,{cachedAt:new Date().toISOString(),byOrder,candidateCount:targets.length});
+  persist(PLAN_OVERVIEW_KEY,{completePlan:true,cachedAt:new Date().toISOString(),byOrder,candidateCount:grouped.size});
   const changed=applyPlanOverview(byOrder);
   if((changed||cacheChanged)&&screen==='home')home();
   if(screen==='plan')productionPlan(productionPlanMode,true);
   if((changed||cacheChanged)&&screen==='projects')projects(filter,true);
   if((changed||cacheChanged)&&screen==='issues')todayIssues();
-  return {byOrder,candidateCount:targets.length,changed,cacheChanged};
- })().finally(()=>{planOverviewPending=null;});
+  return {byOrder,candidateCount:grouped.size,changed,cacheChanged};
+ })().catch(()=>{planReadStale=true;toast('생산계획 최신 조회 실패 · 이전 계획 유지');return null;}).finally(()=>{planOverviewPending=null;});
  return planOverviewPending;
 }
 function productionPlanRows(){

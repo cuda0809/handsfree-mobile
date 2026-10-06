@@ -6,7 +6,7 @@ const source=fs.readFileSync('kmt-sa2/app-flow.js','utf8');
 const home=source.slice(source.indexOf('function renderUnifiedHome('),source.indexOf('function projectMetaCache('));
 function render(confirmed,stale){
  const main={innerHTML:'',querySelectorAll:()=>[]};
- const ctx={main,coreSnapshot:confirmed,readStale:stale,screen:'home',lastRead:'',Date,Map,
+ const ctx={main,coreSnapshot:confirmed,readStale:stale,screen:'home',lastRead:'',Date,Map,planReadStale:false,planOverviewCache:()=>({completePlan:true}),
   setTimeout:()=>0,active(){},syncProjectMeta(){},syncPlanOverview(){},operationalRows:()=>[],
   isCompletedOperational:()=>false,planStagesOnDay:()=>[],hybridDueKey:()=>'',rememberProjectDetail(){},
   esc:String,banner(){}};
