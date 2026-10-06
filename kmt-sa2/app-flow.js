@@ -132,6 +132,12 @@ function hfCardTone(x,kind='active'){
 function hfCardIdentity(x,badge=''){
  return '<div class="hf-card-head"><div><small class="hf-card-job">JOB NO. '+esc(x.orderId||'미등록')+'</small><b class="hf-card-title">'+esc(x.customer||'고객 미등록')+' · '+esc(x.model||'모델 미등록')+'</b></div>'+(badge?'<span class="hf-card-badge">'+esc(badge)+'</span>':'')+'</div>';
 }
+function projectCurrentFields(x){
+ const issue=String(x.currentIssue||'').trim(),event=String(x.recentEvent||'').trim();
+ return (issue?'<div class="project-linked-issue"><small>현재 이슈</small><p>'+esc(issue)+'</p></div>':'')+
+ (event&&event!==issue?'<div class="project-linked-issue"><small>최근 진행 기록</small><p>'+esc(event)+'</p></div>':'')+
+ '<div class="project-linked-issue"><small>다음 행동</small><p>'+esc(x.nextAction||'미등록')+'</p></div>';
+}
 function renderUnifiedHome(){
  active('home');screen='home';
  setTimeout(()=>syncProjectMeta(false),0);setTimeout(()=>syncPlanOverview(false),80);
@@ -471,7 +477,7 @@ async function openProject(orderId,purpose='detail',sourceSnapshot=null){
    return '<div class="hybrid-step '+cls+'"><i></i><b>'+name+'</b><small>'+esc(label)+'</small></div>';
   }).join('')+'</div><div class="project-schedule-status '+(closed?'closed':'active')+'">'+(closed?'<b>제작 종료</b><span>실납기 '+esc(actualDay)+'</span>':'<b>진행중</b><span>'+esc(currentState)+' · 기준 '+esc(currentDate)+'</span>')+'</div>';
   el.innerHTML='<div class="hybrid-project-card"><small>JOB NO. '+esc(p.orderId)+' · PM '+esc(p.pm||'미등록')+'</small><h2>'+esc(p.customer)+' · '+esc(p.model)+'</h2><div class="project-date-grid"><div><small>납기</small><b>'+esc(summaryDue)+'</b></div><div><small>실납기일</small><b>'+esc(summaryActual)+'</b></div></div>'+(closed?'<div class="project-delivery-result '+deliveryPerformance(linked).tone+'">'+esc(deliveryPerformance(linked).label)+'</div>':'')+'<div class="hybrid-state"><span>현재 상태 · '+esc(currentState)+'</span><span>'+esc(closed?'완료':linked.priority===1?'우선 확인':'진행')+'</span></div>'+
- (String(linked.recentEvent||linked.cause||'').trim()?'<div class="project-linked-issue"><small>최근 이슈/진행</small><p>'+esc(linked.recentEvent||linked.cause)+'</p></div>':'')+
+ projectCurrentFields(linked)+
  '</div><div class="hybrid-section"><b>전체 제작 일정</b><span>현장 기준</span></div>'+scheduleBlock+'<div class="hybrid-section"><b>최근 라이프사이클</b><span>'+esc(historyState)+'</span></div><div class="lifecycle-preview">'+(shownHistory?lifecyclePreview(shownHistory,4,linked):lifecyclePreview({events:[],changes:[]},4,linked))+'</div><button id="projectLifecycleButton" class="primary">전체 라이프사이클 보기</button><button id="projectHistoryButton" class="secondary">변경 근거 · RAW 이력</button><button id="projectPlanButton" class="secondary">원본 계획일정 확인</button>';
   $('projectLifecycleButton').onclick=()=>projectLifecycle(p.orderId);
   $('projectHistoryButton').onclick=()=>projectHistory(p.orderId);
@@ -702,7 +708,7 @@ async function syncPlanOverview(force=false){
  const cached=planOverviewCache();
  if(cached)applyPlanOverview(cached.byOrder);
  const fresh=cached&&cached.completePlan===true&&Date.now()-Date.parse(cached.cachedAt||0)<15*60*1000;
- if(!force&&fresh){planReadStale=false;return cached;}
+ if(!force&&fresh&&!planReadStale)return cached;
  if(planOverviewPending)return planOverviewPending;
  planOverviewPending=(async()=>{
   const d=await appCall({action:'plans'});
