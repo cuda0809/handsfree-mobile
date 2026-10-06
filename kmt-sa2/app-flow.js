@@ -48,7 +48,9 @@ function latestUnifiedInputByOrder(){
  return out;
 }
 function operationalRows(includeCompleted=true){
- const meta=projectMetaCache()?.projects||appProjects||[];
+ if(lastReadErrorStatus===401||lastReadErrorStatus===403)return [];
+ const confirmed=coreSnapshot;
+ const meta=confirmed?[]:(projectMetaCache()?.projects||appProjects||[]);
  const plans=planOverviewCache()?.byOrder||{};
  const live=new Map(items.map(x=>[String(x.orderId||''),x]));
  const localInputs=latestUnifiedInputByOrder();
@@ -62,11 +64,11 @@ function operationalRows(includeCompleted=true){
   map.set(orderId,{...(map.get(orderId)||{}),...(plans[orderId]||{}),...x,orderId});
  }
  for(const [orderId,p] of Object.entries(plans)){
-  if(map.has(orderId))continue;
+  if(confirmed||map.has(orderId))continue;
   map.set(orderId,{orderId,...p,state:'계획',priority:2});
  }
  const rows=[...map.values()].map(x=>{
-  const local=localInputs.get(String(x.orderId||''));
+  const local=x.coreVerified?null:localInputs.get(String(x.orderId||''));
   const naturalState=local?.stateSyncVersion==='natural-v3'?String(local.displayState||'').trim():'';
   const localIssue=String(local?.text||'').trim();
   return {
@@ -168,7 +170,7 @@ function renderUnifiedHome(){
  '<div class="hybrid-section"><b>현장 이슈</b><span>'+issueActive.length+'대</span></div>'+
  '<div class="hf-card-list">'+(issueCards||'<div class="empty">현재 진행 이슈가 없습니다.</div>')+'</div>'+
  '<button class="hybrid-quick hf-quick-card" onclick="todayIssues()"><span>🎙 오늘 이슈 입력</span><span>＋</span></button>'+
- '<p class="source">통합 운영 · 계획 + 현재상태 · 조회 '+esc(lastRead||new Date().toLocaleString('ko-KR'))+'</p>';
+ '<p class="source">통합 운영 · 계획 + 현재상태 · 조회 '+esc(lastRead||'확인 전')+'</p>';
  main.querySelectorAll('[data-home-order]').forEach(b=>b.onclick=()=>{const x=operationalRows(true).find(v=>v.orderId===b.dataset.homeOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.homeOrder,'detail',x);});
  banner();
 }
@@ -181,7 +183,7 @@ function applyProjectMeta(projects,source='catalog'){
  const map=new Map((projects||[]).map(p=>[String(p.orderId||''),p]));
  let changed=false;
  items=items.map((x,id)=>{
-   const p=map.get(String(x.orderId||''));if(!p)return {...x,id};
+   const p=map.get(String(x.orderId||''));if(!p||x.coreVerified)return {...x,id:itemIdentity(x)};
    const patch={
     due:String(p.due||x.due||''),
     pm:String(p.pm||x.pm||''),
@@ -201,7 +203,7 @@ function applyProjectMeta(projects,source='catalog'){
     for(const key of ['planAssembly','planElectrical','planProgram','planInspection','planDelivery','confidence','updatedAt'])if(p[key]!==undefined)patch[key]=String(p[key]||'');
    }
    if(Object.keys(patch).some(k=>String(patch[k]||'')!==String(x[k]||'')))changed=true;
-   return {...x,...patch,id};
+   return {...x,...patch,id:itemIdentity(x)};
  });
  return changed;
 }
@@ -379,14 +381,14 @@ function applyLatestHistoryState(orderId,history){
  if(!state)return false;
  const idx=items.findIndex(x=>x.orderId===orderId);
  const previous=idx>=0?items[idx]:null;
- if(!previous)return false;
+ if(!previous||previous.coreVerified)return false;
  const at=String(latest.at||'');
  let day='';
  try{const d=new Date(at);if(!Number.isNaN(d.getTime()))day=d.toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});}catch{}
  const updated={...previous,state,nextAction:next||previous.nextAction,issueStatus:status||previous.issueStatus,process:coreProcessFromState(state,next,previous.process),priority:corePriorityFromState(state,next,status||previous.issueStatus,previous.priority),since:day||previous.since,sourceLatestUpdate:at||previous.sourceLatestUpdate};
  const changed=updated.state!==previous.state||updated.nextAction!==previous.nextAction||updated.issueStatus!==previous.issueStatus||updated.process!==previous.process;
  if(!changed)return false;
- items[idx]=updated;items=items.map((x,id)=>({...x,id}));
+ items[idx]=updated;items=items.map(x=>({...x,id:itemIdentity(x)}));
  if(typeof coreCacheSave==='function')coreCacheSave();
  return true;
 }
@@ -483,13 +485,13 @@ async function openProject(orderId,purpose='detail',sourceSnapshot=null){
  // Always refresh just this JOB NO. in the background. No manual refresh is required.
  if(linked.issueId){
   appCall({action:'issue',issueId:linked.issueId}).then(fresh=>{
-   if(!el?.isConnected||fresh.orderId!==p.orderId)return;
+   if(!el?.isConnected||fresh.orderId!==p.orderId||coreSnapshot)return;
    const idx=items.findIndex(x=>x.issueId===fresh.issueId);
    const previous=idx>=0?items[idx]:linked;
    const state=String(fresh.state||previous.state||''),next=String(fresh.nextAction||previous.nextAction||''),status=String(fresh.status||previous.issueStatus||'');
-   const updated={...previous,state,nextAction:next,issueStatus:status,orderId:String(fresh.orderId||previous.orderId),customer:String(fresh.customer||previous.customer),model:String(fresh.model||previous.model),process:coreProcessFromState(state,next,previous.process),priority:corePriorityFromState(state,next,status,previous.priority),since:state!==previous.state?new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'}):previous.since,sourceLatestUpdate:state!==previous.state?new Date().toISOString():previous.sourceLatestUpdate};
+   const updated={...previous,state,nextAction:next,issueStatus:status,orderId:String(fresh.orderId||previous.orderId),customer:String(fresh.customer||previous.customer),model:String(fresh.model||previous.model),process:coreProcessFromState(state,next,previous.process),priority:corePriorityFromState(state,next,status,previous.priority),since:String(fresh.since||previous.since||''),sourceLatestUpdate:String(fresh.sourceLatestUpdate||previous.sourceLatestUpdate||'')};
    if(idx>=0)items[idx]=updated;else items.push(updated);
-   items=items.map((x,id)=>({...x,id}));
+   items=items.map(x=>({...x,id:itemIdentity(x)}));
    if(typeof coreCacheSave==='function')coreCacheSave();
    linked=projectDetailRow(p.orderId,{...p,state:updated.state,nextAction:updated.nextAction,process:updated.process,issueStatus:updated.issueStatus,priority:updated.priority,since:updated.since,sourceLatestUpdate:updated.sourceLatestUpdate});
    render();
@@ -506,18 +508,18 @@ async function openProject(orderId,purpose='detail',sourceSnapshot=null){
 }
 
 const appScheduleBase=scheduleReport;
-scheduleReport=function(id){const x=typeof id==='object'?id:items[id];if(x?.orderId?.includes('*'))return allProjects(x.orderId.replace(/\*.*$/,''),'schedule');return appScheduleBase(id);};
+scheduleReport=function(id){const x=typeof id==='object'?id:itemById(id);if(x?.orderId?.includes('*'))return allProjects(x.orderId.replace(/\*.*$/,''),'schedule');return appScheduleBase(id);};
 const appInputBase=input;
-input=function(id){const x=typeof id==='object'?id:items[id];if(x?.orderId?.includes('*'))return allProjects(x.orderId.replace(/\*.*$/,''),'input');editingNoteId=null;return appInputBase(id);};
+input=function(id){const x=typeof id==='object'?id:itemById(id);if(x?.orderId?.includes('*'))return allProjects(x.orderId.replace(/\*.*$/,''),'input');editingNoteId=null;return appInputBase(id);};
 const appItemBase=openItem;
-openItem=function(id){appItemBase(id);const x=items[id];if(!x)return;const box=$('sheetBody');box.insertAdjacentHTML('beforeend','<button id="issueHistoryButton" class="secondary">프로젝트 상세 · 라이프사이클</button>');$('issueHistoryButton').onclick=()=>openProject(x.orderId);};
+openItem=function(id){appItemBase(id);const x=itemById(id);if(!x)return;const box=$('sheetBody');box.insertAdjacentHTML('beforeend','<button id="issueHistoryButton" class="secondary">프로젝트 상세 · 라이프사이클</button>');$('issueHistoryButton').onclick=()=>openProject(x.orderId);};
 async function projectHistory(orderId){open(heading('Event · 변경이력',orderId)+'<div id="historyResult">서버 기록을 불러오는 중…</div>');const el=$('historyResult');try{const d=await appCall({action:'history',orderId});if(!el.isConnected)return;
  el.innerHTML='<h3>변경이력</h3>'+d.changes.map(r=>'<article class="item"><b>'+esc(r.kind==='schedule'?'일정 변경':'현재 상태 변경')+'</b><p>'+esc(r.kind==='schedule'?appDay(r.before[3])+' → '+appDay(r.after[3]):r.before[16]+' → '+r.after[16])+'</p><p>'+esc(r.reason)+'</p><small>'+esc(r.at)+' · '+esc(r.actor)+'<br>'+esc(r.id)+'</small></article>').join('')+(!d.changes.length?'<p>기록된 변경이력이 없습니다.</p>':'')+'<h3>Event</h3>'+d.events.map(r=>'<article class="item"><b>'+esc(r.type)+' · '+esc(r.status)+'</b><p>'+esc(r.raw)+'</p><small>'+esc(r.at)+' · '+esc(r.actor||'과거 기록: 입력자 직접 기록 없음')+'<br>'+esc(r.requestId)+'</small></article>').join('')+(!d.events.length?'<p>연결된 Event 기록이 없습니다.</p>':'');
  }catch(e){appFailure(el,e);}}
 async function editIssue(issueId){open(heading('상태 수정',issueId)+'<div id="issueEditResult">최신 상태를 불러오는 중…</div>');const el=$('issueEditResult');try{const d=await appCall({action:'issue',issueId});if(!el.isConnected)return;if(!['OPEN','MONITOR','CLOSED'].includes(d.status)){el.textContent='취소된 과거 이슈는 수정할 수 없습니다. 변경이력에서 확인하세요.';appIssue=null;return;}appIssue=d;
  el.innerHTML='<p>'+esc(d.customer)+' · '+esc(d.model)+'<br>'+esc(d.orderId)+'</p><label>현재 상태<input id="issueState" maxlength="80" value="'+esc(d.state)+'"></label><label>다음 행동<textarea id="issueNext" maxlength="500">'+esc(d.nextAction)+'</textarea></label><label>이슈 관리 상태<select id="issueStatus">'+[['OPEN','진행 중'],['MONITOR','관찰 중'],['CLOSED','종결']].map(([v,t])=>'<option value="'+v+'" '+(d.status===v?'selected':'')+'>'+t+'</option>').join('')+'</select></label><label>변경 사유<textarea id="issueReason" maxlength="500"></textarea></label><p id="issueSaveHint" role="status"></p><button id="issueSaveButton" class="primary" onclick="saveIssue()">변경 내용 확인 후 저장</button><button class="secondary" onclick="checkIssueReceipt()">이 기기의 마지막 상태 저장 결과 확인</button>';
  }catch(e){appFailure(el,e);}}
-function applyIssueReceiptLocal(d){const i=items.findIndex(x=>x.issueId===d.issueId);if(d.issueStatus==='CLOSED'){if(i>=0)items.splice(i,1);}else if(i>=0){const prev=items[i];items[i]={...prev,state:d.state,nextAction:d.nextAction,issueStatus:d.issueStatus,process:coreProcessFromState(d.state,d.nextAction,prev.process),priority:corePriorityFromState(d.state,d.nextAction,d.issueStatus,prev.priority),sourceLatestUpdate:new Date().toISOString()};}items=items.map((x,id)=>({...x,id}));if(screen==='home')home();if(screen==='work')work(filter,$('search')?.value||'');if(screen==='plan')productionPlan(productionPlanMode,true);if(screen==='projects')projects(filter);if(screen==='issues'&&typeof todayIssues==='function')todayIssues();}
+function applyIssueReceiptLocal(d){const i=items.findIndex(x=>x.issueId===d.issueId);if(d.issueStatus==='CLOSED'){if(i>=0)items.splice(i,1);}else if(i>=0){const prev=items[i];items[i]={...prev,state:d.state,nextAction:d.nextAction,issueStatus:d.issueStatus,process:coreProcessFromState(d.state,d.nextAction,prev.process),priority:corePriorityFromState(d.state,d.nextAction,d.issueStatus,prev.priority),sourceLatestUpdate:new Date().toISOString()};}items=items.map(x=>({...x,id:itemIdentity(x)}));if(screen==='home')home();if(screen==='work')work(filter,$('search')?.value||'');if(screen==='plan')productionPlan(productionPlanMode,true);if(screen==='projects')projects(filter);if(screen==='issues'&&typeof todayIssues==='function')todayIssues();}
 async function saveIssue(){if(!appIssue||$('issueSaveButton')?.disabled)return;if(readStore('hf-issue-pending',null))return toast('이전 상태 저장 결과부터 확인하세요. 자동 재전송하지 않습니다.');const body={action:'edit',issueId:appIssue.issueId,orderId:appIssue.orderId,expected:appIssue.revision,state:$('issueState').value.trim(),nextAction:$('issueNext').value.trim(),status:$('issueStatus').value,reason:$('issueReason').value.trim(),requestId:crypto.randomUUID()};const hint=$('issueSaveHint');if(!body.state||!body.reason||(!body.nextAction&&body.status!=='CLOSED')){hint.textContent='현재 상태, 다음 행동, 변경 사유를 확인하세요.';return;}try{persist('hf-issue-pending',body);}catch{hint.textContent='요청을 기기에 보관하지 못해 전송하지 않았습니다.';return;}$('issueSaveButton').disabled=true;hint.textContent='서버 저장 중…';try{const d=await appCall(body);if(d.status!=='APPLIED')throw Error('unconfirmed');applyIssueReceiptLocal(d);showIssueReceiptPending(d);setTimeout(()=>verifyIssueReceipt(d),0);}catch(e){if([400,401,403,409].includes(e.status))localStorage.removeItem('hf-issue-pending');if(hint.isConnected){hint.textContent=appError(e);$('issueSaveButton').hidden=true;}}}
 function showIssueReceiptPending(d){open(heading('서버 저장 성공',d.state,d.orderId)+'<p>다음 행동 '+esc(d.nextAction||'없음')+'</p><p>'+esc(d.reason)+'</p><p class="alert">화면에 바로 반영했습니다. 서버 원본을 다시 확인하고 있습니다.</p><p class="note">'+esc(d.requestId)+'</p>');}
 function showIssueReceipt(d){if(d.status!=='APPLIED')throw Error('unconfirmed');try{localStorage.removeItem('hf-issue-pending');}catch{}open(heading('현재 상태 저장 완료',d.state,d.orderId)+'<p>다음 행동 '+esc(d.nextAction||'없음')+'</p><p>'+esc(d.reason)+'</p><p class="alert">앱의 현재 업무 화면에도 수정 내용을 반영했습니다.</p><p class="note">'+esc(d.actor)+'<br>'+esc(d.requestId)+'</p><button id="savedIssueHistory" class="secondary">변경이력 확인</button>');$('savedIssueHistory').onclick=()=>projectHistory(d.orderId);}
@@ -683,10 +685,10 @@ function summarizePlanRecords(records){
 function applyPlanOverview(byOrder){
  let changed=false;
  items=items.map((x,id)=>{
-  const p=byOrder?.[x.orderId];if(!p)return {...x,id};
+  const p=byOrder?.[x.orderId];if(!p)return {...x,id:itemIdentity(x)};
   const patch={...p};
   if(Object.keys(patch).some(k=>String(patch[k]||'')!==String(x[k]||'')))changed=true;
-  return {...x,...patch,id};
+  return {...x,...patch,id:itemIdentity(x)};
  });
  if(changed&&typeof coreCacheSave==='function')coreCacheSave();
  return changed;
@@ -699,7 +701,7 @@ async function syncPlanOverview(force=false){
  if(planOverviewPending)return planOverviewPending;
  planOverviewPending=(async()=>{
   await syncProjectMeta(false);
-  const meta=projectMetaCache()?.projects||appProjects||[];
+  const meta=coreSnapshot?items:(projectMetaCache()?.projects||appProjects||[]);
   const today=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Seoul'}));
   const from=new Date(today);from.setDate(from.getDate()-45);
   const to=new Date(today);to.setDate(to.getDate()+210);

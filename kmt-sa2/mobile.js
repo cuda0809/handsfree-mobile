@@ -1,6 +1,7 @@
 'use strict';
 const BUILD='2026.09.29.SA2.8.3-CORE', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
 const main=document.getElementById('main'),dialog=document.getElementById('detail');
+let coreSnapshot=false;
 let items=[],live=false,readPending=null,sourceDate='',lastRead='',screen='home',filter='all',returnFocus=null,readMessage='현재 상태를 불러오는 중…',recognition=null,installPrompt=null,readStale=false,lastReadErrorStatus=0,lastCoreAttempt=0;
 const $=id=>document.getElementById(id);
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -39,14 +40,17 @@ async function checkForLiveUpdate(){
 setTimeout(checkForLiveUpdate,2500);
 setInterval(checkForLiveUpdate,60000);
 window.addEventListener('focus',()=>setTimeout(checkForLiveUpdate,300));
-function coreCacheRead(){const v=readStore(CORE_CACHE_KEY,null);return v&&Array.isArray(v.items)&&v.items.length?v:null;}
-function coreCacheSave(){
- try{persist(CORE_CACHE_KEY,{cachedAt:new Date().toISOString(),sourceDate,items:items.map(({id,...x})=>x)});}catch{}
+function coreCacheRead(){const v=readStore(CORE_CACHE_KEY,null);return v&&Array.isArray(v.items)?v:null;}
+function itemIdentity(x){return String(x.projectId||x.issueId||x.orderId||'');}
+function itemById(id){return typeof id==='object'?id:items.find(x=>x.id===String(id));}
+function coreCacheSave(verified=false){
+ if(!verified)return;
+ try{persist(CORE_CACHE_KEY,{completeCore:true,cachedAt:new Date().toISOString(),sourceDate,items:items.map(({id,...x})=>x)});}catch{}
 }
 function coreCacheRestore(){
- const c=coreCacheRead();if(!c)return false;
- items=c.items.map((x,id)=>({...x,priority:corePriorityFromState(x.state,x.nextAction,x.issueStatus,x.priority),id}));sourceDate=String(c.sourceDate||'');lastRead=c.cachedAt?new Date(c.cachedAt).toLocaleString('ko-KR'):'';
- live=true;readStale=true;readMessage='최근 정상값 · 최신 동기화 대기';
+ const c=coreCacheRead();if(!c)return false;coreSnapshot=c.completeCore===true;
+ items=c.items.map(x=>({...x,priority:corePriorityFromState(x.state,x.nextAction,x.issueStatus,x.priority),id:itemIdentity(x)}));sourceDate=String(c.sourceDate||'');lastRead=c.cachedAt?new Date(c.cachedAt).toLocaleString('ko-KR'):'';
+ live=true;readStale=true;readMessage='이전 조회값 · 최신 동기화 대기';
  return true;
 }
 coreCacheRestore();
@@ -73,25 +77,38 @@ function corePriorityFromState(state,next,status,previous=2){
  return previous===1?2:(previous||2);
 }
 async function refreshCachedCore(){
- const d=await api('/api/sa2-app',{action:'catalog'},18000);
- if(!Array.isArray(d.issues))throw Error('invalid_catalog');
- const byId=new Map(d.issues.map(v=>[String(v.issueId||''),v]));
- const changed=[];
- for(const x of items){
-   const v=byId.get(String(x.issueId||''));if(!v)continue;
-   if(String(v.state||'')!==String(x.state||'')||String(v.status||'')!==String(x.issueStatus||''))changed.push({x,v});
+ // Both complete contracts are required; catalog alone cannot establish Core freshness.
+ const d=await api('/api/sa2-app',{action:'core'},22000);
+ if(d.coreFallback)throw Error('partial_core');
+ if(!Array.isArray(d.projects)||!d.generatedAt)throw Error('invalid_core');
+ const seen=new Set(),projectIds=new Set();
+ for(const p of d.projects){
+  if(!p||typeof p!=='object'||!String(p.projectId||'').trim()||!String(p.orderId||'').trim()||typeof p.state!=='string'||typeof p.nextAction!=='string'||typeof p.currentIssue!=='string'||typeof p.recentEvent!=='string'||seen.has(p.orderId)||projectIds.has(p.projectId))throw Error('invalid_core');
+  seen.add(p.orderId);projectIds.add(p.projectId);
  }
- const details=await Promise.allSettled(changed.slice(0,8).map(({x})=>api('/api/sa2-app',{action:'issue',issueId:x.issueId},18000)));
- changed.slice(0,8).forEach(({x,v},i)=>{
-   const detail=details[i]?.status==='fulfilled'?details[i].value:null;
-   const idx=items.findIndex(k=>k.issueId===x.issueId);if(idx<0)return;
-   const state=String(detail?.state??v.state??x.state),next=String(detail?.nextAction??x.nextAction??''),status=String(detail?.status??v.status??x.issueStatus);
-   items[idx]={...x,state,nextAction:next,issueStatus:status,orderId:String(detail?.orderId||x.orderId),customer:String(detail?.customer||x.customer),model:String(detail?.model||x.model),process:coreProcessFromState(state,next,x.process),priority:corePriorityFromState(state,next,status,x.priority),since:state!==x.state?new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'}):x.since,sourceLatestUpdate:state!==x.state?new Date().toISOString():x.sourceLatestUpdate};
+ const catalog=await api('/api/sa2-app',{action:'catalog'},22000);
+ if(!Array.isArray(catalog.issues))throw Error('partial_core');
+ const byOrder=new Map();
+ for(const v of catalog.issues){
+  if(!v||typeof v.issueId!=='string'||!v.issueId||typeof v.orderId!=='string'||typeof v.status!=='string')throw Error('invalid_catalog');
+  const prior=byOrder.get(v.orderId);
+  if(prior&&prior.issueId!==v.issueId)throw Error('ambiguous_issue');
+  byOrder.set(v.orderId,v);
+ }
+ const next=d.projects.map(p=>{
+  const issue=byOrder.get(p.orderId),status=String(issue?.status||'');
+  return {...p,issueId:String(issue?.issueId||''),issueStatus:status,
+   cause:p.currentIssue||p.recentEvent||'',
+   sourceLatestUpdate:String(p.updatedAt||p.sourceLatestUpdate||''),
+   priority:corePriorityFromState(p.state,p.nextAction,status,2),
+   id:itemIdentity(p),coreVerified:true};
  });
- items=items.map((x,id)=>({...x,id}));
- if(changed.length){sourceDate=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});lastRead=new Date().toLocaleString('ko-KR');coreCacheSave();}
- return {changed:changed.length};
+ return {items:next,sourceDate:d.projects.map(p=>String(p.updatedAt||'')).sort().at(-1)||''};
 }
+function renderCoreScreen(){
+ if(screen==='home')home();if(screen==='work')work(filter,$('search')?.value||'');if(screen==='plan'&&typeof productionPlan==='function')productionPlan(productionPlanMode,true);if(screen==='projects'&&typeof projects==='function')projects();if(screen==='issues'&&typeof todayIssues==='function')todayIssues();
+}
+
 function active(name){screen=name;document.querySelectorAll('.bottom button').forEach(b=>b.classList.toggle('selected',b.dataset.page===name));}
 function banner(){
  const demo=document.querySelector('.demo');
@@ -105,57 +122,53 @@ function banner(){
 }
 async function refresh(force=true){
  if(readPending)return readPending;
- if(!force&&Date.now()-lastCoreAttempt<60000)return items.length;
- lastCoreAttempt=Date.now();
- readMessage=items.length?'최근 정상값 표시 · 최신값 확인 중…':'현재 상태를 불러오는 중…';banner();
+ if(!force&&Date.now()-lastCoreAttempt<60000)return !readStale;
+ lastCoreAttempt=Date.now();readStale=true;
+ readMessage=live?'이전 조회값 표시 · 전체 최신값 확인 중…':'현재 상태를 불러오는 중…';banner();
  readPending=(async()=>{
+  const previous={items,live,sourceDate,lastRead,coreSnapshot};
   try{
-   if(items.length){
-    try{
-     const quick=await refreshCachedCore();
-     live=true;readStale=false;lastReadErrorStatus=0;
-     readMessage='CORE · '+items.length+'건 · '+(quick.changed?'변경 '+quick.changed+'건 반영':'최신 상태 확인');
-     return true;
-    }catch(_){}
-   }
-   const d=await api('/api/sa2-real-status',null,22000);
-   if(d.live!==true||!Array.isArray(d.currentStatus))throw Error('invalid_response');
-   items=d.currentStatus.map((x,id)=>({...x,priority:corePriorityFromState(x.state,x.nextAction,x.issueStatus,x.priority),id}));live=true;readStale=false;lastReadErrorStatus=0;sourceDate=d.sourceLatestDate||'';lastRead=new Date().toLocaleString('ko-KR');readMessage=(d.test?'검증 데이터 · 운영 아님 · ':'')+(d.coreRead?'CORE · ':'')+`${items.length}건 · ${sourceDate||'기준일 미등록'}`;coreCacheSave();return true;
+   const full=await refreshCachedCore();
+   items=full.items;coreSnapshot=true;live=true;sourceDate=full.sourceDate;
+   renderCoreScreen(); // A failed application must not advance freshness or the cache.
+   readStale=false;lastReadErrorStatus=0;lastRead=new Date().toLocaleString('ko-KR');
+   readMessage='CORE · '+items.length+'건 · 전체 최신 상태 확인 · '+(sourceDate||'원천 기준시각 미등록');
+   coreCacheSave(true);return true;
   }catch(e){
-   lastReadErrorStatus=e.status||0;
-   if(e.status===401){items=[];live=false;readStale=false;readMessage='사용자 등록 · 연결이 필요합니다';}
-   else{readStale=true;const cached=items.length||coreCacheRestore();if(cached){live=true;readMessage='동기화 지연 · 최근 정상값 유지';}else{live=false;readMessage='현재 상태를 불러오지 못했습니다.';}}
+   ({items,live,sourceDate,lastRead,coreSnapshot}=previous);lastReadErrorStatus=e.status||0;readStale=true;
+   if(e.status===401||e.status===403){items=[];live=false;coreSnapshot=false;screen='home';readMessage='사용자 등록 · 연결이 필요합니다';}
+   else{readMessage=(e.message==='partial_core'?'일부 확인':'갱신 실패')+' · '+(live?'이전 조회값 유지':'현재 상태 확인 불가');}
    return false;
   }finally{
    readPending=null;banner();
-   if(screen==='home')home();if(screen==='work')work(filter,$('search')?.value||'');if(screen==='plan'&&typeof productionPlan==='function')productionPlan(productionPlanMode,true);if(screen==='projects'&&typeof projects==='function')projects();if(screen==='issues'&&typeof todayIssues==='function')todayIssues();
+   try{renderCoreScreen();}catch{readStale=true;readMessage='화면 반영 실패 · 최신 확인 불가';banner();}
   }
  })();
  return readPending;
 }
 
-function card(x){return `<article class="item"><div class="item-top"><div class="item-status"><span class="tag">현재 진행</span><button class="schedule-button" onclick="scheduleReport(${x.id})">계획일정 ↗</button></div><span class="category">${esc(x.process)}</span></div><button class="item-detail" aria-label="${esc(x.customer)} ${esc(x.model)} 업무 상세" onclick="openItem(${x.id})"><h3>${esc(x.customer)}<small>${esc(x.model)}</small></h3><p class="issue">${esc(x.state||'진행내용 미등록')}</p><div class="next"><span>다음 행동 · ${esc(x.nextAction||'확인 필요')}</span><span>›</span></div></button></article>`;}
+function card(x){return `<article class="item"><div class="item-top"><div class="item-status"><span class="tag">현재 진행</span><button class="schedule-button" onclick="scheduleReport(${esc(JSON.stringify(x.id))})">계획일정 ↗</button></div><span class="category">${esc(x.process)}</span></div><button class="item-detail" aria-label="${esc(x.customer)} ${esc(x.model)} 업무 상세" onclick="openItem(${esc(JSON.stringify(x.id))})"><h3>${esc(x.customer)}<small>${esc(x.model)}</small></h3><p class="issue">${esc(x.state||'진행내용 미등록')}</p><div class="next"><span>다음 행동 · ${esc(x.nextAction||'확인 필요')}</span><span>›</span></div></button></article>`;}
 function reports(){return `<section><div class="section-title"><h2>생산 · 지원 집계</h2></div><div class="report-links"><button onclick="productionReport('month')">▥ 월간생산량<small>집계 연결 확인 ›</small></button><button onclick="productionReport('year')">▤ 연간생산량<small>집계 연결 확인 ›</small></button><button onclick="supportReport()">⇄ 타부서지원<small>누적 집계표 ›</small></button></div></section>`;}
 function home(){if(typeof renderUnifiedHome==='function')return renderUnifiedHome();active('home');const urgent=items.filter(x=>x.priority===1),done=items.filter(x=>x.priority===3),top=urgent[0],sorted=items.slice().sort((a,b)=>(a.priority||9)-(b.priority||9));main.innerHTML=`
 <div class="hybrid-eyebrow">${esc(new Date().toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',weekday:'long'}))}</div>
 <h1 class="hybrid-title">오늘 확인할 일<br>${live?urgent.length:'—'}건이 있습니다</h1>
 <p class="hybrid-desc">현재 상태와 다음 행동을 우선순위 기준으로 보여줍니다.</p>${readStale?`<button class="hybrid-quick" onclick="refresh()"><span>↻ 다시 불러오기</span><span>${items.length?'최근 정상값 유지':'재시도'}</span></button>`:''}
-${top?`<section class="hybrid-decision"><div class="hybrid-decision-top"><span>가장 먼저 볼 항목</span><span>P1 · ${esc(top.priorityReason||'확인 필요')}</span></div><h2>${esc(top.customer)} · ${esc(top.model)}<br><span>${esc(top.state)}</span></h2><p>다음 행동 · ${esc(top.nextAction||'확인 필요')}</p><button onclick="openItem(${top.id})"><span>상세와 변경 근거 보기</span><span>›</span></button></section>`:!live&&lastReadErrorStatus===401?'<section class="hybrid-decision"><h2>사용자 연결이 필요합니다.</h2><button onclick="login()"><span>앱 연결하기</span><span>›</span></button></section>':!live?'<section class="hybrid-decision"><h2>서버 연결이 잠시 지연되고 있습니다.</h2><p>사용자 연결은 정상입니다. 다시 불러오기를 눌러주세요.</p></section>':'<section class="hybrid-decision"><h2>우선 확인할 P1 항목이 없습니다.</h2><p>현재 관리 항목은 정상 진행 또는 완료 상태입니다.</p></section>'}
+${top?`<section class="hybrid-decision"><div class="hybrid-decision-top"><span>가장 먼저 볼 항목</span><span>P1 · ${esc(top.priorityReason||'확인 필요')}</span></div><h2>${esc(top.customer)} · ${esc(top.model)}<br><span>${esc(top.state)}</span></h2><p>다음 행동 · ${esc(top.nextAction||'확인 필요')}</p><button onclick="openItem(${esc(JSON.stringify(top.id))})"><span>상세와 변경 근거 보기</span><span>›</span></button></section>`:!live&&lastReadErrorStatus===401?'<section class="hybrid-decision"><h2>사용자 연결이 필요합니다.</h2><button onclick="login()"><span>앱 연결하기</span><span>›</span></button></section>':!live?'<section class="hybrid-decision"><h2>서버 연결이 잠시 지연되고 있습니다.</h2><p>사용자 연결은 정상입니다. 다시 불러오기를 눌러주세요.</p></section>':'<section class="hybrid-decision"><h2>우선 확인할 P1 항목이 없습니다.</h2><p>현재 관리 항목은 정상 진행 또는 완료 상태입니다.</p></section>'}
 <div class="hybrid-numbers"><button class="hybrid-number" onclick="projects()"><small>관리중</small><b>${live?items.length:'—'}</b><em>현재 Core</em></button><button class="hybrid-number risk" onclick="projects('urgent')"><small>우선순위 1</small><b>${live?urgent.length:'—'}</b><em>먼저 확인</em></button><button class="hybrid-number" onclick="showInbox()"><small>완료 상태</small><b>${live?done.length:'—'}</b><em>기록 확인</em></button></div>
 <div class="hybrid-section"><b>공정 신호</b><span>우선순위순</span></div>
-<div class="hybrid-floor">${sorted.map(x=>`<button class="hybrid-floor-row p${esc(x.priority||2)}" onclick="openItem(${x.id})"><span class="hybrid-code">${x.priority===1?'P1':x.priority===3?'완료':'P2'}</span><span><b>${esc(x.customer)} · ${esc(x.model)}</b><small>${esc(x.state||'미등록')} · 다음 ${esc(x.nextAction||'확인 필요')}</small></span><span class="hybrid-priority">${x.priority===1?'확인':x.priority===3?'완료':'진행'}</span></button>`).join('')||'<div class="empty">현재 관리 항목이 없습니다.</div>'}</div>
+<div class="hybrid-floor">${sorted.map(x=>`<button class="hybrid-floor-row p${esc(x.priority||2)}" onclick="openItem(${esc(JSON.stringify(x.id))})"><span class="hybrid-code">${x.priority===1?'P1':x.priority===3?'완료':'P2'}</span><span><b>${esc(x.customer)} · ${esc(x.model)}</b><small>${esc(x.state||'미등록')} · 다음 ${esc(x.nextAction||'확인 필요')}</small></span><span class="hybrid-priority">${x.priority===1?'확인':x.priority===3?'완료':'진행'}</span></button>`).join('')||'<div class="empty">현재 관리 항목이 없습니다.</div>'}</div>
 <button class="hybrid-quick" onclick="todayIssues()"><span>🎙 오늘 이슈 입력</span><span>＋</span></button>
 <div class="hybrid-section"><b>생산 · 지원 집계</b><span>실제 집계</span></div>${reports()}
 <p class="source">${live?`Core 기준 · 조회 ${esc(lastRead)}`:esc(readMessage)}</p>`;banner();}
 function work(f='all',query=''){active('work');filter=f;main.innerHTML=`<h1>업무 <span>한눈에</span></h1><p class="lead">현재 관리 이슈를 검색합니다.</p><div class="search"><input id="search" aria-label="고객 또는 장비 검색" value="${esc(query)}" placeholder="고객명 · 장비명 · 상태" oninput="renderList()"></div><div class="tabs">${[['all','전체'],['waiting','대기·보류'],['urgent','우선순위 1']].map(([v,t])=>`<button class="chip ${f===v?'active':''}" onclick="work('${v}')">${t}</button>`).join('')}</div><div id="list"></div>`;renderList();}
 function renderList(){const q=norm($('search').value),a=items.filter(x=>(filter!=='waiting'||/대기|보류|지연/.test(x.state))&&(filter!=='urgent'||x.priority===1)&&norm([x.customer,x.model,x.state,x.cause,x.orderId].join(' ')).includes(q));$('list').innerHTML=a.length?a.map(card).join(''):`<div class="empty">${live?'일치하는 업무가 없습니다.':esc(readMessage)}</div>`;}
-function openItem(id){const x=items[id];if(!x)return toast('최신 상태를 다시 불러오세요.');open(heading(x.process,x.customer,x.model)+`<div class="job-number"><small>JOB NO.</small><b>${esc(x.orderId||'미등록')}</b></div><h4>납기</h4><p>${esc(typeof formatHfDate==='function'?formatHfDate(x.due):(x.due||'미정'))}</p><h4>최근 진행내용</h4><div class="action-box">${esc(x.state||'미등록')}</div><h4>진행 시작 · 지속</h4><p>${esc(x.since||'미등록')} · ${Number.isFinite(x.days)?x.days+'일째':'기간 미확인'}</p><h4>기존 원인 / 이슈</h4><p>${esc(x.cause||'미등록')}</p><h4>다음 행동</h4><p>${esc(x.nextAction||'미등록')}</p><p class="note">${esc(x.issueId)} · ${esc(x.issueStatus)} · 원본 최신 ${esc(x.sourceLatestUpdate||sourceDate)}</p><button class="primary" onclick="openUnifiedEvent('${esc(x.issueId)}')">오늘 이슈 입력</button><button class="secondary" onclick="scheduleReport(${id})">계획일정 확인</button>`);}
+function openItem(id){const x=itemById(id);if(!x)return toast('최신 상태를 다시 불러오세요.');open(heading(x.process,x.customer,x.model)+`<div class="job-number"><small>JOB NO.</small><b>${esc(x.orderId||'미등록')}</b></div><h4>납기</h4><p>${esc(typeof formatHfDate==='function'?formatHfDate(x.due):(x.due||'미정'))}</p><h4>최근 진행내용</h4><div class="action-box">${esc(x.state||'미등록')}</div><h4>진행 시작 · 지속</h4><p>${esc(x.since||'미등록')} · ${Number.isFinite(x.days)?x.days+'일째':'기간 미확인'}</p><h4>기존 원인 / 이슈</h4><p>${esc(x.cause||'미등록')}</p><h4>다음 행동</h4><p>${esc(x.nextAction||'미등록')}</p><p class="note">${esc(x.issueId)} · ${esc(x.issueStatus)} · 원본 최신 ${esc(x.sourceLatestUpdate||sourceDate)}</p><button class="primary" onclick="openUnifiedEvent('${esc(x.issueId)}')">오늘 이슈 입력</button><button class="secondary" onclick="scheduleReport(${esc(JSON.stringify(id))})">계획일정 확인</button>`);}
 function unavailable(title,description){open(heading('연결 상태',title,'실제 데이터 연결이 필요합니다')+`<div class="alert">${esc(description)}</div><p>값을 0 또는 완료로 대신 표시하지 않습니다.</p><button class="secondary" onclick="dialog.close()">닫기</button>`);}
 function productionReport(mode){unavailable(mode==='month'?'월간생산량':'연간생산량','현재 조회 서비스에 생산 완료일·완료 수량이 없어 실적을 집계할 수 없습니다.');}
 function supportReport(){unavailable('타부서지원 누적 집계표','현재 조회 서비스에 지원 부서·지원 시간·기준일이 연결되지 않았습니다.');}
 let planRequest=0;
 async function scheduleReport(id){
- const x=items[id];if(!x)return;
+ const x=itemById(id);if(!x)return;
  const request=++planRequest;
  open(heading('계획일정',x.customer,x.model)+'<p id="planResult">원본 계획을 불러오는 중…</p>');
  const result=$('planResult');
@@ -168,7 +181,7 @@ async function scheduleReport(id){
     (d.plans.length?d.plans.map(r=>'<article class="item"><b>'+esc(r[3])+' · '+esc(r[10])+'</b><p>'+esc(r[11]||'상태 미등록')+'</p></article>').join(''):'<p>이 프로젝트 ID에 연결된 계획이 없습니다.</p>');
  }catch{if(request===planRequest&&result.isConnected)result.textContent='계획을 불러오지 못했습니다. 연결을 확인한 뒤 다시 여세요.';}
 }
-function input(id){const x=typeof id==='object'?id:items[id],d=readStore(DRAFT,{}),target=x?`${x.orderId?x.orderId+' · ':''}${x.customer} · ${x.model}`:d.target||'',draftText=x&&d.target&&d.target!==target?'':d.text||'';open(heading('FIELD NOTE','진행내용 입력',x?.issueId?'입력한 첫 줄을 현재 업무 카드에도 바로 표시합니다.':'기기에 보관한 뒤 내용을 확인하여 서버로 보냅니다')+`<label>입력 대상<input id="inputTarget" aria-label="입력 대상" maxlength="160" value="${esc(target)}" placeholder="고객명 · 장비명" oninput="saveDraft()"></label><label>진행내용<textarea id="draft" aria-label="진행 내용" maxlength="800" placeholder="바뀐 진행내용을 입력하세요." oninput="saveDraft()">${esc(draftText)}</textarea></label><input id="inputIssueId" type="hidden" value="${esc(x?.issueId||'')}"><input id="inputOrderId" type="hidden" value="${esc(x?.orderId||'')}"><input id="inputNextAction" type="hidden" value="${esc(x?.nextAction||'')}"><input id="inputIssueStatus" type="hidden" value="${esc(x?.issueStatus||'OPEN')}"><button class="chip" onclick="voice()">◉ 음성 입력</button><p id="inputHint" class="note">${draftText?'보관한 초안을 불러왔습니다.':x?.issueId?'첫 줄은 현재 진행으로 표시하고, 다음 행동·일정은 그대로 둡니다.':'입력 원문은 이 기기에 보관됩니다.'}</p><button class="primary" onclick="saveAndSendNote()">서버로 보내고 바로 반영</button><button class="secondary" onclick="saveNote()">기기에만 보관</button><p class="note">서버 저장과 재조회를 확인한 뒤 업무 카드를 자동으로 갱신합니다.</p>`);}
+function input(id){const x=typeof id==='object'?id:itemById(id),d=readStore(DRAFT,{}),target=x?`${x.orderId?x.orderId+' · ':''}${x.customer} · ${x.model}`:d.target||'',draftText=x&&d.target&&d.target!==target?'':d.text||'';open(heading('FIELD NOTE','진행내용 입력',x?.issueId?'입력한 첫 줄을 현재 업무 카드에도 바로 표시합니다.':'기기에 보관한 뒤 내용을 확인하여 서버로 보냅니다')+`<label>입력 대상<input id="inputTarget" aria-label="입력 대상" maxlength="160" value="${esc(target)}" placeholder="고객명 · 장비명" oninput="saveDraft()"></label><label>진행내용<textarea id="draft" aria-label="진행 내용" maxlength="800" placeholder="바뀐 진행내용을 입력하세요." oninput="saveDraft()">${esc(draftText)}</textarea></label><input id="inputIssueId" type="hidden" value="${esc(x?.issueId||'')}"><input id="inputOrderId" type="hidden" value="${esc(x?.orderId||'')}"><input id="inputNextAction" type="hidden" value="${esc(x?.nextAction||'')}"><input id="inputIssueStatus" type="hidden" value="${esc(x?.issueStatus||'OPEN')}"><button class="chip" onclick="voice()">◉ 음성 입력</button><p id="inputHint" class="note">${draftText?'보관한 초안을 불러왔습니다.':x?.issueId?'첫 줄은 현재 진행으로 표시하고, 다음 행동·일정은 그대로 둡니다.':'입력 원문은 이 기기에 보관됩니다.'}</p><button class="primary" onclick="saveAndSendNote()">서버로 보내고 바로 반영</button><button class="secondary" onclick="saveNote()">기기에만 보관</button><p class="note">서버 저장과 재조회를 확인한 뒤 업무 카드를 자동으로 갱신합니다.</p>`);}
 function saveDraft(){try{persist(DRAFT,{target:$('inputTarget').value,text:$('draft').value});$('inputHint').textContent='이 기기에 초안 보관됨';}catch{$('inputHint').textContent='기기 저장에 실패했습니다. 화면을 닫기 전에 원문을 복사하세요.';}}
 function saveNote(){const target=$('inputTarget').value.trim(),text=$('draft').value.trim();if(!target||!text){$('inputHint').textContent='입력 대상과 진행 내용을 모두 작성하세요.';return;}try{const id=crypto.randomUUID(),r={id,submissionId:id,target,text,status:'draft',createdAt:new Date().toISOString(),issueId:$('inputIssueId')?.value||'',orderId:$('inputOrderId')?.value||'',displayState:text.split(/\r?\n/).map(v=>v.trim()).find(Boolean)?.slice(0,80)||'',nextAction:$('inputNextAction')?.value||'',issueStatus:$('inputIssueStatus')?.value||'OPEN'};const a=notes();a.unshift(r);persist(KEY,a);localStorage.removeItem(DRAFT);receiptDetail(r.id);return r.id;}catch{toast('저장에 실패했습니다. 원문을 복사하여 보관하세요.');}}
 async function saveAndSendNote(){const id=saveNote();if(id)await sendNote(id);}
