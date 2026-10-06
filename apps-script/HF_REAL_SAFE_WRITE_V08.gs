@@ -145,7 +145,7 @@ function generalEvent_(ss,line,index,p){
  const now=new Date(),date=parseDate_(line,now),dateKey=Utilities.formatDate(date,HF_SW.TZ,'yyyy-MM-dd');
  const excluded=dateKey===(safety_(ss,'Excluded Actual Date')||'2026-09-14');
  const valid=String(line||'').trim().length>=2&&String(p.requester||'').trim()!=='';
- return {receivedAt:now,source:'FIELD_INPUT',raw:line,eventIndex:index,target:'업무이력',date,type:/지원/.test(line)?'타팀지원':'일반이슈',customer:'',model:'',orderId:'',actor:String(p.requester||'UNKNOWN'),work:String(line).trim(),people:extractPeople_(line).join(', '),link:'',confidence:valid?1:0,safe:valid&&!excluded,excluded,reason:excluded?'EXCLUDED_DATE:'+dateKey:valid?'':'GENERAL_INPUT_INVALID',inputSheet:p.inputSheet,inputRow:p.inputRow};
+ return {receivedAt:now,source:'FIELD_INPUT',raw:line,eventIndex:index,target:'업무이력',date,type:/지원/.test(line)?'타팀지원':'기타',general:true,customer:'',model:'',orderId:'',actor:String(p.requester||'UNKNOWN'),work:String(line).trim(),people:extractPeople_(line).join(', '),link:'',confidence:valid?1:0,safe:valid&&!excluded,excluded,reason:excluded?'EXCLUDED_DATE:'+dateKey:valid?'':'GENERAL_INPUT_INVALID',inputSheet:p.inputSheet,inputRow:p.inputRow};
 }
 function resolveEventProject_(sh,raw){
   const rows=sh.getRange(5,1,Math.max(sh.getLastRow()-4,1),3).getDisplayValues().filter(r=>String(r[0]||'').trim());
@@ -169,7 +169,14 @@ function highConfidence_(type,p,people,c){if(['연차','반차'].includes(type))
 function workContent_(raw,p,people){let t=String(raw).trim();[p.orderId,p.customer,p.model].concat(people).forEach(v=>{if(v)t=t.replace(v,' ');});t=t.replace(/\s+/g,' ').trim();return t||String(raw).trim();}
 
 function appendNorm_(ss,e,id){
-  const sh=getSheet_(ss,HF_SW.SHEET.NORM,HF_SW.ID.NORM),row=blankRow_(sh,2,1);ensureRows_(sh,row);const eid=id+'-E'+String(e.eventIndex).padStart(2,'0'),dedupe=sha256_([e.source,Utilities.formatDate(e.date,HF_SW.TZ,'yyyy-MM-dd'),norm_(e.raw)].join('|'));
+  const sh=getSheet_(ss,HF_SW.SHEET.NORM,HF_SW.ID.NORM),eid=id+'-E'+String(e.eventIndex).padStart(2,'0'),dedupe=sha256_([e.source,Utilities.formatDate(e.date,HF_SW.TZ,'yyyy-MM-dd'),norm_(e.raw)].join('|'));
+  let row=blankRow_(sh,2,1);
+  if(e.general&&sh.getLastRow()>1){
+    const found=sh.getRange(2,1,sh.getLastRow()-1,23).getDisplayValues().map((r,i)=>({r,row:i+2})).filter(x=>x.r[0]===eid);
+    if(found.length>1)throw Error('GENERAL_EVENT_ID_CONFLICT');
+    if(found.length){const prior=found[0];if(prior.r[3]!==e.raw||prior.r[17]||prior.r.slice(7).some(v=>String(v||'').trim()))throw Error('GENERAL_EVENT_RETRY_REVIEW_REQUIRED');row=prior.row;}
+  }
+  ensureRows_(sh,row);
   const headers=['Project_ID','Actor_Email','Request_ID'];
   if(sh.getMaxColumns()<23)sh.insertColumnsAfter(sh.getMaxColumns(),23-sh.getMaxColumns());
   const existing=sh.getRange(1,21,1,3).getDisplayValues()[0];

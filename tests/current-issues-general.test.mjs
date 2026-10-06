@@ -31,7 +31,7 @@ test('general issue normalization never resolves equipment; excluded date and cl
  vm.runInContext(engine.slice(engine.indexOf('function generalEvent_('),engine.indexOf('function resolveEventProject_(')),c);
  const p={channel:'MOBILE|GENERAL_EVENT|SA2:owner',targetHint:'GENERAL_ISSUE',requester:'fixture@example.test',inputSheet:'MOBILE',inputRow:0};
  for(const raw of ['B팀 2명 A팀 조립 지원','260727A-060-01 고객명 출고완료 언급','공통 안전점검']){
-  const e=c.normalEvent_({},raw,1,p);assert.equal(e.safe,true);assert.equal(e.orderId,'');assert.equal(e.link,'');assert.equal(e.customer,'');assert.equal(e.model,'');assert.equal(e.raw,raw);
+  const e=c.normalEvent_({},raw,1,p);assert.equal(e.safe,true);assert.ok(['기타','타팀지원'].includes(e.type));assert.equal(e.orderId,'');assert.equal(e.link,'');assert.equal(e.customer,'');assert.equal(e.model,'');assert.equal(e.raw,raw);
  }
  const excluded=c.normalEvent_({},'9/14 인원지원',1,p);assert.equal(excluded.excluded,true);assert.equal(excluded.safe,false);
  assert.equal(c.normalEvent_({},'일반 이슈',1,{...p,requester:''}).safe,false);
