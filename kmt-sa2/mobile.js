@@ -138,7 +138,7 @@ async function refresh(force=true){
   }catch(e){
    ({items,live,sourceDate,lastRead,coreSnapshot}=previous);lastReadErrorStatus=e.status||0;readStale=true;
    if(e.status===401||e.status===403){items=[];live=false;coreSnapshot=false;screen='home';readMessage='사용자 등록 · 연결이 필요합니다';}
-   else{readMessage=(e.message==='partial_core'?'일부 확인':'갱신 실패')+' · '+(live?'이전 조회값 유지':'현재 상태 확인 불가');}
+   else{readMessage=(e.message==='core_not_supported'?'서버 조회 버전 불일치':e.message==='partial_core'?'일부 확인':'갱신 실패')+' · '+(live?'이전 조회값 유지':'현재 상태 확인 불가');}
    return false;
   }finally{
    readPending=null;banner();
