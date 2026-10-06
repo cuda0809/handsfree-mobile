@@ -144,7 +144,7 @@ function renderUnifiedHome(){
  active('home');screen='home';
  setTimeout(()=>syncProjectMeta(false),0);setTimeout(()=>syncPlanOverview(false),80);
  const all=operationalRows(true),activeRows=all.filter(x=>!isCompletedOperational(x));
- const workingRows=activeRows.filter(x=>String(x.team||'').trim()==='B'?['진행 중','작업 예정'].includes(productionClass(x)):['planAssembly','planElectrical','planProgram','planInspection','planDelivery'].some(k=>formatHfDate(x[k])!=='미정'));
+ const workingRows=activeRows.filter(x=>['진행 중','작업 예정'].includes(productionClass(x)));
  const today=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
  const plannedToday=workingRows.filter(x=>planStagesOnDay(x,today).length);
  const urgent=activeRows.filter(x=>x.priority===1);
@@ -756,21 +756,16 @@ async function syncPlanOverview(force=false){
  })().catch(()=>{planReadStale=true;toast('생산계획 최신 조회 실패 · 이전 계획 유지');return null;}).finally(()=>{planOverviewPending=null;});
  return planOverviewPending;
 }
-function productionPlanRows(){
- return operationalRows(false).filter(x=>
-  String(x.team||'').trim()==='B'||['planAssembly','planElectrical','planProgram','planInspection','planDelivery']
-   .some(k=>formatHfDate(x[k])!=='미정')
- );
-}
+function productionPlanRows(){return operationalRows(false);}
 
 let productionPlanMode='plan',deliveryView='active';
 function productionPlan(mode='plan',skipMeta=false){
  productionPlanMode=mode;active('plan');screen='plan';
  if(!skipMeta){setTimeout(()=>syncProjectMeta(false),0);setTimeout(()=>syncPlanOverview(false),80);}
  const allPlanRows=productionPlanRows();
- const secondary=allPlanRows.filter(x=>String(x.team||'').trim()==='B'&&['출고대기','확인 필요'].includes(productionClass(x)));
+ const secondary=allPlanRows.filter(x=>['출고대기','확인 필요'].includes(productionClass(x)));
  const selected=(mode==='delivery'?allPlanRows:allPlanRows.filter(x=>!secondary.includes(x))).sort((a,b)=>{
-  const rank=x=>String(x.team||'').trim()==='B'&&productionClass(x)==='진행 중'?0:1;
+  const rank=x=>productionClass(x)==='진행 중'?0:1;
   const date=x=>(x.planTimeline||[]).map(r=>formatHfDate(r.date)).filter(d=>d>=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'})).sort()[0]||'9999';
   return rank(a)-rank(b)||date(a).localeCompare(date(b))||String(a.orderId).localeCompare(String(b.orderId));
  });allPlanRows.forEach(rememberProjectDetail);
