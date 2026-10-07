@@ -2,6 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import {upstream} from '../lib/kmt-server.mjs';
+test('remote rejection and transport failure retain distinct provenance without changing response semantics',async()=>{
+ const priorFetch=globalThis.fetch,priorUrl=process.env.HF_REAL_READ_URL,priorToken=process.env.HF_REAL_READ_TOKEN;
+ try{
+  process.env.HF_REAL_READ_URL='https://example.invalid';process.env.HF_REAL_READ_TOKEN='isolated-fixture';
+  globalThis.fetch=async()=>({ok:true,status:200,json:async()=>({ok:false,error:'upstream_failed'})});
+  await assert.rejects(upstream({op:'light_app'}),e=>e.message==='upstream_failed'&&e.upstreamResponse===true&&e.upstreamStatus===200);
+  globalThis.fetch=async()=>{throw Object.assign(Error('fetch failed'),{cause:{code:'ECONNRESET'}});};
+  await assert.rejects(upstream({op:'light_app'}),e=>e.upstreamResponse!==true&&e.cause.code==='ECONNRESET');
+ }finally{globalThis.fetch=priorFetch;if(priorUrl===undefined)delete process.env.HF_REAL_READ_URL;else process.env.HF_REAL_READ_URL=priorUrl;if(priorToken===undefined)delete process.env.HF_REAL_READ_TOKEN;else process.env.HF_REAL_READ_TOKEN=priorToken;}
+});
 test('failed read identifies action without retaining request or private error text',async()=>{
  const source=fs.readFileSync('kmt-sa2/mobile.js','utf8');
  const error=Object.assign(Error('app_unavailable'),{status:502,data:{reason:'upstream_timeout'}});
