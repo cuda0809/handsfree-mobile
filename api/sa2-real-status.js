@@ -1,6 +1,10 @@
 import crypto from 'node:crypto';
 
 const COOKIE='hf_real_session';
+const CACHE_TTL_MS=15000;
+let statusCache=null;
+let statusCacheAt=0;
+let statusRefreshPending=null;
 
 function safeEqual(a,b){
   const ha=crypto.createHash('sha256').update(String(a)).digest();
@@ -98,7 +102,17 @@ export default async function handler(req,res){
   }
 
   try{
-    const data=await readOnce(base,token);
+    const force=String(req.query?.fresh||'')==='1';
+    const now=Date.now();
+    let data;
+    if(!force&&statusCache&&now-statusCacheAt<CACHE_TTL_MS){
+      data=statusCache;
+    }else if(!force&&statusRefreshPending){
+      data=await statusRefreshPending;
+    }else{
+      statusRefreshPending=readOnce(base,token).then(v=>{statusCache=v;statusCacheAt=Date.now();return v;}).finally(()=>{statusRefreshPending=null;});
+      data=await statusRefreshPending;
+    }
     const raw=Array.isArray(data.currentStatus)?data.currentStatus.map(normalize):[];
     const currentStatus=raw.filter(isLiveItem).map(x=>{
       const ranked=rank(x);
