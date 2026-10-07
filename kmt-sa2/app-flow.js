@@ -183,7 +183,7 @@ function renderUnifiedHome(){
  main.innerHTML=
  '<div class="hybrid-eyebrow">'+esc(new Date().toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',weekday:'long'}))+'</div>'+
  '<h1 class="hybrid-title">오늘 확인할 일<br>'+(currentAvailable&&plansAvailable?attention.length+'건'+(previousView?' · 최근 확인 자료':'이 있습니다'):'최신 상태 확인 필요')+'</h1>'+
- (previousView?'<div class="alert" role="status">'+(currentAvailable?'최근 정상 조회 자료를 먼저 표시합니다. 최신값은 확인 중이며, 완료되면 자동으로 바뀝니다. 최근 조회 '+esc(lastRead||'시각 미등록'):'현재 상태와 이슈 조회를 완료하지 못했습니다. 아래 계획은 참고용이며, 이슈가 없다는 뜻이 아닙니다.')+'<button class="secondary" onclick="refresh()">최신 상태 다시 확인</button></div>':'')+
+ (previousView?'<div class="alert" role="status">'+(currentAvailable?'최근 정상 조회 자료를 먼저 표시합니다. 최신값은 확인 중이며, 완료되면 자동으로 바뀝니다. 최근 조회 '+esc(lastRead||'시각 미등록'):'현재 상태와 이슈 조회를 완료하지 못했습니다. 아래 계획은 참고용이며, 이슈가 없다는 뜻이 아닙니다.')+'<button class="secondary" onclick="refreshAllCurrent()">최신 상태 다시 확인</button></div>':'')+
  '<p class="hybrid-desc">생산계획과 현장 이슈를 같은 카드 규칙으로 보여줍니다.</p>'+
  '<div class="hf-stat-grid"><button class="hf-stat-card tone-active" onclick="productionPlan()"><small>현재 작업</small><b>'+(currentAvailable&&plansAvailable?workingRows.length:'확인 불가')+'</b><span>'+(previousView?'최근 확인 자료':'통합 운영')+'</span></button><button class="hf-stat-card tone-urgent" onclick="projects(\'active\')"><small>우선순위 1</small><b>'+(currentAvailable?urgent.length:'확인 불가')+'</b><span>'+(previousView?'최근 확인 자료':'먼저 확인')+'</span></button><button class="hf-stat-card tone-complete" onclick="projects(\'completed\')"><small>완료</small><b>'+(currentAvailable?done.length:'확인 불가')+'</b><span>'+(previousView?'최근 확인 자료':'이력 보존')+'</span></button></div>'+
  (top?'<div class="hybrid-section"><b>우선 확인 이슈</b><span>P1</span></div><button class="hf-card hf-feature-card '+hfCardTone(top,'issue')+'" data-home-order="'+esc(top.orderId)+'">'+hfCardIdentity(top,'우선 확인')+hfDueAlert(top)+'<div class="hf-card-meta"><div><small>현재 상태</small><b>'+esc(top.state||'미등록')+'</b></div><div><small>납기</small><b>'+esc(formatHfDate(top.due))+'</b></div></div><div class="hf-card-next"><span>다음</span>'+esc(displayedNextAction(top))+'</div></button>':'')+
@@ -732,6 +732,10 @@ function applyPlanOverview(byOrder){
  if(changed&&typeof coreCacheSave==='function')coreCacheSave();
  return changed;
 }
+async function refreshAllCurrent(){
+ const [core,plans]=await Promise.all([refresh(true),syncPlanOverview(true)]);
+ return core===true&&!!plans;
+}
 async function syncPlanOverview(force=false){
  const cached=planOverviewCache();
  if(cached)applyPlanOverview(cached.byOrder);
@@ -765,7 +769,7 @@ async function syncPlanOverview(force=false){
   if(screen==='projects')projects(filter,true);
   if(screen==='issues')todayIssues();
   return {byOrder,candidateCount:grouped.size,changed,cacheChanged};
- })().catch(e=>{planReadStale=true;console.warn('HF_PLAN_READ_FAILED',e.status||0,['invalid_plans','core_unverified'].includes(e.message)?e.message:'upstream_unavailable');toast(e.message==='invalid_plans'?'생산계획 응답 형식 확인 필요 · 이전 계획 유지':'생산계획 최신 조회 실패 · 이전 계획 유지');return null;}).finally(()=>{planOverviewPending=null;});
+ })().catch(e=>{planReadStale=true;const reason=/^(upstream_timeout|upstream_invalid_json|invalid_source_month|ENOTFOUND|EAI_AGAIN|ECONNRESET|ETIMEDOUT|UND_ERR_CONNECT_TIMEOUT|UND_ERR_HEADERS_TIMEOUT|UND_ERR_SOCKET)$/.test(e.data?.reason||'')?e.data.reason:['invalid_plans','core_unverified'].includes(e.message)?e.message:'upstream_unavailable';console.warn('HF_PLAN_READ_FAILED',e.status||0,reason);toast(e.message==='invalid_plans'?'생산계획 응답 형식 확인 필요 · 이전 계획 유지':'생산계획 최신 조회 실패 · 이전 계획 유지');return null;}).finally(()=>{planOverviewPending=null;});
  return planOverviewPending;
 }
 function productionPlanRows(){return operationalRows(false);}

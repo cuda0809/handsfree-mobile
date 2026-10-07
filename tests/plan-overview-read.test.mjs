@@ -4,6 +4,14 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 const source=fs.readFileSync('kmt-sa2/app-flow.js','utf8');
 const code=source.slice(source.indexOf('async function syncPlanOverview('),source.indexOf('function productionPlanRows('));
+test('manual latest refresh retries both Core and plans, and partial success stays unconfirmed',async()=>{
+ const manual=source.slice(source.indexOf('async function refreshAllCurrent('),source.indexOf('async function syncPlanOverview('));
+ for(const planResult of [null,{byOrder:{}}]){
+  const calls=[];const c=vm.createContext({Promise,refresh:async force=>{calls.push(['core',force]);return true;},syncPlanOverview:async force=>{calls.push(['plans',force]);return planResult;}});
+  vm.runInContext(manual,c);assert.equal(await c.refreshAllCurrent(),!!planResult);assert.deepEqual(calls,[['core',true],['plans',true]]);
+ }
+ assert.match(source,/onclick="refreshAllCurrent\(\)">최신 상태 다시 확인/);
+});
 function harness(response){
  const prior={completePlan:true,cachedAt:'2000-01-01',byOrder:{OLD:{planTimeline:[{date:'2026-10-06',process:'조립'}]}}};
  const ctx={Date,Map,JSON,Error,items:[{team:'B',orderId:'NEW'}],coreSnapshot:true,screen:'home',planReadStale:true,planOverviewPending:null,PLAN_OVERVIEW_KEY:'fixture',calls:[],saved:null,rendered:0,
