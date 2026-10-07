@@ -730,7 +730,7 @@ async function syncPlanOverview(force=false){
   if((changed||cacheChanged)&&screen==='projects')projects(filter,true);
   if((changed||cacheChanged)&&screen==='issues')todayIssues();
   return {byOrder,candidateCount:grouped.size,changed,cacheChanged};
- })().catch(()=>{planReadStale=true;toast('생산계획 최신 조회 실패 · 이전 계획 유지');return null;}).finally(()=>{planOverviewPending=null;});
+ })().catch(()=>{const coreHasPlans=!!coreSnapshot&&items.some(x=>['planAssembly','planElectrical','planProgram','planInspection','planDelivery'].some(k=>formatHfDate(x[k])!=='미정'));planReadStale=!coreHasPlans;if(coreHasPlans){const byOrder={};items.forEach(x=>{if(x.orderId)byOrder[x.orderId]={planAssembly:x.planAssembly||'',planElectrical:x.planElectrical||'',planProgram:x.planProgram||'',planInspection:x.planInspection||'',planDelivery:x.planDelivery||'',planTimeline:Array.isArray(x.planTimeline)?x.planTimeline:[]};});try{persist(PLAN_OVERVIEW_KEY,{completePlan:true,cachedAt:new Date().toISOString(),byOrder,candidateCount:Object.keys(byOrder).length,source:'core-fallback'});}catch{}if(screen==='plan')productionPlan(productionPlanMode,true);return {byOrder,candidateCount:Object.keys(byOrder).length,source:'core-fallback'};}toast('생산계획 최신 조회 실패 · 이전 계획 유지');return null;}).finally(()=>{planOverviewPending=null;});
  return planOverviewPending;
 }
 function productionPlanRows(){
