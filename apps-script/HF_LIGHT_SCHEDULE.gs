@@ -48,8 +48,10 @@ function hfLsRecord_(s,orderId,key){
 function hfLsList_(s,orderId){
   return s.plans.slice(1).filter(function(r){return r[4]===orderId;}).map(function(r){
     var key=hfLsKey_(r),base={key:key,recordId:r[0],orderId:r[4],sourceMonth:r[12],process:r[10],editable:false};
-    try{base.date=hfLsDay_(r[3]);var p=hfLsRecord_(s,orderId,key);base.revision=p.revision;base.editable=true;base.minDate=p.start;base.maxDate=new Date(Date.parse(p.start)+30*86400000).toISOString().slice(0,10);}
-    catch(e){base.blockedReason=e.message;}return base;
+    try{base.date=hfLsDay_(r[3]);}catch(e){base.date='';base.blockedReason=e.message;return base;}
+    try{var p=hfLsRecord_(s,orderId,key);base.revision=p.revision;base.editable=true;base.minDate=p.start;base.maxDate=new Date(Date.parse(p.start)+30*86400000).toISOString().slice(0,10);}
+    catch(e){base.blockedReason=e.message;}
+    return base;
   });
 }
 function hfLsPayloadHash_(b){return hfLsHash_([b.orderId,b.key,b.expected,b.date,b.reason,b.actor.sub,b.actor.email]);}
