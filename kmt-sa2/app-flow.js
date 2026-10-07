@@ -885,16 +885,35 @@ function productionPlan(mode='plan',skipMeta=false){
  main.querySelectorAll('[data-plan-order]').forEach(b=>b.onclick=()=>{const x=productionPlanRows().find(v=>v.orderId===b.dataset.planOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.planOrder,'detail',x);});
 }
 function delivery(skipMeta=false){return productionPlan('delivery',skipMeta);}
-function projects(mode='active',skipMeta=false){
- if(!['active','urgent','waiting','review','completed'].includes(mode))mode='active';
+function projectViewBucket(x){
+ const base=projectBucket(x);if(['stock','completed','waiting'].includes(base))return base;
+ const state=String(x.state||'');
+ if(HfProductionRules.manufacturingNow(x,HfProductionRules.today())||/(조립|전장|프로그램|검수|테스트|마감).*완료/.test(state)&&!/예정|미완료/.test(state))return 'active';
+ if(/착수\s*전|미착수|제작\s*예정|작업\s*예정|조립\s*예정/.test(state)||productionClass(x)==='작업 예정')return 'planned';
+ return 'review';
+}
+function projectReviewReason(x){
+ if(projectViewBucket(x)==='review')return '상태 확인 필요';
+ const text=String(x.currentIssue||'').trim();
+ return /확인\s*필요|확인\s*요청|미확정|협의/.test(text)?text:'';
+}
+function projectMatchesView(x,mode){
+ const bucket=projectViewBucket(x);if(bucket==='stock')return false;
+ if(mode==='all')return true;
+ if(mode==='urgent')return x.priority===1;
+ if(mode==='review')return !!projectReviewReason(x);
+ return bucket===mode;
+}
+function projects(mode='all',skipMeta=false){
+ if(!['all','planned','active','waiting','review','urgent','completed'].includes(mode))mode='all';
  active('projects');screen='projects';filter=mode;
  if(!skipMeta){setTimeout(()=>syncProjectMeta(false),0);setTimeout(()=>syncPlanOverview(false),80);}
  const all=operationalRows(true);
- main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">PROJECT LIFECYCLE</div><h1>프로젝트</h1></div></div>'+
- '<p class="hybrid-desc">작업번호 연도가 아닌 확인된 상태로 분류합니다. 제작·예정, 출고대기, 확인 필요, 출고완료를 구분합니다.</p>'+reports()+
- '<input id="hybridProjectSearch" class="hybrid-search" placeholder="고객명 · 장비명 · JOB NO." oninput="renderHybridProjects()">'+
- '<div class="tabs project-state-tabs">'+[['active','제작 · 예정'],['urgent','우선 조치'],['waiting','출고대기'],['review','확인 필요'],['completed','출고완료']].map(([key,label])=>'<button class="chip '+(mode===key?'active':'')+'" onclick="projects(\''+key+'\')">'+label+' '+(readStale||planReadStale?'확인 중':all.filter(x=>key==='urgent'?x.priority===1:projectBucket(x)===key).length)+'</button>').join('')+'</div>'+
- '<div id="hybridProjectList" class="hybrid-project-list"></div>';
+ const buttons=options=>options.map(([key,label])=>'<button class="chip '+(mode===key?'active':'')+'" onclick="projects(\''+key+'\')">'+label+' '+(readStale?'확인 중':all.filter(x=>projectMatchesView(x,key)).length)+'</button>').join('');
+ main.innerHTML='<div class="hybrid-page-head"><h1>프로젝트</h1></div>'+reports()+
+ '<input id="hybridProjectSearch" class="hybrid-search" placeholder="고객 · 장비 · JOB NO. · PM 검색" oninput="renderHybridProjects()">'+
+ '<div class="tabs project-state-tabs">'+buttons([['all','전체'],['planned','제작 예정'],['active','제작 중'],['waiting','출고대기'],['completed','출고완료']])+'</div>'+
+ '<div class="tabs">'+buttons([['urgent','우선 조치'],['review','확인 필요']])+'</div><div id="hybridProjectList" class="hybrid-project-list"></div>';
  renderHybridProjects();
 }
 function ymdTime(v){
@@ -913,32 +932,23 @@ function projectStageLabel(x){return HYBRID_FLOW_STAGES[strictCurrentStageIndex(
 function renderHybridProjects(){
  const el=$('hybridProjectList');if(!el)return;
  const q=norm($('hybridProjectSearch')?.value||'');
- let rows=operationalRows(true).filter(x=>filter==='urgent'?x.priority===1:projectBucket(x)===filter);rows.forEach(rememberProjectDetail);
- if(q)rows=rows.filter(x=>norm([x.orderId,x.customer,x.model,x.state,x.pm,x.nextAction].join(' ')).includes(q));
- if(!rows.length){el.innerHTML='<p class="empty">'+(filter==='completed'?'완료 프로젝트가 없습니다.':'현재 진행 중인 프로젝트가 없습니다.')+'</p>';return;}
-
- if(filter==='completed'){
-  rows.sort((a,b)=>String(formatHfDate(b.actualDelivery)==='미정'?'':formatHfDate(b.actualDelivery)).localeCompare(String(formatHfDate(a.actualDelivery)==='미정'?'':formatHfDate(a.actualDelivery)))||hybridDueKey(b.due).localeCompare(hybridDueKey(a.due)));
-  const groups=new Map();
-  rows.forEach(x=>{const d=formatHfDate(x.actualDelivery),key=/^\d{4}-\d{2}-\d{2}$/.test(d)?d.slice(0,7):'날짜 미정';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(x);});
-  let first=true;
-  el.innerHTML=[...groups].map(([month,list])=>{
-   const title=month==='날짜 미정'?month:month.replace('-','년 ')+'월';
-   const html=list.map(x=>{const perf=deliveryPerformance(x);return '<button class="hybrid-project-row project-completed compact-project hf-card '+hfCardTone(x,'completed')+'" data-project-order="'+esc(x.orderId)+'"><div class="project-card-top"><div><small class="project-job">'+esc(x.orderId)+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><small>담당 PM: '+esc(x.pm||'PM 미등록')+'</small></div><span class="delivery-performance '+perf.tone+'">'+esc(perf.label)+'</span></div><div class="project-row-dates compact-dates"><span>납기 <b>'+esc(formatHfDate(x.due))+'</b></span><span>실납기 <b>'+esc(formatHfDate(x.actualDelivery))+'</b></span></div></button>';}).join('');
-   const open=first?' open':'';first=false;
-   return '<details class="project-group"'+open+'><summary><span>'+esc(title)+'</span><b>'+list.length+'대</b></summary><div class="project-group-body">'+html+'</div></details>';
+ const rows=operationalRows(true).filter(x=>projectMatchesView(x,filter)&&(!q||norm([x.orderId,x.customer,x.model,x.state,x.pm,x.currentIssue].join(' ')).includes(q)));
+ rows.forEach(rememberProjectDetail);
+ if(!rows.length){el.innerHTML='<p class="empty">'+(readStale?'최신 프로젝트 확인 필요':'해당 프로젝트가 없습니다.')+'</p>';return;}
+ const labels={active:'제작 중',planned:'제작 예정',waiting:'출고대기',review:'상태 확인 필요',completed:'출고완료'};
+ const order=['active','planned','waiting','review','completed'];
+ el.innerHTML=order.map(bucket=>{
+  const list=rows.filter(x=>projectViewBucket(x)===bucket).sort((a,b)=>(a.priority||9)-(b.priority||9)||hybridDueKey(a.due).localeCompare(hybridDueKey(b.due)));
+  if(!list.length)return '';
+  const cards=list.map(x=>{
+   const reasons=priorityAssessment(x).reasons,review=projectReviewReason(x);
+   const issue=reasons.length?'우선 조치 · '+reasons.join(' · '):review||String(x.currentIssue||'').trim();
+   const line=issue&&norm(issue)!==norm(x.state)&&!/^(미정|미등록|없음|조립진행중)$/.test(norm(issue))?'<p class="note">'+esc(issue)+'</p>':'';
+   return '<button class="hybrid-project-row compact-project hf-card '+hfCardTone(x,bucket==='completed'?'completed':'active')+'" data-project-order="'+esc(x.orderId)+'"><div class="project-card-top"><div><small>'+esc(x.orderId)+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b>'+(x.pm?'<small>담당 PM: '+esc(x.pm)+'</small>':'')+'</div></div><div class="project-compact-line"><span>현재</span><b>'+esc(bucket==='review'?'상태 확인 필요':x.state||labels[bucket])+'</b>'+(formatHfDate(x.due)!=='미정'&&x.due?'<em>납기 '+esc(formatHfDate(x.due))+'</em>':'')+'</div>'+line+'</button>';
   }).join('');
- }else{
-  const order=['출고','검수','마감조립','프로그램','전장','조립','자재','기타'];
-  const groups=new Map(order.map(k=>[k,[]]));
-  rows.forEach(x=>groups.get(projectStageLabel(x)).push(x));
-  el.innerHTML=order.filter(k=>groups.get(k).length).map(stage=>{
-   const list=groups.get(stage).sort((a,b)=>(a.priority||9)-(b.priority||9)||hybridDueKey(a.due).localeCompare(hybridDueKey(b.due)));
-   const html=list.map(x=>'<button class="hybrid-project-row project-active compact-project hf-card '+hfCardTone(x,'active')+'" data-project-order="'+esc(x.orderId)+'"><div class="project-card-top"><div><small class="project-job">'+esc(x.orderId)+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><small>담당 PM: '+esc(x.pm||'PM 미등록')+'</small></div><span class="project-stage-badge">'+esc(stage)+'</span></div>'+priorityReasonHtml(x)+'<div class="project-compact-line"><span>현재</span><b>'+esc(currentStatusLabel(x))+'</b><em>납기 '+esc(formatHfDate(x.due))+'</em></div><div class="project-row-next"><span>다음</span>'+esc(displayedNextAction(x))+'</div></button>').join('');
-   return '<details class="project-group" open><summary><span>'+esc(stage)+'</span><b>'+list.length+'대</b></summary><div class="project-group-body">'+html+'</div></details>';
-  }).join('');
- }
- el.querySelectorAll('[data-project-order]').forEach(b=>b.onclick=()=>{const x=operationalRows(true).find(v=>v.orderId===b.dataset.projectOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.projectOrder,'detail',x);});
+  return '<details class="project-group"'+(bucket==='completed'&&filter==='all'?'':' open')+'><summary><span>'+labels[bucket]+'</span><b>'+list.length+'대</b></summary><div class="project-group-body">'+cards+'</div></details>';
+ }).join('');
+ el.querySelectorAll('[data-project-order]').forEach(b=>b.onclick=()=>{const x=rows.find(v=>v.orderId===b.dataset.projectOrder);if(x)openProject(x.orderId,'detail',x);});
 }
 
 function naturalProcess(text){

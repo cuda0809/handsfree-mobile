@@ -84,6 +84,14 @@ test('priority uses current actionable evidence without changing source records'
  ];
  for(const [x,n] of cases){const before=JSON.stringify(x);assert.equal(c.priorityAssessment(x).reasons.length,n);assert.equal(JSON.stringify(x),before);}
  assert.match(flow,/projects\(\\'urgent\\'\).*우선 조치/);
- assert.match(flow,/filter==='urgent'\?x.priority===1/);
+ assert.match(flow,/if\(mode==='urgent'\)return x.priority===1/);
  assert.match(flow,/담당 PM:/);
+});
+test('project phases keep unknown, pre-start, active and inventory separate',()=>{
+ const c=vm.createContext({projectBucket:x=>x.base||'active',productionClass:x=>x.production||'',HfProductionRules:{today:()=> '2026-10-07',manufacturingNow:x=>/진행/.test(x.state||'')}});
+ vm.runInContext(flow.slice(flow.indexOf('function projectViewBucket('),flow.indexOf('function projects(')),c);
+ const cases=[[{state:'조립 예정'},'planned'],[{state:'조립 진행'},'active'],[{state:'프로그램 완료'},'active'],[{state:'미정'},'review'],[{base:'waiting'},'waiting'],[{base:'stock'},'stock'],[{base:'completed'},'completed']];
+ for(const [x,want] of cases){const before=JSON.stringify(x);assert.equal(c.projectViewBucket(x),want);assert.equal(c.projectMatchesView(x,'all'),want!=='stock');assert.equal(JSON.stringify(x),before);}
+ const x={state:'조립 진행',currentIssue:'입고일 확인 필요',priority:1};
+ assert.equal(c.projectViewBucket(x),'active');assert.equal(c.projectMatchesView(x,'review'),true);assert.equal(c.projectMatchesView(x,'urgent'),true);
 });
