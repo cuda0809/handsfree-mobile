@@ -40,9 +40,28 @@ test('equipment receipt stays unverified when journal saved but current server s
  for(const fresh of [false,true]){
   const note={id:'n1',orderId:job,displayState:'전장 완료',stateSyncVersion:'natural-v3'};
   const c=vm.createContext({Date,notes:()=>[note],receiptState:()=> 'saved_unverified',updateNote:(_,p)=>Object.assign(note,p),readPending:null,refresh:async()=>true,
-   items:[{orderId:job,state:fresh?'전장 완료':base.state,stateEvidence:fresh?{entryId:'REQ-E01'}:null}]});
+   items:[{orderId:job,state:fresh?'전장 완료':base.state,stateEvidence:fresh?{entryId:'REQ-E01'}:null,contentEvidence:fresh?{requestId:'REQ'}:null}]});
   vm.runInContext(flow.slice(flow.indexOf('async function verifyEventNote('),flow.indexOf('async function syncProgressIssue(')),c);
   assert.equal(await c.verifyEventNote('n1',{applied:true,status:'WRITTEN',requestId:'REQ'}),fresh);
   assert.equal(note.status,fresh?'applied':'saved_unverified');
+ }
+});
+test('multiline issue reads back latest request without inventing state or overwriting manual action',()=>{
+ const first=event({0:'NEW-E01',22:'NEW',6:'2026-10-06',10:'10/6 메인하우징 베어링 커버 조립 불가로 혜성 반출'});
+ const second=event({0:'NEW-E02',22:'NEW',6:'2026-10-07',10:'10/7 커버 입고 예정'});
+ const p={...base,state:'조립 진행',since:'2026-10-01',nextAction:'담당자 확인'},before=JSON.stringify([p,first,second]);
+ const out=run(p,[event({0:'OLD-E01',1:'2026-10-07 07:00:00 KST',10:'조립 진행'}),first,second]);
+ assert.equal(out.currentIssue,first[10]+'\n'+second[10]);assert.equal(out.recentEvent,out.currentIssue);
+ assert.equal(out.state,p.state);assert.equal(out.nextAction,p.nextAction);assert.equal(out.since,'2026-10-06');
+ assert.deepEqual(Array.from(out.contentEvidence.entryIds),['NEW-E01','NEW-E02']);assert.equal(out.contentEvidence.requestId,'NEW');
+ assert.equal(JSON.stringify([p,first,second]),before);
+});
+test('saved narrative receipt is not reported applied until exact request is visible',async()=>{
+ const flow=fs.readFileSync('kmt-sa2/app-flow.js','utf8');
+ for(const fresh of [false,true]){
+  const note={id:'n1',orderId:job,text:'커버 입고 예정'};
+  const c=vm.createContext({Date,notes:()=>[note],receiptState:()=> 'saved_unverified',updateNote:(_,p)=>Object.assign(note,p),readPending:null,refresh:async()=>true,items:[{orderId:job,contentEvidence:{requestId:fresh?'NEW':'OLD'}}]});
+  vm.runInContext(flow.slice(flow.indexOf('async function verifyEventNote('),flow.indexOf('async function syncProgressIssue(')),c);
+  assert.equal(await c.verifyEventNote('n1',{applied:true,status:'WRITTEN',requestId:'NEW'}),fresh);
  }
 });

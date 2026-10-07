@@ -608,6 +608,7 @@ async function verifyEventNote(id,receipt){
    if(r.issueId)return await syncProgressIssue(id);
    if(readPending)await readPending;
    if(!await refresh())throw Error('refresh_failed');
+   if(!items.some(x=>x.orderId===r.orderId&&x.contentEvidence?.requestId===d.requestId))throw Error('content_readback_unconfirmed');
    if(r.stateSyncVersion==='natural-v3'&&r.displayState&&!items.some(x=>x.orderId===r.orderId&&x.state===r.displayState&&String(x.stateEvidence?.entryId||'').startsWith(d.requestId+'-E')))throw Error('state_readback_unconfirmed');
    updateNote(id,{status:'applied',requestId:d.requestId,verifiedAt:new Date().toISOString(),ack:'업무이력 저장과 서버 재조회가 일치합니다.'});return true;
   }
@@ -620,6 +621,7 @@ async function verifyEventNote(id,receipt){
   if(r.issueId)return await syncProgressIssue(id);
   if(readPending)await readPending;
   if(!await refresh())throw Error('refresh_failed');
+  if(!items.some(x=>x.orderId===r.orderId&&x.contentEvidence?.requestId===d.requestId))throw Error('content_readback_unconfirmed');
    if(r.stateSyncVersion==='natural-v3'&&r.displayState&&!items.some(x=>x.orderId===r.orderId&&x.state===r.displayState&&String(x.stateEvidence?.entryId||'').startsWith(d.requestId+'-E')))throw Error('state_readback_unconfirmed');
   updateNote(id,{status:'applied',requestId:d.requestId,verifiedAt:new Date().toISOString(),ack:'업무이력 저장과 서버 재조회가 일치합니다.'});return true;
   }catch(e){const latest=notes().find(x=>x.id===id);updateNote(id,{status:'saved_unverified',verifiedAt:'',ack:(latest?.ack||'서버 저장 응답을 받았습니다.')+' 원본 재조회가 지연 중이며 새로고침할 때 자동으로 다시 확인합니다.'});return false;}

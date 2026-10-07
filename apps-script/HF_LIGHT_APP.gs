@@ -18,19 +18,22 @@ function hfAppCore_(ss){
 // Confirmed, precisely linked field events are operational evidence, not local drafts.
 // This read projection preserves Core/RAW, manual Next_Action, and shipping history.
 function hfAppCurrentEvidence_(projects,events,today){
- var byJob={},latest={};projects.forEach(function(p){byJob[p.orderId]=p;});
+ var byJob={},latest={},content={};projects.forEach(function(p){byJob[p.orderId]=p;});
  events.forEach(function(e){
   if(e[17]!=='WRITTEN'||e[2]!=='FIELD_INPUT'||e[7]!=='일일작업'||!e[20]||e[15]!==e[20])return;
   var p=byJob[e[20]],date=hfAppDeliveryDay_(e[6]);if(!p||p.team!=='B'||!date||date>today||date==='2026-09-14')return;
   var raw=String(e[3]||''),jobs=raw.match(/(?:[A-Z]{2,4}-)?\d{6}[A-Z]-\d{3}(?:-\d+)?/g)||[];
   if(!jobs.length||jobs.some(function(j){return j!==p.orderId;}))return;
   var text=String(e[10]||'').replace(/^[·\s]+/,'').trim();
+  var request=String(e[22]||e[0]||'').replace(/-E\d+$/,''),stamp=String(e[1]||''),c=content[p.orderId];
+  if(text&&(!c||stamp>c.stamp)){c=content[p.orderId]={requestId:request,stamp:stamp,date:date,lines:[],ids:[]};}
+  if(text&&c&&c.requestId===request){c.lines.push(text);c.ids.push(e[0]);if(date>c.date)c.date=date;}
   var match=text.match(/^(조립|마감조립|전장|배선|프로그램|검수)\s*(완료|진행(?:\s*중)?|중)(?:\s+(?:20\d{2}[-/.])?\d{1,2}[-/.]\d{1,2})?\s*$/);
   if(!match)return;
   var stamp=String(e[1]||''),prior=latest[p.orderId];
   if(!prior||date>prior.date||date===prior.date&&stamp>prior.stamp)latest[p.orderId]={date:date,stamp:stamp,state:match[1]+' '+match[2],process:/전장|배선/.test(match[1])?'전장':match[1],id:e[0],raw:text};
  });
- return projects.map(function(p){
+ var projected=projects.map(function(p){
   var e=latest[p.orderId];if(!e||p.actualDelivery||/출고\s*완료|납품\s*완료|출고\s*대기/.test(p.state||''))return p;
   // Generic collection timestamps do not establish a newer business state.
   var currentDay=hfAppDeliveryDay_(p.since||p.stateSince),eventDay=String(p.recentEventAt||'').slice(0,10);
@@ -42,6 +45,12 @@ function hfAppCurrentEvidence_(projects,events,today){
   var out={};Object.keys(p).forEach(function(k){out[k]=p[k];});
   out.state=e.state;out.process=e.process;out.since=e.date;out.recentEvent=e.raw;out.recentEventAt=e.stamp;out.updatedAt=e.stamp;
   out.stateEvidence={source:'확정 Event',entryId:e.id,businessDate:e.date};return out;
+ });
+ return projected.map(function(p){
+  var c=content[p.orderId];if(!c||String(p.recentEventAt||'')>c.stamp||hfAppDeliveryDay_(p.since||p.stateSince)>c.date)return p;
+  var out={};Object.keys(p).forEach(function(k){out[k]=p[k];});
+  out.currentIssue=c.lines.join('\n');out.recentEvent=out.currentIssue;out.recentEventAt=c.stamp;out.updatedAt=c.stamp;
+  out.contentEvidence={source:'확정 Event',requestId:c.requestId,entryIds:c.ids,businessDate:c.date};return out;
  });
 }
 // READ projection only: keep the Core value and raw journals intact.
