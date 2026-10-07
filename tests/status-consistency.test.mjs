@@ -97,9 +97,9 @@ test('project phases keep unknown, pre-start, active and inventory separate',()=
 });
 
  test('today counters filter only their own rows and retain completed history',()=>{
- const c=vm.createContext({isCompletedOperational:x=>x.done,isCarryoverStock:x=>x.stock,productionClass:x=>x.stage});
+ const c=vm.createContext({isCompletedOperational:x=>x.done,isCarryoverStock:x=>x.stock,productionClass:x=>x.stage,HfProductionRules:{today:()=> '2026-10-08',jobYear:id=>id.startsWith('26')?'2026':'2025'}});
  vm.runInContext(flow.slice(flow.indexOf('function homeStatRows('),flow.indexOf('function homeStatHtml(')),c);
- const rows=[{orderId:'a',stage:'진행 중',priority:1},{orderId:'b',stage:'작업 예정'},{orderId:'c',stage:'출고대기',priority:1},{orderId:'d',done:true,priority:1},{orderId:'e',stock:true,priority:1}];
+ const rows=[{orderId:'a',stage:'진행 중',priority:1},{orderId:'b',stage:'작업 예정'},{orderId:'c',stage:'출고대기',priority:1},{orderId:'260101A-001',done:true,priority:1},{orderId:'250101A-002',done:true},{orderId:'e',stock:true,priority:1}];
  const ids=mode=>Array.from(c.homeStatRows(rows,mode),x=>x.orderId);
- assert.deepEqual(ids('current'),['a','b']);assert.deepEqual(ids('urgent'),['a','c']);assert.deepEqual(ids('completed'),['d']);
+ assert.deepEqual(ids('current'),['a']);assert.deepEqual(ids('urgent'),['a','c']);assert.deepEqual(ids('completed'),['260101A-001']);
  });
