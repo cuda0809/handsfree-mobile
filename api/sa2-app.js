@@ -19,8 +19,8 @@ export default async function handler(req,res){
  try{return reply(res,200,await upstream({op:'light_app',signed,signature}));}
  catch(e){
   const transport=/^(ENOTFOUND|EAI_AGAIN|ECONNRESET|ETIMEDOUT|UND_ERR_CONNECT_TIMEOUT|UND_ERR_HEADERS_TIMEOUT|UND_ERR_SOCKET)$/.test(e.cause?.code||'')?e.cause.code:'';
-  const diagnostic=transport||(/^(not_configured|upstream_invalid_json|upstream_failed|invalid_source_month|forbidden|busy|unsupported_operation)$/.test(e.message)?e.message:e.name==='TimeoutError'||e.name==='AbortError'?'upstream_timeout':'upstream_unavailable');
-  console.warn('HF_APP_READ_FAILED',b.action,diagnostic);
+  const diagnostic=transport||(/timed?\s*out|timeout/i.test(e.message)?'upstream_timeout':/quota|too many times|too many requests|limit exceeded/i.test(e.message)?'upstream_quota':/^(not_configured|upstream_invalid_json|upstream_failed|invalid_source_month|missing_table|invalid_structure|forbidden|busy|unsupported_operation)$/.test(e.message)?e.message:e.name==='TimeoutError'||e.name==='AbortError'?'upstream_timeout':'upstream_unavailable');
+  console.warn('HF_APP_READ_FAILED',b.action,diagnostic,e.upstreamResponse===true?'remote_rejection':'transport',e.upstreamStatus||0);
   if(b.action==='core'&&e.message==='unsupported_operation'){
    return reply(res,502,{ok:false,error:'core_not_supported'});
   }

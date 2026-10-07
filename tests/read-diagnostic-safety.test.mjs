@@ -19,6 +19,8 @@ test('server diagnostic whitelist never prints exception message or credentials'
  assert.equal(run(Error('invalid_source_month')),'invalid_source_month');
  assert.equal(run(Object.assign(Error('fetch failed'),{cause:{code:'UND_ERR_CONNECT_TIMEOUT'}})),'UND_ERR_CONNECT_TIMEOUT');
  assert.equal(run(Object.assign(Error('fetch failed'),{cause:{code:'PRIVATE_SECRET'}})),'upstream_unavailable');
- assert.match(source,/console.warn\('HF_APP_READ_FAILED',b.action,diagnostic\)/);
+ assert.equal(run(Error('Service Spreadsheets timed out while accessing PRIVATE_DOCUMENT')),'upstream_timeout');
+ assert.equal(run(Error('Service invoked too many times: PRIVATE_DOCUMENT')),'upstream_quota');
+ assert.match(source,/console.warn\('HF_APP_READ_FAILED',b.action,diagnostic,/);
  assert.doesNotMatch(source,/console\.(?:warn|error|log)\([^\n]*(?:signed|signature|payload|e.message)/);
 });
