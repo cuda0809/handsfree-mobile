@@ -1,5 +1,5 @@
 'use strict';
-const BUILD='2026.10.07.FASTSYNC.V2', SNAPSHOT='handsfree-renewal-status-snapshot-v2', SNAPSHOT_MAX_AGE=86400000, KEY='handsfree-renewal-notes-v1', DRAFT='handsfree-renewal-draft-v1';
+const BUILD='2026.10.07.FASTSYNC.V2', SNAPSHOT='handsfree-renewal-status-session-v2', KEY='handsfree-renewal-notes-v1', DRAFT='handsfree-renewal-draft-v1';
 const main=document.getElementById('main'),dialog=document.getElementById('detail');
 function operationsMode(){return new URLSearchParams(location.search).get('mode')==='operations';}
 function loginUrl(reason=''){return './login.html?'+(reason?'reason='+encodeURIComponent(reason)+'&':'')+(operationsMode()?'mode=operations':'');}
@@ -16,10 +16,10 @@ function toast(text){clearTimeout(toast.timer);$('toast').hidden=true;let target
 function readStore(key,fallback){try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback;}catch{return fallback;}}
 function persist(key,value){localStorage.setItem(key,JSON.stringify(value));if(localStorage.getItem(key)!==JSON.stringify(value))throw Error('storage_failed');}
 function loadSnapshot(){
- const d=readStore(SNAPSHOT,null);if(!d||!Array.isArray(d.items)||!d.items.length||!Number.isFinite(d.at)||Date.now()-d.at>SNAPSHOT_MAX_AGE)return false;
+ let d=null;try{const raw=sessionStorage.getItem(SNAPSHOT);d=raw?JSON.parse(raw):null;}catch{}if(!d||!Array.isArray(d.items)||!d.items.length)return false;
  items=d.items.map((x,id)=>({...x,id}));live=true;personalConnected=d.personalConnected===true;sourceDate=d.sourceDate||'';lastRead=d.lastRead||'';readMessage=`${items.length}건 · 즉시 표시 · 최신값 확인 중`;return true;
 }
-function saveSnapshot(){try{persist(SNAPSHOT,{items:items.map(({id,...x})=>x),personalConnected,sourceDate,lastRead,at:Date.now()});}catch{}}
+function saveSnapshot(){try{sessionStorage.setItem(SNAPSHOT,JSON.stringify({items:items.map(({id,...x})=>x),personalConnected,sourceDate,lastRead,at:Date.now()}));}catch{}}
 function notes(){const a=readStore(KEY,[]);return Array.isArray(a)?a:[];}
 function updateNote(id,patch){const a=notes(),r=a.find(r=>r.id===id);if(!r)throw Error('missing_note');Object.assign(r,patch);persist(KEY,a);return r;}
 async function api(path,body,timeout=25000){const c=new AbortController(),timer=setTimeout(()=>c.abort(),timeout);try{const r=await fetch(path,{credentials:'include',cache:'no-store',signal:c.signal,...(body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});let d;try{d=await r.json();}catch{const e=Error('invalid_response');e.status=r.status;throw e;}if(!r.ok||d.ok!==true){const e=Error(d.error||'request_failed');e.status=r.status;e.data=d;throw e;}return d;}catch(e){if(e.name==='AbortError'){const timeoutError=Error('request_timeout');timeoutError.timeout=true;throw timeoutError;}throw e;}finally{clearTimeout(timer);}}
