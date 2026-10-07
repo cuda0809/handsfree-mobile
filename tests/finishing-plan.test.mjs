@@ -30,3 +30,10 @@ test('multi-day source uses program end and inspection start; today includes der
  assert.deepEqual(Array.from(ctx.planStagesOnDay(x,'2026-10-12')),['마감조립']);
  assert.deepEqual(Array.from(ctx.planStagesOnDay(x,'2026-10-10')),[]);
 });
+
+test('test runs do not masquerade as inspection and stale earlier inspection does not close the revised window',()=>{
+ const x={planProgram:'2026-10-07',planInspection:'2026-10-14',planTimeline:[{date:'2026-10-07',process:'프로그램'},{date:'2026-10-08',process:'테스트'},{date:'2026-10-12',process:'테스트'},{date:'2026-10-14',process:'검수'}]};
+ assert.deepEqual(Array.from(ctx.finishingPlan(x).days),['2026-10-08','2026-10-09']);
+ x.planTimeline.unshift({date:'2026-10-01',process:'검수'});
+ assert.deepEqual(Array.from(ctx.finishingPlan(x).days),['2026-10-08','2026-10-09']);
+});

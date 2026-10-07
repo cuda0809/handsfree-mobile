@@ -853,3 +853,15 @@ main{padding-bottom:84px!important}
 .hybrid-timeline{grid-template-columns:repeat(7,minmax(76px,1fr));overflow-x:auto;overscroll-behavior-x:contain}
 .hybrid-flow{grid-template-columns:repeat(7,minmax(42px,1fr));overflow-x:auto}
 .production-plan-stages{grid-template-columns:repeat(6,minmax(72px,1fr));overflow-x:auto}
+
+/* Project navigation: reports on one line, phases then attention filters. */
+.project-report-links{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:6px!important}
+.project-report-links button{min-width:0;min-height:64px!important;padding:10px 5px!important;text-align:center!important;white-space:nowrap;font-size:12px!important}
+.project-report-links small{white-space:normal;font-size:10px!important}
+.project-state-tabs{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px!important;overflow:visible!important}
+.project-state-tabs{grid-template-columns:repeat(5,minmax(0,1fr))}
+.project-review-tabs{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px!important;margin-top:8px!important}
+.project-state-tabs .chip,.project-review-tabs .chip{min-width:0!important;width:100%;margin:0!important;border-radius:10px!important;padding:9px 3px!important;white-space:nowrap;font-size:11px!important}
+.project-state-tabs .chip span,.project-state-tabs .chip b{display:block}
+.project-state-tabs .chip b{font-size:16px;margin-top:4px}
+.project-review-tabs .chip{display:flex;justify-content:center;align-items:center;gap:10px;font-size:12px!important}

@@ -102,7 +102,8 @@ function finishingPlan(x){
  const explicit=dates(/마감\s*조립/),manual=date(x.planFinishing);
  if(manual||explicit.length){const start=manual||explicit[0],end=date(x.planFinishingEnd)||explicit.at(-1)||start;return {start,end,automatic:false,days:explicit.length?explicit:[start],label:start+(end!==start?' ~ '+end:'')};}
  const program=dates(/프로그램|프로그래밍/).at(-1)||date(x.planProgram);
- const inspection=dates(/검수|테스트|시험|FAT/)[0]||date(x.planInspection);
+ // Test runs may overlap finishing; only actual inspection bounds the window.
+ const inspection=dates(/검수/).at(-1)||date(x.planInspection);
  if(!program||!inspection)return {start:'',end:'',automatic:true,days:[],label:'선행 일정 확인 필요'};
  const days=[];const d=new Date(program+'T00:00:00Z');
  for(d.setUTCDate(d.getUTCDate()+1);d.toISOString().slice(0,10)<inspection&&days.length<2;d.setUTCDate(d.getUTCDate()+1)){
@@ -304,7 +305,7 @@ async function syncProjectMeta(force=false){
 }
 function scheduleText(v){return formatHfDate(v)==='미정'?'미정':formatHfDate(v);}
 function appQuantity(v){const n=Number(String(v).replaceAll(',',''));if(!String(v).trim()||!Number.isFinite(n)||n<0)throw Error('invalid_report');return n;}
-reports=function(){return '<section><div class="section-title"><h2>생산 · 지원 집계</h2></div><div class="report-links compact"><button onclick="productionReport()">▥ 생산 실적<small>월별 누적 · 과거 연도 합계 ›</small></button><button onclick="supportReport()">⇄ 타부서 지원<small>월별 인원 · 연간 합계 ›</small></button>'+(screen==='projects'?'<button onclick="showStockInventory()">▦ 재고현황<small>미배정 보유 장비 ›</small></button>':'')+'</div></section>';};
+reports=function(){return '<section><div class="section-title"><h2>생산 · 지원 집계</h2></div><div class="report-links compact '+(screen==='projects'?'project-report-links':'')+'"><button onclick="productionReport()">▥ 생산 실적<small>월별 누적 · 과거 연도 합계 ›</small></button><button onclick="supportReport()">⇄ 타부서 지원<small>월별 인원 · 연간 합계 ›</small></button>'+(screen==='projects'?'<button onclick="showStockInventory()">▦ 재고현황<small>미배정 보유 장비 ›</small></button>':'')+'</div></section>';};
 productionReport=async function(){await loadAppReport('production');};
 supportReport=async function(){await loadAppReport('support');};
 function showStockInventory(){
@@ -328,17 +329,20 @@ function productionReportMonths(data){
  }
  return old.filter(r=>String(r[0])!==year).concat([...counts].map(([month,qty])=>[year,String(month),'Core 실제 납품',qty]));
 }
+function supportReportDay(r){
+ return appDay(r[0])||String(r[10]||'').match(/기준월 (20\d{2}-\d{2})/)?.[1]||'';
+}
 function renderAppReport(){
  const el=$('appReportResult');if(!el||!appReport)return;const {mode,data}=appReport;
  try{
-  const support=mode==='support',monthly=productionReportMonths(data),annual=(data.annual||[]).slice(1).filter(r=>r[0]&&r[1]),supportRows=(data.support||[]).slice(1).filter(r=>r[0]);
-  const years=[...new Set((support?supportRows.map(r=>appDay(r[0]).slice(0,4)):monthly.map(r=>String(r[0])).concat(data.projects?[String(new Date().getFullYear())]:[])).filter(Boolean))].sort().reverse();
+  const support=mode==='support',monthly=productionReportMonths(data),annual=(data.annual||[]).slice(1).filter(r=>r[0]&&r[1]),supportRows=(data.support||[]).slice(1).filter(r=>supportReportDay(r));
+  const years=[...new Set((support?supportRows.map(r=>supportReportDay(r).slice(0,4)):monthly.map(r=>String(r[0])).concat(data.projects?[String(new Date().getFullYear())]:[])).filter(Boolean))].sort().reverse();
   const year=$('reportYear')?.value||years[0]||String(new Date().getFullYear());
   let body='';
   if(support){
-   const selected=supportRows.filter(r=>appDay(r[0]).startsWith(year)&&r[11]==='Y'&&r[8]==='확정'),monthPeople=new Map(),allPeople=new Set();
-   selected.forEach(r=>{const month=Number(appDay(r[0]).slice(5,7)),names=String(r[5]||'').split(/[,·/]+/).map(v=>v.trim()).filter(Boolean);if(!monthPeople.has(month))monthPeople.set(month,{people:new Set(),cases:0});const group=monthPeople.get(month);group.cases++;names.forEach(name=>{group.people.add(name);allPeople.add(name);});});
-   body='<div class="action-box"><small>'+esc(year)+'년 타부서 지원</small><strong>'+allPeople.size+'명</strong><span>확정 '+selected.length+'건</span></div><h3>월별 지원 인원</h3><div class="month-list">'+Array.from({length:12},(_,i)=>i+1).map(m=>{const v=monthPeople.get(m);return '<div><b>'+m+'월</b><span>'+(v?v.people.size:0)+'명</span><small>'+(v?v.cases:0)+'건</small></div>';}).join('')+'</div><p class="note">월 인원은 참여자 이름의 중복을 제거한 인원수입니다. 연간 인원도 같은 사람의 중복을 제거합니다. 원본에서 확정되고 운영현황 표시가 Y인 기록만 포함합니다.</p>';
+   const selected=supportRows.filter(r=>supportReportDay(r).startsWith(year)&&r[11]==='Y'&&r[8]==='확정'),monthPeople=new Map(),allPeople=new Set();
+   selected.forEach(r=>{const month=Number(supportReportDay(r).slice(5,7)),names=String(r[5]||'').split(/[,·/]+/).map(v=>v.trim()).filter(Boolean);if(!monthPeople.has(month))monthPeople.set(month,{people:new Set(),cases:0});const group=monthPeople.get(month);group.cases++;names.forEach(name=>{group.people.add(name);allPeople.add(name);});});
+   body='<div class="action-box"><small>'+esc(year)+'년 타부서 지원</small><strong>'+allPeople.size+'명</strong><span>확정 '+selected.length+'건</span></div><h3>월별 지원 인원</h3><div class="month-list">'+Array.from({length:12},(_,i)=>i+1).map(m=>{const v=monthPeople.get(m);return '<div><b>'+m+'월</b><span>'+(v?v.people.size:0)+'명</span><small>'+(v?v.cases:0)+'건</small></div>';}).join('')+'</div><p class="note">월 인원은 참여자 이름의 중복을 제거한 인원수입니다. 연간 인원도 같은 사람의 중복을 제거합니다. 원본에서 확정되고 운영현황 표시가 Y인 기록만 포함합니다. 일자 미확정 주간 기록은 해당 월에 한 번만 집계합니다.</p><h3>지원 이력</h3>'+selected.slice().sort((a,b)=>supportReportDay(b).localeCompare(supportReportDay(a))).map(r=>'<div class="action-box"><b>'+esc(r[2]||r[9]||r[1])+' · '+esc(r[5]||'참여자 미등록')+'</b><p>'+esc(r[4])+'</p><small>'+esc(r[0]?appDay(r[0]):String(r[10]).split(' · ').slice(0,3).join(' · '))+'</small></div>').join('');
   }else{
    const selected=monthly.filter(r=>String(r[0])===year),byMonth=new Map();selected.forEach(r=>byMonth.set(Number(r[1]),(byMonth.get(Number(r[1]))||0)+appQuantity(r[3])));
    const currentYear=String(new Date().getFullYear()),lastDataMonth=Math.max(0,...byMonth.keys()),lastMonth=year===currentYear?Math.max(new Date().getMonth()+1,lastDataMonth):Math.max(12,lastDataMonth);let cumulative=0;
@@ -929,11 +933,11 @@ function projects(mode='all',skipMeta=false){
  active('projects');screen='projects';filter=mode;
  if(!skipMeta){setTimeout(()=>syncProjectMeta(false),0);setTimeout(()=>syncPlanOverview(false),80);}
  const all=operationalRows(true);
- const buttons=options=>options.map(([key,label])=>'<button class="chip '+(mode===key?'active':'')+'" onclick="projects(\''+key+'\')">'+label+' '+(readStale?'확인 중':all.filter(x=>projectMatchesView(x,key)).length)+'</button>').join('');
+ const buttons=options=>options.map(([key,label])=>'<button class="chip '+(mode===key?'active':'')+'" onclick="projects(\''+key+'\')">'+'<span>'+label+'</span><b>'+(readStale?'확인 중':all.filter(x=>projectMatchesView(x,key)).length)+'</b></button>').join('');
  main.innerHTML='<div class="hybrid-page-head"><h1>프로젝트</h1></div>'+reports()+
  '<input id="hybridProjectSearch" class="hybrid-search" placeholder="고객 · 장비 · JOB NO. · PM 검색" oninput="renderHybridProjects()">'+
  '<div class="tabs project-state-tabs">'+buttons([['all','전체'],['planned','제작 예정'],['active','제작 중'],['waiting','출고대기'],['completed','출고완료']])+'</div>'+
- '<div class="tabs">'+buttons([['urgent','우선 조치'],['review','확인 필요']])+'</div><div id="hybridProjectList" class="hybrid-project-list"></div>';
+ '<div class="tabs project-review-tabs">'+buttons([['urgent','우선 조치'],['review','확인 필요']])+'</div><div id="hybridProjectList" class="hybrid-project-list"></div>';
  renderHybridProjects();
 }
 function ymdTime(v){
