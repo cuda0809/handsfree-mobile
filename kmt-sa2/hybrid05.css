@@ -865,3 +865,8 @@ main{padding-bottom:84px!important}
 .project-state-tabs .chip span,.project-state-tabs .chip b{display:block}
 .project-state-tabs .chip b{font-size:16px;margin-top:4px}
 .project-review-tabs .chip{display:flex;justify-content:center;align-items:center;gap:10px;font-size:12px!important}
+
+.context-plan-list{display:grid;gap:8px;margin:16px 0}
+.context-plan-row{display:grid;grid-template-columns:95px minmax(0,1fr);gap:10px;align-items:center;padding:12px;border:1px solid #dce3e9;border-radius:10px}
+.context-plan-row span{font-size:13px;overflow-wrap:anywhere}
+.context-plan-row.current{border-color:#e77837;background:#fff8f1}

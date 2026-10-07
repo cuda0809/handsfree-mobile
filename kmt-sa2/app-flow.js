@@ -250,7 +250,7 @@ function renderUnifiedHome(){
  '<div class="hf-card-list">'+(currentAvailable?(issueCards||'<div class="empty">'+(currentConfirmed?'현재 진행 이슈가 없습니다.':'최근 자료에 표시할 이슈가 없습니다. 최신 확인 중입니다.')+'</div>'):'<div class="empty">최신 이슈를 확인하지 못했습니다.</div>')+'</div>'+
  '<button class="hybrid-quick hf-quick-card" onclick="todayIssues()"><span>🎙 오늘 이슈 입력</span><span>＋</span></button>'+
  reports()+'<p class="source">통합 운영 · 계획 + 현재상태 · 조회 '+esc(lastRead||'확인 전')+'</p>';
- main.querySelectorAll('[data-home-order]').forEach(b=>b.onclick=()=>{const x=operationalRows(true).find(v=>v.orderId===b.dataset.homeOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.homeOrder,'detail',x);});
+ main.querySelectorAll('[data-home-order]').forEach(b=>b.onclick=()=>{const x=operationalRows(true).find(v=>v.orderId===b.dataset.homeOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.homeOrder,'today',x);});
  banner();
 }
 
@@ -531,6 +531,40 @@ function projectDetailRow(orderId,fallback={}){
   nextAction:pick(canonical.nextAction,snap.nextAction,fallback.nextAction)
  };
 }
+function pageDetailHtml(x,purpose){
+ const identity='<div class="job-number"><small>JOB NO.</small><b>'+esc(x.orderId)+'</b></div>';
+ if(purpose==='today'){
+  const stages=planStagesOnDay(x,HfProductionRules.today());
+  return heading('오늘 현황',x.customer,x.model)+identity+
+   '<div class="project-linked-issue"><small>현재 상태</small><p>'+esc(x.state||'미등록')+'</p></div>'+
+   '<div class="project-linked-issue"><small>현재 이슈</small><p>'+esc(x.currentIssue||'등록된 이슈 없음')+'</p></div>'+
+   '<div class="project-linked-issue"><small>오늘 계획</small><p>'+esc(stages.length?stages.join(' · '):'오늘로 지정된 공정 없음')+'</p></div>'+
+   '<div class="project-linked-issue"><small>다음 행동</small><p>'+esc(displayedNextAction(x))+'</p></div>'+
+   '<div class="project-linked-issue"><small>최근 입력'+(x.recentEventAt?' · '+esc(x.recentEventAt):'')+'</small><p>'+esc(x.recentEvent||'등록된 기록 없음')+'</p></div>';
+ }
+ const names=['자재','조립','전장','프로그램','마감조립','검수','출고'];
+ const fields=['','planAssembly','planElectrical','planProgram','planFinishing','planInspection','planDelivery'];
+ const patterns=[/자재수령/,/^(?!.*마감).*조립/,/전장|전기|배선/,/프로그램|프로그래밍/,/마감\s*조립/,/검수/,/출고|납품/];
+ const current=strictCurrentStageIndex(x);
+ const rows=names.map((name,i)=>{
+  const dates=(x.planTimeline||[]).filter(r=>patterns[i].test(String(r.process||''))).map(r=>formatHfDate(r.date)).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  const start=dates[0]||formatHfDate(x[fields[i]]),end=dates.at(-1)||start;
+  const label=name==='마감조립'?finishingPlan(x).label:start+(end!==start?' ~ '+end:'');
+  return '<article class="context-plan-row'+(i===current?' current':'')+'"><b>'+name+(i===current?' · 현재':'')+'</b><span>'+esc(label)+'</span></article>';
+ }).join('');
+ return heading('공정 계획',x.customer,x.model)+identity+
+  '<p class="note">현재 상태 · '+esc(x.state||'미등록')+'</p><div class="context-plan-list">'+rows+'</div>'+
+  '<p class="note">토·일 제외 · 마감조립은 프로그램 후 검수 전 1~2일 자동 계획입니다. 테스트와의 중첩은 일정 충돌로 보지 않습니다. 계획은 완료 실적이 아닙니다.</p>';
+}
+function openPageDetail(orderId,purpose,sourceSnapshot){
+ if(!operationalRows(true).some(x=>x.orderId===orderId))return toast('B팀 장비의 최신 조회가 필요합니다.');
+ const x=projectDetailRow(orderId,sourceSnapshot||{});
+ open(pageDetailHtml(x,purpose)+(readStale?'<p class="alert">최신 조회 미확인 · 최근 확인 자료입니다.</p>':'')+
+  (purpose==='plan'?'<button id="contextScheduleEdit" class="primary">일정 확인 · 수정</button>':'')+
+  '<button id="contextProjectLink" class="secondary">프로젝트 전체 보기</button>');
+ $('contextProjectLink').onclick=()=>openProject(orderId,'detail',x);
+ if(purpose==='plan')$('contextScheduleEdit').onclick=()=>scheduleReport(x);
+}
 async function openProject(orderId,purpose='detail',sourceSnapshot=null){
  if(!operationalRows(true).some(x=>x.orderId===orderId))return toast('B팀 장비의 최신 조회가 필요합니다.');
  if(sourceSnapshot?.orderId)rememberProjectDetail(sourceSnapshot);
@@ -542,6 +576,7 @@ async function openProject(orderId,purpose='detail',sourceSnapshot=null){
  }
  if(!p.orderId||(!p.customer&&!p.model))return toast('프로젝트 원장을 불러오지 못했습니다.');
  if(purpose==='input')return input(p);
+ if(purpose==='today'||purpose==='plan')return openPageDetail(orderId,purpose,p);
  open(heading('프로젝트',p.customer,p.model)+'<div id="projectOverview"></div>');const el=$('projectOverview');
  let linked=projectDetailRow(p.orderId,p);
  const local=lifecycleCacheGet(p.orderId);
@@ -885,7 +920,7 @@ function productionPlan(mode='plan',skipMeta=false){
   (readStale||planReadStale?'<div class="alert">최신 조회 미확인 · 이전 정상값 표시</div>':'')+'<p class="hybrid-desc">납기는 고객 약속일입니다. 실납기일은 확인된 실제 출고일이며, 입력한 날짜나 출고 예정일로 대신하지 않습니다.</p>'+deliveryTabs+'<div id="deliveryList" class="hybrid-promise-list">'+
   (deliveryRows.length?deliveryRows.map(x=>{const due=formatHfDate(x.due),actual=formatHfDate(x.actualDelivery);return '<button class="hybrid-promise-row delivery-v2 hf-card '+hfCardTone(x,deliveryView==='completed'?'completed':'active')+'" data-delivery-order="'+esc(x.orderId)+'"><div class="delivery-dates"><div><small>납기</small><strong>'+esc(due)+'</strong></div><div><small>실납기일</small><strong>'+esc(actual)+'</strong></div></div>'+(String(x.team||'').trim()==='B'?'<p>출고 계획 · '+esc(formatHfDate(x.planDelivery))+' (실적 아님)</p>':'')+(x.actualDeliveryReview?'<p class="alert">'+esc(x.actualDeliveryReview)+'</p>':'')+(x.actualDeliveryEvidence?.length?'<p>출고완료 근거 · '+esc([...new Set(x.actualDeliveryEvidence.map(e=>e.source))].join(' · '))+'</p>':'')+hfDueAlert(x)+'<div class="delivery-main"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><small class="delivery-job">JOB NO. '+esc(x.orderId||'미등록')+'</small><p><span>현재</span>'+esc(x.state||'미등록')+'</p><p><span>다음</span>'+esc(displayedNextAction(x))+'</p></div>'+hybridStageFlow(x)+'</button>';}).join(''):'<p class="empty">'+(readStale||planReadStale?'최신 목록을 확인하지 못했습니다.':'해당하는 장비가 없습니다.')+'</p>')+
   '</div>';
-  const el=$('deliveryList');el?.querySelectorAll('[data-delivery-order]').forEach(b=>b.onclick=()=>openProject(b.dataset.deliveryOrder));
+  const el=$('deliveryList');el?.querySelectorAll('[data-delivery-order]').forEach(b=>b.onclick=()=>openProject(b.dataset.deliveryOrder,'plan'));
   return;
  }
  const allStages=['조립','전장','프로그램','마감조립','검수','출고'];
@@ -906,7 +941,7 @@ function productionPlan(mode='plan',skipMeta=false){
    '<p class="production-plan-next"><span>다음 행동</span>'+esc(displayedNextAction(x))+'</p></button>';
  }).join(''):'<p class="empty">'+(readStale||planReadStale?'최신 목록을 확인하지 못했습니다.':'현재 작업 중이거나 예정된 장비가 없습니다.')+'</p>')+
  '</div>'+['출고대기','확인 필요'].map(label=>{const rows=secondary.filter(x=>productionClass(x)===label);return '<details><summary>'+esc(label)+' · '+(!readStale&&!planReadStale?rows.length:'최신 확인 불가')+'</summary>'+rows.map(x=>'<button class="production-plan-card hf-card" data-plan-order="'+esc(x.orderId)+'"><small>JOB NO. '+esc(x.orderId)+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(x.state||'미등록')+'</p><p>다음 행동 · '+esc(displayedNextAction(x))+'</p></button>').join('')+'</details>';}).join('');
- main.querySelectorAll('[data-plan-order]').forEach(b=>b.onclick=()=>{const x=productionPlanRows().find(v=>v.orderId===b.dataset.planOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.planOrder,'detail',x);});
+ main.querySelectorAll('[data-plan-order]').forEach(b=>b.onclick=()=>{const x=productionPlanRows().find(v=>v.orderId===b.dataset.planOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.planOrder,'plan',x);});
 }
 function delivery(skipMeta=false){return productionPlan('delivery',skipMeta);}
 function projectViewBucket(x){
