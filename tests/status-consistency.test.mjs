@@ -83,7 +83,7 @@ test('priority uses current actionable evidence without changing source records'
  [{due:'2026-10-05',actualDelivery:'2026-10-06'},0]
  ];
  for(const [x,n] of cases){const before=JSON.stringify(x);assert.equal(c.priorityAssessment(x).reasons.length,n);assert.equal(JSON.stringify(x),before);}
- assert.match(flow,/projects\(\\'urgent\\'\).*우선 조치/);
+ assert.match(flow,/homeStat\(\\'urgent\\'\).*우선 조치/);
  assert.match(flow,/if\(mode==='urgent'\)return x.priority===1/);
  assert.match(flow,/담당 PM:/);
 });
@@ -95,3 +95,11 @@ test('project phases keep unknown, pre-start, active and inventory separate',()=
  const x={state:'조립 진행',currentIssue:'입고일 확인 필요',priority:1};
  assert.equal(c.projectViewBucket(x),'active');assert.equal(c.projectMatchesView(x,'review'),true);assert.equal(c.projectMatchesView(x,'urgent'),true);
 });
+
+ test('today counters filter only their own rows and retain completed history',()=>{
+ const c=vm.createContext({isCompletedOperational:x=>x.done,isCarryoverStock:x=>x.stock,productionClass:x=>x.stage});
+ vm.runInContext(flow.slice(flow.indexOf('function homeStatRows('),flow.indexOf('function homeStatHtml(')),c);
+ const rows=[{orderId:'a',stage:'진행 중',priority:1},{orderId:'b',stage:'작업 예정'},{orderId:'c',stage:'출고대기',priority:1},{orderId:'d',done:true,priority:1},{orderId:'e',stock:true,priority:1}];
+ const ids=mode=>Array.from(c.homeStatRows(rows,mode),x=>x.orderId);
+ assert.deepEqual(ids('current'),['a','b']);assert.deepEqual(ids('urgent'),['a','c']);assert.deepEqual(ids('completed'),['d']);
+ });
