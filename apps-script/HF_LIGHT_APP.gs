@@ -32,8 +32,11 @@ function hfAppCurrentEvidence_(projects,events,today){
  });
  return projects.map(function(p){
   var e=latest[p.orderId];if(!e||p.actualDelivery||/출고\s*완료|납품\s*완료|출고\s*대기/.test(p.state||''))return p;
-  var currentDay=hfAppDeliveryDay_(String(p.updatedAt||'').slice(0,10)),eventDay=String(p.recentEventAt||'').slice(0,10);
+  // Generic collection timestamps do not establish a newer business state.
+  var currentDay=hfAppDeliveryDay_(p.since||p.stateSince),eventDay=String(p.recentEventAt||'').slice(0,10);
   if(currentDay>e.date||eventDay>e.date)return p;
+  function stage(v){return /출고|납품/.test(v)?5:/검수|테스트|시험/.test(v)?4:/프로그램/.test(v)?3:/전장|배선/.test(v)?2:/조립/.test(v)?1:0;}
+  if(stage(p.state||'')>stage(e.state))return p;
   // A newer explicit Core state remains authoritative (including same-day edits).
   if(String(p.recentEventAt||'')>e.stamp)return p;
   var out={};Object.keys(p).forEach(function(k){out[k]=p[k];});

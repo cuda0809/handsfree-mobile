@@ -18,7 +18,8 @@ test('confirmed exact job event projects completion across devices without chang
 });
 test('draft, failed, general, other equipment, future and older evidence cannot replace current state',()=>{
  for(const patch of [{17:'REVIEW'},{2:'GENERAL_EVENT'},{7:'기타'},{15:'OTHER'},{20:'OTHER'},{6:'2026-10-08'},{6:'2026-09-14'},{10:'전장 완료 예정'},{10:'전장 완료 아님'},{10:'전장 완료 여부 확인'},{3:job+' 260727A-060-03 전장 완료'}])assert.equal(run(base,[event(patch)]).state,base.state);
- for(const patch of [{team:'A'},{updatedAt:'2026-10-07'},{recentEventAt:'2026-10-07 09:00:00 KST'},{actualDelivery:'2026-10-01'},{state:'출고완료'},{state:'출고대기'}])assert.equal(run({...base,...patch},[event()]).state,({...base,...patch}).state);
+ for(const patch of [{team:'A'},{since:'2026-10-07'},{state:'검수 진행'},{recentEventAt:'2026-10-07 09:00:00 KST'},{actualDelivery:'2026-10-01'},{state:'출고완료'},{state:'출고대기'}])assert.equal(run({...base,...patch},[event()]).state,({...base,...patch}).state);
+ assert.equal(run({...base,updatedAt:'2026-10-08'},[event()]).state,'전장 완료','a later collection does not roll confirmed business state back');
 });
 test('latest business date wins; late entry of older events does not roll progress back',()=>{
  const older=event({0:'OLD-E01',1:'2026-10-07 09:00:00 KST',6:'2026-10-05',10:'조립 완료 10/5'});
