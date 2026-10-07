@@ -70,6 +70,9 @@ test('priority uses current actionable evidence without changing source records'
  const c=vm.createContext({isCompletedOperational:x=>!!x.actualDelivery,formatHfDate:v=>v||'',HfProductionRules:{today:()=> '2026-10-07'},ymdTime:v=>Date.parse(v+'T00:00:00Z')});
  vm.runInContext(flow.slice(flow.indexOf('function priorityAssessment('),flow.indexOf('function priorityReasonHtml(')),c);
  const cases=[
+ [{orderId:'251215A-144-04',customer:'재고',state:'출고대기',due:'2026-03-13'},0],
+ [{orderId:'251215A-144-04',customer:'재고 -> 고객',state:'출고대기',due:'2026-03-13'},1],
+ [{orderId:'260727A-061-01',customer:'재고',state:'조립 진행',due:'2026-10-05'},1],
  [{due:'2026-10-05',currentIssue:'세라믹 입고 지연으로 납기 협의'},2],
  [{due:'2026-10-27',state:'프로그램 완료',currentIssue:'가공수정품 입고 대기 10/21'},0],
  [{due:'2026-10-29',currentIssue:'베어링·갭링 입고 완료'},0],

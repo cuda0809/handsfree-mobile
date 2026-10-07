@@ -36,6 +36,7 @@ function isCompletedOperational(x){
 }
 function currentProductionRows(){const today=HfProductionRules.today();return operationalRows(true).filter(x=>String(x.team||'').trim()==='B'&&HfProductionRules.manufacturingNow(x,today));}
 function displayedNextAction(x){
+ if(isCarryoverStock(x))return '출고대기 · 출고 일정 확정 시 확인';
  const manual=String(x.nextAction||'').trim();
  if(manual&&manual!=='미정'&&manual!=='미등록')return manual;
  if(planReadStale)return '계획 재조회 필요';
@@ -107,7 +108,7 @@ function planStagesOnDay(x,day){
  }).filter(Boolean))];
 }
 function dueUrgency(x){
- if(isCompletedOperational(x))return {level:'none',days:null,label:''};
+ if(isCarryoverStock(x)||isCompletedOperational(x))return {level:'none',days:null,label:''};
  const due=formatHfDate(x?.due);
  if(!/^\d{4}-\d{2}-\d{2}$/.test(due))return {level:'none',days:null,label:''};
  const today=HfProductionRules.today();
@@ -120,6 +121,7 @@ function dueUrgency(x){
  return {level:'none',days,label:''};
 }
 function priorityAssessment(x){
+ if(isCarryoverStock(x))return {reasons:[],review:'이월 재고 · 출고대기'};
  if(isCompletedOperational(x))return {reasons:[],review:''};
  const reasons=[],due=formatHfDate(x.due),today=HfProductionRules.today();
  const customerWait=/출고\s*대기|납품\s*대기/.test(String(x.state||''))&&/고객|고객사|현장\s*요청/.test(String(x.currentIssue||'')+' '+String(x.nextAction||''));
@@ -135,6 +137,10 @@ function priorityAssessment(x){
   if(match){const inbound=(match[1]||today.slice(0,4))+'-'+match[2].padStart(2,'0')+'-'+match[3].padStart(2,'0');if(Number.isFinite(ymdTime(inbound))&&inbound>due)reasons.push('입고 예정일이 납기 이후');}
  }
  return {reasons:[...new Set(reasons)],review:customerWait?'고객 요청 출고대기 · 합의 일정 확인':!/^\d{4}-\d{2}-\d{2}$/.test(due)?'납기 확인 필요':''};
+}
+function isCarryoverStock(x){
+ const match=String(x.orderId||'').match(/^(?:[A-Z]+-)?(\d{2})\d{4}[A-Z]-/);
+ return !!match&&Number('20'+match[1])<Number(HfProductionRules.today().slice(0,4))&&/^재고(?:\s*\([^)]*\))?\s*$/.test(String(x.customer||'').trim())&&/출고\s*대기|납품\s*대기|보관\s*중/.test(String(x.state||'')+' '+String(x.deliveryState||''))&&!isCompletedOperational(x);
 }
 function priorityReasonHtml(x){const a=priorityAssessment(x);return a.reasons.length?'<p class="hf-due-alert overdue">우선 조치 · '+esc(a.reasons.join(' · '))+'</p>':a.review?'<p class="note">'+esc(a.review)+'</p>':'';}
 function hfDueAlert(x){
@@ -154,6 +160,7 @@ function hfCardTone(x,kind='active'){
  return base+(d.level!=='none'?' due-'+d.level:'');
 }
 function hfCardIdentity(x,badge=''){
+ if(isCarryoverStock(x))badge='출고대기';
  return '<div class="hf-card-head"><div><small class="hf-card-job">JOB NO. '+esc(x.orderId||'미등록')+'</small><b class="hf-card-title">'+esc(x.customer||'고객 미등록')+' · '+esc(x.model||'모델 미등록')+'</b><small>담당 PM: '+esc(x.pm||'PM 미등록')+'</small></div>'+(badge?'<span class="hf-card-badge">'+esc(badge)+'</span>':'')+'</div>'+priorityReasonHtml(x);
 }
 function productionClass(x){return HfProductionRules.classify(x,HfProductionRules.today());}
