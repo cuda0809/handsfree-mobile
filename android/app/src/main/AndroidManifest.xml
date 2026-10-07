@@ -7,8 +7,8 @@
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:usesCleartextTraffic="false"
-        android:icon="@drawable/ic_handsfree"
-        android:roundIcon="@drawable/ic_handsfree"
+        android:icon="@drawable/kmt_company_logo"
+        android:roundIcon="@drawable/kmt_company_logo"
         android:label="${appLabel}"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
