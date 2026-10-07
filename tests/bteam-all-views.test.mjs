@@ -5,6 +5,12 @@ import vm from 'node:vm';
 import {createRequire} from 'node:module';
 const rules=createRequire(import.meta.url)('../kmt-sa2/production-rules.js');
 const source=fs.readFileSync('kmt-sa2/app-flow.js','utf8');
+test('local input history hides other-team equipment without deleting original notes or general work',()=>{
+ const mobile=fs.readFileSync('kmt-sa2/mobile.js','utf8'),notes=[{orderId:'A'},{orderId:'B'},{orderId:'UNKNOWN'},{text:'일반 이슈'}],before=JSON.stringify(notes);
+ const c=vm.createContext({notes:()=>notes,items:[{orderId:'A',team:'A'},{orderId:'B',team:'B'}],isBTeam:x=>x.team==='B'});
+ vm.runInContext(mobile.slice(mobile.indexOf('function visibleNotes('),mobile.indexOf('function updateNote(')),c);
+ assert.equal(c.visibleNotes().length,2);assert.equal(JSON.stringify(notes),before);
+});
 test('all operational views fail closed for other teams and stale metadata; completed detail uses current snapshot',()=>{
  const fixture=[{orderId:'B-active',team:'B',state:'조립 진행'},{orderId:'B-done',team:'B',state:'출고완료',actualDelivery:'2026-09-22'},...['A','C','D',''].map(team=>({orderId:team+'-other',team,state:'조립 진행'}))];
  const c=vm.createContext({items:fixture,coreSnapshot:true,lastReadErrorStatus:0,appProjects:[],projectMetaCache:()=>({projects:[{orderId:'A-stale',team:'A'}]}),planOverviewCache:()=>({byOrder:{'A-other':{planAssembly:'2026-10-12'}}}),latestUnifiedInputByOrder:()=>new Map(),hybridDueKey:()=>'',productionClass:x=>rules.classify(x,'2026-10-07'),isCompletedOperational:x=>rules.classify(x,'2026-10-07')==='출고완료',PROJECT_DETAIL_SNAPSHOT:new Map([['B-done',{actualDelivery:'2026-09-01'}],['A-other',{customer:'stale A'}]])});
