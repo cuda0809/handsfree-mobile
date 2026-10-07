@@ -4,12 +4,13 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 const source=fs.readFileSync('kmt-sa2/app-flow.js','utf8');
 const home=source.slice(source.indexOf('function renderUnifiedHome('),source.indexOf('function projectMetaCache('));
-function render(confirmed,stale){
+function render(confirmed,stale,rows=[]){
  const main={innerHTML:'',querySelectorAll:()=>[]};
  const ctx={main,coreSnapshot:confirmed,readStale:stale,screen:'home',lastRead:'',Date,Map,planReadStale:false,planOverviewCache:()=>({completePlan:true}),
-  setTimeout:()=>0,active(){},syncProjectMeta(){},syncPlanOverview(){},operationalRows:()=>[],
-  isCompletedOperational:()=>false,planStagesOnDay:()=>[],hybridDueKey:()=>'',rememberProjectDetail(){},
-  currentProductionRows:()=>[],reports:()=>'',esc:String,banner(){}};
+  setTimeout:()=>0,active(){},syncProjectMeta(){},syncPlanOverview(){},operationalRows:()=>rows,
+  productionClass:()=> '진행 중',isCompletedOperational:()=>false,planStagesOnDay:()=>['조립'],hybridDueKey:()=>'',rememberProjectDetail(){},
+  hfCardTone:()=>'',hfCardIdentity:x=>x.orderId,hfDueAlert:()=>'',formatHfDate:String,displayedNextAction:()=> '검수',
+  currentProductionRows:()=>rows,reports:()=>'',esc:String,banner(){}};
  vm.createContext(ctx);vm.runInContext(home+';renderUnifiedHome();',ctx);return main.innerHTML;
 }
 test('unavailable or stale Core never presents zero issues as a confirmed result',()=>{
@@ -25,6 +26,17 @@ test('unavailable or stale Core never presents zero issues as a confirmed result
 test('verified empty Core can accurately show zero issues',()=>{
  const html=render(true,false);assert.match(html,/현장 이슈<\/b><span>0대/);
  assert.match(html,/현재 진행 이슈가 없습니다/);assert.doesNotMatch(html,/최신 상태 확인 필요/);
+});
+test('verified nonempty previous snapshot displays real cards immediately but remains explicitly stale',()=>{
+ const html=render(true,true,[{orderId:'B-054',state:'전장 진행',issueId:'ISS54',priority:2,currentIssue:'전장 진행'}]);
+ assert.match(html,/data-home-order="B-054"/);
+ assert.match(html,/최근 정상 조회 자료를 먼저 표시/);
+ assert.match(html,/1건 · 최근 확인 자료/);
+ assert.match(html,/현장 이슈<\/b><span>1대 · 최근 확인/);
+ assert.doesNotMatch(html,/1건이 있습니다/);
+ const unauthorized=render(false,true,[{orderId:'B-054',state:'전장 진행',issueId:'ISS54'}]);
+ assert.doesNotMatch(unauthorized,/data-home-order="B-054"/);
+ assert.match(unauthorized,/최신 상태 확인 필요/);
 });
 test('project detail keeps current issue, recent event and next action distinct',()=>{
  const fn=source.slice(source.indexOf('function projectCurrentFields('),source.indexOf('function renderUnifiedHome('));

@@ -162,6 +162,9 @@ function renderUnifiedHome(){
  const top=urgent[0]||null,done=all.filter(isCompletedOperational);
  const currentConfirmed=coreSnapshot&&!readStale;
  const plansConfirmed=planOverviewCache()?.completePlan===true&&!planReadStale;
+ const currentAvailable=currentConfirmed||(coreSnapshot&&all.length>0);
+ const plansAvailable=currentAvailable&&(plansConfirmed||planOverviewCache()?.completePlan===true);
+ const previousView=!currentConfirmed||!plansConfirmed;
  plannedToday.forEach(rememberProjectDetail);issueActive.forEach(rememberProjectDetail);
  const planCards=plannedToday.map(x=>{
   const stages=planStagesOnDay(x,today);
@@ -179,15 +182,15 @@ function renderUnifiedHome(){
  }).join('');
  main.innerHTML=
  '<div class="hybrid-eyebrow">'+esc(new Date().toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',weekday:'long'}))+'</div>'+
- '<h1 class="hybrid-title">오늘 확인할 일<br>'+(currentConfirmed&&plansConfirmed?attention.length+'건이 있습니다':'최신 상태 확인 필요')+'</h1>'+
- (!currentConfirmed?'<div class="alert" role="status">현재 상태와 이슈 조회를 완료하지 못했습니다. 아래 계획은 참고용이며, 이슈가 없다는 뜻이 아닙니다.<button class="secondary" onclick="refresh()">최신 상태 다시 확인</button></div>':'')+
+ '<h1 class="hybrid-title">오늘 확인할 일<br>'+(currentAvailable&&plansAvailable?attention.length+'건'+(previousView?' · 최근 확인 자료':'이 있습니다'):'최신 상태 확인 필요')+'</h1>'+
+ (previousView?'<div class="alert" role="status">'+(currentAvailable?'최근 정상 조회 자료를 먼저 표시합니다. 최신값은 확인 중이며, 완료되면 자동으로 바뀝니다. 최근 조회 '+esc(lastRead||'시각 미등록'):'현재 상태와 이슈 조회를 완료하지 못했습니다. 아래 계획은 참고용이며, 이슈가 없다는 뜻이 아닙니다.')+'<button class="secondary" onclick="refresh()">최신 상태 다시 확인</button></div>':'')+
  '<p class="hybrid-desc">생산계획과 현장 이슈를 같은 카드 규칙으로 보여줍니다.</p>'+
- '<div class="hf-stat-grid"><button class="hf-stat-card tone-active" onclick="productionPlan()"><small>현재 작업</small><b>'+(currentConfirmed&&plansConfirmed?workingRows.length:'확인 불가')+'</b><span>통합 운영</span></button><button class="hf-stat-card tone-urgent" onclick="projects(\'active\')"><small>우선순위 1</small><b>'+(currentConfirmed?urgent.length:'확인 불가')+'</b><span>먼저 확인</span></button><button class="hf-stat-card tone-complete" onclick="projects(\'completed\')"><small>완료</small><b>'+(currentConfirmed?done.length:'확인 불가')+'</b><span>이력 보존</span></button></div>'+
+ '<div class="hf-stat-grid"><button class="hf-stat-card tone-active" onclick="productionPlan()"><small>현재 작업</small><b>'+(currentAvailable&&plansAvailable?workingRows.length:'확인 불가')+'</b><span>'+(previousView?'최근 확인 자료':'통합 운영')+'</span></button><button class="hf-stat-card tone-urgent" onclick="projects(\'active\')"><small>우선순위 1</small><b>'+(currentAvailable?urgent.length:'확인 불가')+'</b><span>'+(previousView?'최근 확인 자료':'먼저 확인')+'</span></button><button class="hf-stat-card tone-complete" onclick="projects(\'completed\')"><small>완료</small><b>'+(currentAvailable?done.length:'확인 불가')+'</b><span>'+(previousView?'최근 확인 자료':'이력 보존')+'</span></button></div>'+
  (top?'<div class="hybrid-section"><b>우선 확인 이슈</b><span>P1</span></div><button class="hf-card hf-feature-card '+hfCardTone(top,'issue')+'" data-home-order="'+esc(top.orderId)+'">'+hfCardIdentity(top,'우선 확인')+hfDueAlert(top)+'<div class="hf-card-meta"><div><small>현재 상태</small><b>'+esc(top.state||'미등록')+'</b></div><div><small>납기</small><b>'+esc(formatHfDate(top.due))+'</b></div></div><div class="hf-card-next"><span>다음</span>'+esc(displayedNextAction(top))+'</div></button>':'')+
- '<div class="hybrid-section"><b>오늘 생산계획</b><span>'+(plansConfirmed?plannedToday.length+'대':'확인 중 / 확인 불가')+'</span></div>'+
- '<div class="hf-card-list">'+(plansConfirmed?(planCards||'<div class="empty">오늘로 잡힌 생산계획이 없습니다.</div>'):'<div class="empty">생산계획 최신 조회를 확인하지 못했습니다.</div>')+'</div>'+
- '<div class="hybrid-section"><b>현장 이슈</b><span>'+(currentConfirmed?issueActive.length+'대':'확인 불가')+'</span></div>'+
- '<div class="hf-card-list">'+(currentConfirmed?(issueCards||'<div class="empty">현재 진행 이슈가 없습니다.</div>'):'<div class="empty">최신 이슈를 확인하지 못했습니다.</div>')+'</div>'+
+ '<div class="hybrid-section"><b>오늘 생산계획</b><span>'+(plansAvailable?plannedToday.length+'대'+(!plansConfirmed?' · 최근 확인':''):'확인 중 / 확인 불가')+'</span></div>'+
+ '<div class="hf-card-list">'+(plansAvailable?(planCards||'<div class="empty">'+(plansConfirmed?'오늘로 잡힌 생산계획이 없습니다.':'최근 자료에 오늘 일정이 없습니다. 최신 확인 중입니다.')+'</div>'):'<div class="empty">생산계획 최신 조회를 확인하지 못했습니다.</div>')+'</div>'+
+ '<div class="hybrid-section"><b>현장 이슈</b><span>'+(currentAvailable?issueActive.length+'대'+(!currentConfirmed?' · 최근 확인':''):'확인 불가')+'</span></div>'+
+ '<div class="hf-card-list">'+(currentAvailable?(issueCards||'<div class="empty">'+(currentConfirmed?'현재 진행 이슈가 없습니다.':'최근 자료에 표시할 이슈가 없습니다. 최신 확인 중입니다.')+'</div>'):'<div class="empty">최신 이슈를 확인하지 못했습니다.</div>')+'</div>'+
  '<button class="hybrid-quick hf-quick-card" onclick="todayIssues()"><span>🎙 오늘 이슈 입력</span><span>＋</span></button>'+
  reports()+'<p class="source">통합 운영 · 계획 + 현재상태 · 조회 '+esc(lastRead||'확인 전')+'</p>';
  main.querySelectorAll('[data-home-order]').forEach(b=>b.onclick=()=>{const x=operationalRows(true).find(v=>v.orderId===b.dataset.homeOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.homeOrder,'detail',x);});
