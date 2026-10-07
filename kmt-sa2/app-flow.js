@@ -758,10 +758,11 @@ function productionPlan(mode='plan',skipMeta=false){
  const planValue=(x,name)=>({
   '조립':x.planAssembly,'전장':x.planElectrical,'프로그램':x.planProgram,'검수':x.planInspection,'출고':x.planDelivery
  }[name]||'');
+ const currentWorkCount=selected.filter(x=>!isCompletedOperational(x)).length;
  const missingCount=selected.reduce((n,x)=>n+allStages.filter(s=>formatHfDate(planValue(x,s))==='미정').length,0);
  main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">PRODUCTION CONTROL</div><h1>생산계획</h1></div></div>'+tabs+
  '<p class="hybrid-desc">현재 관리 중인 JOB NO.의 제작일정을 봅니다. 계획값이 없는 공정은 임의로 계산하지 않고 미정으로 표시합니다.</p>'+
- '<div class="plan-summary"><div><small>관리 장비</small><b>'+selected.length+'</b></div><div><small>미정 공정</small><b>'+missingCount+'</b></div></div>'+
+ '<div class="plan-summary"><div><small>현재 작업</small><b>'+currentWorkCount+'</b></div><div><small>미정 공정</small><b>'+missingCount+'</b></div></div>'+
  '<div class="production-plan-list hf-card-list">'+
  (selected.length?selected.map(x=>{
    const planned=allStages.some(s=>formatHfDate(planValue(x,s))!=='미정');
