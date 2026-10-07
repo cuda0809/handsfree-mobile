@@ -140,10 +140,11 @@ function hfCardIdentity(x,badge=''){
 }
 function productionClass(x){return HfProductionRules.classify(x,new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'}));}
 function projectCurrentFields(x){
+ const completed=isCompletedOperational(x);
  const issue=String(x.currentIssue||'').trim(),event=String(x.recentEvent||'').trim();
  const deliveryEvidence=(x.actualDeliveryEvidence||[]).map(e=>'<p>'+esc(e.date)+' · '+esc(e.source)+' · '+esc(e.sourceRef)+'</p>').join('');
- return (String(x.team||'').trim()==='B'?'<div class="project-linked-issue"><small>생산계획 분류</small><p>'+esc(productionClass(x))+'</p></div>':'')+(x.actualDeliveryReview?'<p class="alert">'+esc(x.actualDeliveryReview)+'</p>':'')+(deliveryEvidence?'<div class="project-linked-issue"><small>실출고일 근거</small>'+deliveryEvidence+'</div>':'')+(issue?'<div class="project-linked-issue"><small>현재 이슈</small><p>'+esc(issue)+'</p></div>':'')+
- (event&&event!==issue?'<div class="project-linked-issue"><small>최근 진행 기록</small><p>'+esc(event)+'</p></div>':'')+
+ return (String(x.team||'').trim()==='B'?'<div class="project-linked-issue"><small>생산계획 분류</small><p>'+esc(productionClass(x))+'</p></div>':'')+(x.actualDeliveryReview?'<p class="alert">'+esc(x.actualDeliveryReview)+'</p>':'')+(deliveryEvidence?'<div class="project-linked-issue"><small>실출고일 근거</small>'+deliveryEvidence+'</div>':'')+(issue?'<div class="project-linked-issue"><small>'+esc(completed?'과거 이슈 기록':'현재 이슈')+'</small><p>'+esc(issue)+'</p></div>':'')+
+ (event&&event!==issue?'<div class="project-linked-issue"><small>'+esc(completed?'과거 진행 기록':'최근 진행 기록')+'</small><p>'+esc(event)+'</p></div>':'')+
  '<div class="project-linked-issue"><small>다음 행동</small><p>'+esc(displayedNextAction(x))+'</p></div>';
 }
 function renderUnifiedHome(){
@@ -346,7 +347,7 @@ function lifecycleEntriesFromHistory(history,item=null){
    if(cause&&!entries.some(r=>norm(r.text).includes(norm(cause))||norm(cause).includes(norm(r.text)))){
      entries.push({at:legacyLifecycleDate(cause,item.since||item.sourceLatestUpdate),kind:'legacy',type:'기존 이슈 · 이관',text:cause,change:'',actor:'기존 원장',id:'LEGACY-'+String(item.issueId||item.orderId||'')});
    }
-   const stateDate=appDay(item.since)||appDay(item.sourceLatestUpdate)||'';
+   const stateDate=(isCompletedOperational(item)?HfProductionRules.day(item.actualDelivery):'')||appDay(item.since)||appDay(item.sourceLatestUpdate)||'';
    const alreadyState=entries.some(r=>r.change&&norm(r.change).endsWith(norm(state))||norm(r.text)===norm(state));
    if(state&&!alreadyState){
      entries.push({at:stateDate,kind:'current',type:'현재 상태',text:state,change:item.nextAction?'다음 행동 · '+String(item.nextAction):'',actor:'Core 현재상태',id:'CURRENT-'+String(item.issueId||item.orderId||'')});

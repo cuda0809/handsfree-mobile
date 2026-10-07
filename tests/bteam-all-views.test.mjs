@@ -21,3 +21,11 @@ test('equipment picker joins the authoritative team rather than catalog status o
  assert.deepEqual(Array.from((await c.getAppProjects()).map(x=>x.orderId)),['B25']);
  assert.deepEqual(Array.from(c.appIssues.map(x=>x.orderId)),['B25']);
 });
+test('completed lifecycle uses shipment business date and preserves the later receipt timestamp',()=>{
+ const c=vm.createContext({HfProductionRules:rules,appDay:String,norm:v=>String(v||''),isCompletedOperational:x=>rules.classify(x,'2026-10-07')==='출고완료'});
+ vm.runInContext(source.slice(source.indexOf('function lifecycleEntriesFromHistory('),source.indexOf('function lifecyclePreview(')),c);
+ const history={events:[{id:'e',at:'2026-10-06',raw:'출고완료 10/1'}],changes:[]};
+ const rows=c.lifecycleEntriesFromHistory(history,{orderId:'B',state:'출고완료',actualDelivery:'2026-10-01',sourceLatestUpdate:'2026-10-04'});
+ assert.equal(rows.find(x=>x.kind==='current').at,'2026-10-01');
+ assert.equal(rows.find(x=>x.kind==='event').at,'2026-10-06');
+});
