@@ -1,4 +1,4 @@
-const CACHE='kmt-sa2-preview-sa283-mobile15-20261007';
+const CACHE='kmt-sa2-preview-sa283-schedule-yeargroups-20261008';
 const FILES=['./','./index.html','./mobile.js','./theme.js','./schedule.js','./app-flow.js','./production-rules.js','./manifest.webmanifest','./icon.svg','./hybrid05.css'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('kmt-sa2-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));

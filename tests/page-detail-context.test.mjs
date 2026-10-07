@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 const src=fs.readFileSync('kmt-sa2/app-flow.js','utf8');
-const c=vm.createContext({esc:v=>String(v||''),heading:(...x)=>x.join(' · '),formatHfDate:v=>v||'미정',planStagesOnDay:()=>['프로그램'],HfProductionRules:{today:()=> '2026-10-07'},displayedNextAction:x=>x.nextAction,strictCurrentStageIndex:()=>3,finishingPlan:()=>({label:'2026-10-08 ~ 2026-10-09 · 자동 계획'})});
+const c=vm.createContext({esc:v=>String(v||''),currentStatusLabel:x=>x.state,heading:(...x)=>x.join(' · '),formatHfDate:v=>v||'미정',planStagesOnDay:()=>['프로그램'],HfProductionRules:{today:()=> '2026-10-07'},displayedNextAction:x=>x.nextAction,strictCurrentStageIndex:()=>3,finishingPlan:()=>({label:'2026-10-08 ~ 2026-10-09 · 자동 계획'})});
 vm.runInContext(src.slice(src.indexOf('function pageDetailHtml('),src.indexOf('async function openProject(')),c);
 const row={orderId:'FIXTURE',customer:'고객',model:'장비',state:'프로그램 완료',currentIssue:'부품 대기',nextAction:'입고 확인',recentEvent:'전장 완료',planProgram:'2026-10-07',planInspection:'2026-10-14',planTimeline:[]};
 test('today detail contains context only, no input or full project lifecycle',()=>{

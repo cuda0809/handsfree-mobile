@@ -44,7 +44,7 @@
    planProgram:dates(/프로그램|프로그래밍/)[0]||'',planFinishing:dates(/마감\s*조립/)[0]||'',planInspection:dates(/검수|테스트|시험|FAT/).at(-1)||'',
    planDelivery:dates(/출고|납품/).at(-1)||'',planSourceMonth:month,
    planTimeline:timeline.map(r=>({date:r.date,process:r.process,sourceMonth:r.sourceMonth||''})),
-   planHistory:list.filter(r=>r.process).map(r=>({date:day(r.date),process:r.process,sourceMonth:r.sourceMonth||''})),
+   planHistory:list.filter(r=>r.process).map(r=>({recordId:r.recordId||'',date:day(r.date),process:r.process,sourceMonth:r.sourceMonth||'',sourceRef:r.sourceRef||'',current:selected.includes(r)})),
    planSourceVerified:verified.length>0,
    productionEvidence:verified.find(r=>!r.process&&['진행 중','작업 예정','출고대기','확인 필요'].includes(r.status))||null};
  }
@@ -81,6 +81,15 @@
   const date=day(r.date);
   return r.process+' · '+date+(date<today?' (일정 경과 · 진행 확인)':'');
  }
- const rules={day,today,classify,resolve,manufacturingNow,nextAction};root.HfProductionRules=rules;
+ function jobYear(orderId){
+  const m=String(orderId||'').match(/^(?:LAB-)?(\d{2})(\d{2})(\d{2})[A-Z]-\d+(?:-\d+)?$/);
+  return m&&day('20'+m[1]+'-'+m[2]+'-'+m[3])?'20'+m[1]:'';
+ }
+ function completedGroups(rows,query='',currentYear=today().slice(0,4)){
+  const groups=new Map();
+  for(const x of rows){const year=jobYear(x.orderId)||'연도 미확인';if(!groups.has(year))groups.set(year,[]);groups.get(year).push(x);}
+  return [...groups].sort(([a],[b])=>a===currentYear?-1:b===currentYear?1:b.localeCompare(a)).map(([year,items])=>({year,items,open:!!query||year===currentYear}));
+ }
+ const rules={day,today,classify,resolve,manufacturingNow,nextAction,jobYear,completedGroups};root.HfProductionRules=rules;
  if(typeof module==='object'&&module.exports)module.exports=rules;
 })(typeof window==='object'?window:globalThis);

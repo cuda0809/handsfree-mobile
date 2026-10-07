@@ -247,7 +247,7 @@ function renderUnifiedHome(){
  const issueCards=issueActive.sort((a,b)=>(a.priority||9)-(b.priority||9)).map(x=>{
   const issueText=String(x.currentIssue||x.recentEvent||x.cause||'').trim();
   return '<button class="hf-card '+hfCardTone(x,'issue')+'" data-home-order="'+esc(x.orderId)+'">'+hfCardIdentity(x,x.priority===1?'P1':'진행')+hfDueAlert(x)+
-  '<div class="hf-card-meta"><div><small>현재 상태</small><b>'+esc(x.state||'미등록')+'</b></div><div><small>납기</small><b>'+esc(formatHfDate(x.due))+'</b></div></div>'+
+  '<div class="hf-card-meta"><div><small>현재 상태</small><b>'+esc(currentStatusLabel(x))+'</b></div><div><small>납기</small><b>'+esc(formatHfDate(x.due))+'</b></div></div>'+
   (issueText?'<div class="hf-card-issue"><span>이슈/진행</span><p>'+esc(issueText)+'</p></div>':'')+
   '<div class="hf-card-next"><span>다음</span>'+esc(displayedNextAction(x))+'</div></button>';
  }).join('');
@@ -412,6 +412,7 @@ function lifecycleEntriesFromHistory(history,item=null){
    });
  });
  if(item){
+   (item.planHistory||[]).filter(r=>r.current===false).forEach(r=>entries.push({at:r.date,kind:'legacy',type:'변경 전 계획 · 이력',text:r.process+' · '+r.date,change:'현재 계획에서 제외 · 이력 보존',actor:r.sourceRef||'계획원장',id:r.recordId||r.process+'-'+r.date}));
    const cause=String(item.cause||'').trim(),state=String(item.state||'').trim();
    if(cause&&!entries.some(r=>norm(r.text).includes(norm(cause))||norm(cause).includes(norm(r.text)))){
      entries.push({at:legacyLifecycleDate(cause,item.since||item.sourceLatestUpdate),kind:'legacy',type:'기존 이슈 · 이관',text:cause,change:'',actor:'기존 원장',id:'LEGACY-'+String(item.issueId||item.orderId||'')});
@@ -550,7 +551,7 @@ function pageDetailHtml(x,purpose){
  if(purpose==='today'){
   const stages=planStagesOnDay(x,HfProductionRules.today());
   return heading('오늘 현황',x.customer,x.model)+identity+
-   '<div class="project-linked-issue"><small>현재 상태</small><p>'+esc(x.state||'미등록')+'</p></div>'+
+   '<div class="project-linked-issue"><small>현재 상태</small><p>'+esc(currentStatusLabel(x))+'</p></div>'+
    '<div class="project-linked-issue"><small>현재 이슈</small><p>'+esc(x.currentIssue||'등록된 이슈 없음')+'</p></div>'+
    '<div class="project-linked-issue"><small>오늘 계획</small><p>'+esc(stages.length?stages.join(' · '):'오늘로 지정된 공정 없음')+'</p></div>'+
    '<div class="project-linked-issue"><small>다음 행동</small><p>'+esc(displayedNextAction(x))+'</p></div>'+
@@ -567,7 +568,7 @@ function pageDetailHtml(x,purpose){
   return '<article class="context-plan-row'+(i===current?' current':'')+'"><b>'+name+(i===current?' · 현재':'')+'</b><span>'+esc(label)+'</span></article>';
  }).join('');
  return heading('공정 계획',x.customer,x.model)+identity+
-  '<p class="note">현재 상태 · '+esc(x.state||'미등록')+'</p><div class="context-plan-list">'+rows+'</div>'+
+  '<p class="note">현재 상태 · '+esc(currentStatusLabel(x))+'</p><div class="context-plan-list">'+rows+'</div>'+
   '<p class="note">토·일 제외 · 마감조립은 프로그램 후 검수 전 1~2일 자동 계획입니다. 테스트와의 중첩은 일정 충돌로 보지 않습니다. 계획은 완료 실적이 아닙니다.</p>';
 }
 function openPageDetail(orderId,purpose,sourceSnapshot){
@@ -918,7 +919,7 @@ function planCountLabel(count,needsPlans=true){
 }
 function productionPlanRows(){return operationalRows(false);}
 
-let productionPlanMode='plan',deliveryView='active';
+let productionPlanMode='plan',deliveryView='active',deliverySearch='';
 function productionPlan(mode='plan',skipMeta=false){
  productionPlanMode=mode;active('plan');screen='plan';
  if(!skipMeta){setTimeout(()=>syncProjectMeta(false),0);setTimeout(()=>syncPlanOverview(false),80);}
@@ -933,13 +934,14 @@ function productionPlan(mode='plan',skipMeta=false){
  const tabs='<div class="plan-switch"><button class="'+(mode==='plan'?'active':'')+'" onclick="productionPlan(\'plan\')">생산계획</button><button class="'+(mode==='delivery'?'active':'')+'" onclick="productionPlan(\'delivery\')">납기 · 출고</button></div>';
  if(mode==='delivery'){
   const completed=operationalRows(true).filter(isCompletedOperational).sort((a,b)=>String(formatHfDate(b.actualDelivery)).localeCompare(String(formatHfDate(a.actualDelivery))));
-  const deliveryRows=deliveryView==='completed'?completed:selected;
+  const q=norm(deliverySearch);
+  const deliveryRows=(deliveryView==='completed'?completed:selected).filter(x=>!q||norm([x.orderId,x.customer,x.model,x.pm].join(' ')).includes(q));
   deliveryRows.forEach(rememberProjectDetail);
   const count=rows=>planCountLabel(rows.length,false);
   const deliveryTabs='<div class="plan-switch"><button class="'+(deliveryView==='active'?'active':'')+'" onclick="deliveryView=\'active\';productionPlan(\'delivery\',true)">진행 · 출고대기 · '+count(selected)+'</button><button class="'+(deliveryView==='completed'?'active':'')+'" onclick="deliveryView=\'completed\';productionPlan(\'delivery\',true)">출고완료 · '+count(completed)+'</button></div>';
   main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">PRODUCTION CONTROL</div><h1>계획</h1></div></div>'+tabs+
-  (readStale||planReadStale?'<div class="alert">최신 조회 미확인 · 이전 정상값 표시</div>':'')+'<p class="hybrid-desc">납기는 고객 약속일입니다. 실납기일은 확인된 실제 출고일이며, 입력한 날짜나 출고 예정일로 대신하지 않습니다.</p>'+deliveryTabs+'<div id="deliveryList" class="hybrid-promise-list">'+
-  (deliveryRows.length?deliveryRows.map(x=>{const due=formatHfDate(x.due),actual=formatHfDate(x.actualDelivery);return '<button class="hybrid-promise-row delivery-v2 hf-card '+hfCardTone(x,deliveryView==='completed'?'completed':'active')+'" data-delivery-order="'+esc(x.orderId)+'"><div class="delivery-dates"><div><small>납기</small><strong>'+esc(due)+'</strong></div><div><small>실납기일</small><strong>'+esc(actual)+'</strong></div></div>'+(String(x.team||'').trim()==='B'?'<p>출고 계획 · '+esc(formatHfDate(x.planDelivery))+' (실적 아님)</p>':'')+(x.actualDeliveryReview?'<p class="alert">'+esc(x.actualDeliveryReview)+'</p>':'')+(x.actualDeliveryEvidence?.length?'<p>출고완료 근거 · '+esc([...new Set(x.actualDeliveryEvidence.map(e=>e.source))].join(' · '))+'</p>':'')+hfDueAlert(x)+'<div class="delivery-main"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><small class="delivery-job">JOB NO. '+esc(x.orderId||'미등록')+'</small><p><span>현재</span>'+esc(x.state||'미등록')+'</p><p><span>다음</span>'+esc(displayedNextAction(x))+'</p></div>'+hybridStageFlow(x)+'</button>';}).join(''):'<p class="empty">'+(readStale||planReadStale?'최신 목록을 확인하지 못했습니다.':'해당하는 장비가 없습니다.')+'</p>')+
+  (readStale||planReadStale?'<div class="alert">최신 조회 미확인 · 이전 정상값 표시</div>':'')+'<p class="hybrid-desc">납기는 고객 약속일입니다. 실납기일은 확인된 실제 출고일이며, 입력한 날짜나 출고 예정일로 대신하지 않습니다.</p>'+deliveryTabs+'<input id="deliverySearch" class="hybrid-search" placeholder="전체 연도 고객 · 장비 · JOB NO. 검색" value="'+esc(deliverySearch)+'" oninput="deliverySearch=this.value;productionPlan(\'delivery\',true);const e=document.getElementById(\'deliverySearch\');e.focus();e.setSelectionRange(e.value.length,e.value.length)"><div id="deliveryList" class="hybrid-promise-list">'+
+  (deliveryRows.length?(deliveryView==='completed'?completedYearHtml(deliveryRows,deliverySearch,rows=>rows.map(x=>{const due=formatHfDate(x.due),actual=formatHfDate(x.actualDelivery);return '<button class="hybrid-promise-row delivery-v2 hf-card '+hfCardTone(x,deliveryView==='completed'?'completed':'active')+'" data-delivery-order="'+esc(x.orderId)+'"><div class="delivery-dates"><div><small>납기</small><strong>'+esc(due)+'</strong></div><div><small>실납기일</small><strong>'+esc(actual)+'</strong></div></div>'+(String(x.team||'').trim()==='B'?'<p>출고 계획 · '+esc(formatHfDate(x.planDelivery))+' (실적 아님)</p>':'')+(x.actualDeliveryReview?'<p class="alert">'+esc(x.actualDeliveryReview)+'</p>':'')+(x.actualDeliveryEvidence?.length?'<p>출고완료 근거 · '+esc([...new Set(x.actualDeliveryEvidence.map(e=>e.source))].join(' · '))+'</p>':'')+hfDueAlert(x)+'<div class="delivery-main"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><small class="delivery-job">JOB NO. '+esc(x.orderId||'미등록')+'</small><p><span>현재</span>'+esc(currentStatusLabel(x))+'</p><p><span>다음</span>'+esc(displayedNextAction(x))+'</p></div>'+hybridStageFlow(x)+'</button>';}).join('')):deliveryRows.map(x=>{const due=formatHfDate(x.due),actual=formatHfDate(x.actualDelivery);return '<button class="hybrid-promise-row delivery-v2 hf-card '+hfCardTone(x,deliveryView==='completed'?'completed':'active')+'" data-delivery-order="'+esc(x.orderId)+'"><div class="delivery-dates"><div><small>납기</small><strong>'+esc(due)+'</strong></div><div><small>실납기일</small><strong>'+esc(actual)+'</strong></div></div>'+(String(x.team||'').trim()==='B'?'<p>출고 계획 · '+esc(formatHfDate(x.planDelivery))+' (실적 아님)</p>':'')+(x.actualDeliveryReview?'<p class="alert">'+esc(x.actualDeliveryReview)+'</p>':'')+(x.actualDeliveryEvidence?.length?'<p>출고완료 근거 · '+esc([...new Set(x.actualDeliveryEvidence.map(e=>e.source))].join(' · '))+'</p>':'')+hfDueAlert(x)+'<div class="delivery-main"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><small class="delivery-job">JOB NO. '+esc(x.orderId||'미등록')+'</small><p><span>현재</span>'+esc(currentStatusLabel(x))+'</p><p><span>다음</span>'+esc(displayedNextAction(x))+'</p></div>'+hybridStageFlow(x)+'</button>';}).join('')):'<p class="empty">'+(readStale||planReadStale?'최신 목록을 확인하지 못했습니다.':'해당하는 장비가 없습니다.')+'</p>')+
   '</div>';
   const el=$('deliveryList');el?.querySelectorAll('[data-delivery-order]').forEach(b=>b.onclick=()=>openProject(b.dataset.deliveryOrder,'plan'));
   return;
@@ -958,11 +960,11 @@ function productionPlan(mode='plan',skipMeta=false){
    const planned=allStages.some(s=>formatHfDate(planValue(x,s))!=='미정');
    const review=planReviewReasons(x);
    return '<button class="production-plan-card hf-card '+hfCardTone(x,'plan')+'" data-plan-review="'+(review.length?'true':'false')+'" data-plan-order="'+esc(x.orderId)+'"><div class="production-plan-head"><div><small>JOB NO. '+esc(x.orderId||'미등록')+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b></div><span class="'+(planned?'set':'unset')+'">'+(String(x.team||'').trim()==='B'?productionClass(x):(planned?'일정 있음':'제작일정 미정'))+'</span></div>'+hfDueAlert(x)+(review.length?'<div class="plan-review-notice"><b>일정 확인 필요</b><p>'+esc(review.join(' / '))+'</p></div>':'')+
-   '<div class="production-plan-meta"><div><small>납기</small><b>'+esc(formatHfDate(x.due))+'</b></div><div><small>현재</small><b>'+esc(x.state||'미등록')+'</b></div></div>'+
+   '<div class="production-plan-meta"><div><small>납기</small><b>'+esc(formatHfDate(x.due))+'</b></div><div><small>현재</small><b>'+esc(currentStatusLabel(x))+'</b></div></div>'+
    '<div class="production-plan-stages">'+allStages.map(name=>'<div><small>'+name+'</small><b>'+esc(name==='마감조립'?finishingPlan(x).label:formatHfDate(planValue(x,name)))+'</b></div>').join('')+'</div>'+
    '<p class="production-plan-next"><span>다음 행동</span>'+esc(displayedNextAction(x))+'</p></button>';
  }).join(''):'<p class="empty">'+(readStale||planReadStale?'최신 목록을 확인하지 못했습니다.':'현재 작업 중이거나 예정된 장비가 없습니다.')+'</p>')+
- '</div>'+['출고대기','확인 필요'].map(label=>{const rows=secondary.filter(x=>productionClass(x)===label);return '<details><summary>'+esc(label)+' · '+planCountLabel(rows.length)+'</summary>'+rows.map(x=>'<button class="production-plan-card hf-card" data-plan-order="'+esc(x.orderId)+'"><small>JOB NO. '+esc(x.orderId)+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(x.state||'미등록')+'</p><p>다음 행동 · '+esc(displayedNextAction(x))+'</p></button>').join('')+'</details>';}).join('');
+ '</div>'+['출고대기','확인 필요'].map(label=>{const rows=secondary.filter(x=>productionClass(x)===label);return '<details><summary>'+esc(label)+' · '+planCountLabel(rows.length)+'</summary>'+rows.map(x=>'<button class="production-plan-card hf-card" data-plan-order="'+esc(x.orderId)+'"><small>JOB NO. '+esc(x.orderId)+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(currentStatusLabel(x))+'</p><p>다음 행동 · '+esc(displayedNextAction(x))+'</p></button>').join('')+'</details>';}).join('');
  main.querySelectorAll('[data-plan-order]').forEach(b=>b.onclick=()=>{const x=productionPlanRows().find(v=>v.orderId===b.dataset.planOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.planOrder,'plan',x);});
 }
 function delivery(skipMeta=false){return productionPlan('delivery',skipMeta);}
@@ -1010,6 +1012,9 @@ function deliveryPerformance(x){
  return {days:0,label:'정시 출고',tone:'ontime'};
 }
 function projectStageLabel(x){return HYBRID_FLOW_STAGES[strictCurrentStageIndex(x)]||'기타';}
+function completedYearHtml(rows,query,renderRows){
+ return HfProductionRules.completedGroups(rows,query).map(g=>'<details class="project-group completed-year"'+(g.open?' open':'')+'><summary><span>'+esc(g.year==='연도 미확인'?g.year:g.year+'년 출고완료')+'</span><b>'+g.items.length+'대</b></summary><div class="project-group-body">'+renderRows(g.items)+'</div></details>').join('');
+}
 function renderHybridProjects(){
  const el=$('hybridProjectList');if(!el)return;
  const q=norm($('hybridProjectSearch')?.value||'');
@@ -1021,13 +1026,15 @@ function renderHybridProjects(){
  el.innerHTML=order.map(bucket=>{
   const list=rows.filter(x=>projectViewBucket(x)===bucket).sort((a,b)=>(a.priority||9)-(b.priority||9)||hybridDueKey(a.due).localeCompare(hybridDueKey(b.due)));
   if(!list.length)return '';
-  const cards=list.map(x=>{
+  const cardsByOrder=list.map(x=>{
    const reasons=priorityAssessment(x).reasons,review=projectReviewReason(x);
    const issue=reasons.length?'우선 조치 · '+reasons.join(' · '):review||String(x.currentIssue||'').trim();
    const line=issue&&norm(issue)!==norm(x.state)&&!/^(미정|미등록|없음|조립진행중)$/.test(norm(issue))?'<p class="note">'+esc(issue)+'</p>':'';
-   return '<button class="hybrid-project-row compact-project hf-card '+hfCardTone(x,bucket==='completed'?'completed':'active')+'" data-project-order="'+esc(x.orderId)+'"><div class="project-card-top"><div><small>'+esc(x.orderId)+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b>'+(x.pm?'<small>담당 PM: '+esc(x.pm)+'</small>':'')+'</div></div><div class="project-compact-line"><span>현재</span><b>'+esc(bucket==='review'?'상태 확인 필요':x.state||labels[bucket])+'</b>'+(formatHfDate(x.due)!=='미정'&&x.due?'<em>납기 '+esc(formatHfDate(x.due))+'</em>':'')+'</div>'+line+'</button>';
-  }).join('');
-  return '<details class="project-group"'+(bucket==='completed'&&filter==='all'?'':' open')+'><summary><span>'+labels[bucket]+'</span><b>'+list.length+'대</b></summary><div class="project-group-body">'+cards+'</div></details>';
+   return '<button class="hybrid-project-row compact-project hf-card '+hfCardTone(x,bucket==='completed'?'completed':'active')+'" data-project-order="'+esc(x.orderId)+'"><div class="project-card-top"><div><small>'+esc(x.orderId)+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b>'+(x.pm?'<small>담당 PM: '+esc(x.pm)+'</small>':'')+'</div></div><div class="project-compact-line"><span>현재</span><b>'+esc(currentStatusLabel(x))+'</b>'+(formatHfDate(x.due)!=='미정'&&x.due?'<em>납기 '+esc(formatHfDate(x.due))+'</em>':'')+'</div>'+line+'</button>';
+  });
+  const cards=cardsByOrder.join('');
+  if(bucket==='completed')return completedYearHtml(list,q,group=>group.map(x=>cardsByOrder[list.indexOf(x)]).join(''));
+  return '<details class="project-group" open><summary><span>'+labels[bucket]+'</span><b>'+list.length+'대</b></summary><div class="project-group-body">'+cards+'</div></details>';
  }).join('');
  el.querySelectorAll('[data-project-order]').forEach(b=>b.onclick=()=>{const x=rows.find(v=>v.orderId===b.dataset.projectOrder);if(x)openProject(x.orderId,'detail',x);});
 }
@@ -1297,7 +1304,7 @@ async function saveTodayIssue(key){
 }
 function openUnifiedEvent(issueId){
  const x=items.find(v=>v.issueId===issueId);if(!x)return toast('최신 상태를 다시 불러오세요.');
- open(heading('TODAY ISSUE',x.customer,x.model)+'<p class="note">'+esc(x.orderId)+' · 현재 '+esc(x.state||'미등록')+'</p><label>진행·이슈·사유<textarea id="unifiedDialogText" maxlength="800" placeholder="예: 마감조립 진행 / 부품 미입고로 조립 대기 / 센서값 이상 확인"></textarea></label><p id="unifiedDialogPreview" class="note">내용을 입력하면 상태 반영 여부를 미리 보여줍니다.</p><button id="unifiedDialogSave" class="primary">기록 및 자동 반영</button><button class="secondary" onclick="todayIssues();dialog.close()">오늘 이슈 전체 보기</button>');
+ open(heading('TODAY ISSUE',x.customer,x.model)+'<p class="note">'+esc(x.orderId)+' · 현재 '+esc(currentStatusLabel(x))+'</p><label>진행·이슈·사유<textarea id="unifiedDialogText" maxlength="800" placeholder="예: 마감조립 진행 / 부품 미입고로 조립 대기 / 센서값 이상 확인"></textarea></label><p id="unifiedDialogPreview" class="note">내용을 입력하면 상태 반영 여부를 미리 보여줍니다.</p><button id="unifiedDialogSave" class="primary">기록 및 자동 반영</button><button class="secondary" onclick="todayIssues();dialog.close()">오늘 이슈 전체 보기</button>');
  const field=$('unifiedDialogText'),preview=$('unifiedDialogPreview'),button=$('unifiedDialogSave');
  field.oninput=()=>{const v=field.value.trim();preview.textContent=v?'자동 판정 · '+resolveUnifiedImpact(x,classifyUnifiedEvent(v),v).label:'내용을 입력하면 상태 반영 여부를 미리 보여줍니다.';};
  button.onclick=async()=>{const text=field.value.trim();if(!text){preview.textContent='내용을 입력하세요.';return;}button.disabled=true;preview.textContent='기록 중…';const result=await submitUnifiedEvent(issueId,text,preview);if(result.ok){preview.textContent=result.statePending?'Event 저장 완료 · 현재상태 자동반영 중':result.stateApplied?'Event와 현재상태 반영 완료':'Project Event 기록 완료';field.value='';}else if(result.partial){preview.textContent=result.eventSaved?'Event 저장 완료 · 상태 자동반영 확인 필요':'서버 접수 결과 확인 필요';}else preview.textContent='기록 결과를 확인하지 못했습니다.';button.disabled=false;};
