@@ -26,8 +26,8 @@ function hfAppCurrentEvidence_(projects,events,today){
   if(!jobs.length||jobs.some(function(j){return j!==p.orderId;}))return;
   var text=String(e[10]||'').replace(/^[·\s]+/,'').trim();
   var request=String(e[22]||e[0]||'').replace(/-E\d+$/,''),stamp=String(e[1]||''),c=content[p.orderId];
-  if(text&&(!c||stamp>c.stamp)){c=content[p.orderId]={requestId:request,stamp:stamp,date:date,lines:[],ids:[]};}
-  if(text&&c&&c.requestId===request){c.lines.push(text);c.ids.push(e[0]);if(date>c.date)c.date=date;}
+  if(text&&(!c||stamp>c.stamp&&c.requestId!==request)){c=content[p.orderId]={requestId:request,stamp:stamp,date:date,lines:[],ids:[]};}
+  if(text&&c&&c.requestId===request){c.lines.push(text);c.ids.push(e[0]);if(date>c.date)c.date=date;if(stamp>c.stamp)c.stamp=stamp;}
   var match=text.match(/^(조립|마감조립|전장|배선|프로그램|검수)\s*(완료|진행(?:\s*중)?|중)(?:\s+(?:20\d{2}[-/.])?\d{1,2}[-/.]\d{1,2})?\s*$/);
   if(!match)return;
   var stamp=String(e[1]||''),prior=latest[p.orderId];

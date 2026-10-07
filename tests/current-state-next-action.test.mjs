@@ -48,7 +48,7 @@ test('equipment receipt stays unverified when journal saved but current server s
 });
 test('multiline issue reads back latest request without inventing state or overwriting manual action',()=>{
  const first=event({0:'NEW-E01',22:'NEW',6:'2026-10-06',10:'10/6 메인하우징 베어링 커버 조립 불가로 혜성 반출'});
- const second=event({0:'NEW-E02',22:'NEW',6:'2026-10-07',10:'10/7 커버 입고 예정'});
+ const second=event({0:'NEW-E02',22:'NEW',1:'2026-10-07 08:42:51 KST',6:'2026-10-07',10:'10/7 커버 입고 예정'});
  const p={...base,state:'조립 진행',since:'2026-10-01',nextAction:'담당자 확인'},before=JSON.stringify([p,first,second]);
  const out=run(p,[event({0:'OLD-E01',1:'2026-10-07 07:00:00 KST',10:'조립 진행'}),first,second]);
  assert.equal(out.currentIssue,first[10]+'\n'+second[10]);assert.equal(out.recentEvent,out.currentIssue);
