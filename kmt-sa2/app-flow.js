@@ -515,6 +515,8 @@ async function openProject(orderId,purpose='detail',sourceSnapshot=null){
   $('projectLifecycleButton').onclick=()=>projectLifecycle(p.orderId);
   $('projectHistoryButton').onclick=()=>projectHistory(p.orderId);
   $('projectPlanButton').onclick=()=>openProjectPlan(p.orderId,linked);
+  el.insertAdjacentHTML('beforeend','<button id="projectProgressInput" class="primary">진행내용 입력</button>');
+  $('projectProgressInput').onclick=()=>input(linked);
  };
  render();
 
