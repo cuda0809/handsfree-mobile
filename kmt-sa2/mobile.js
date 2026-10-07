@@ -1,5 +1,5 @@
 'use strict';
-const BUILD='2026.10.07.SA2.8.3-MOBILE3', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
+const BUILD='2026.10.07.SA2.8.3-MOBILE4', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
 const main=document.getElementById('main'),dialog=document.getElementById('detail');
 let coreSnapshot=false;
 let items=[],live=false,readPending=null,sourceDate='',lastRead='',screen='home',filter='all',returnFocus=null,readMessage='현재 상태를 불러오는 중…',recognition=null,installPrompt=null,readStale=false,lastReadErrorStatus=0,lastCoreAttempt=0;
@@ -7,7 +7,10 @@ const $=id=>document.getElementById(id);
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function norm(s){return String(s||'').toLowerCase().replace(/[\s\-‐‑–—]/g,'');}
 function heading(k,t,sub=''){return `<div class="sheet-head"><div><div class="eyebrow">${esc(k)}</div><h2>${esc(t)}</h2></div><button class="icon" aria-label="상세 닫기" onclick="dialog.close()">×</button></div><div class="sub">${esc(sub)}</div>`;}
-function open(html){stopVoice();if(!dialog.open)returnFocus=document.activeElement;$('sheetBody').innerHTML=html;if(!dialog.open)dialog.showModal();dialog.scrollTop=0;}
+// A normal fixed detail page avoids the native modal top layer making the entire app inert.
+// Keep HTMLDialogElement.close/open for existing save, refresh and editor guards.
+function open(html){stopVoice();if(!dialog.open)returnFocus=document.activeElement;$('sheetBody').innerHTML=html;if(!dialog.open)dialog.show();dialog.scrollTop=0;}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&dialog.open){e.preventDefault();dialog.close();}});
 dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});
 dialog.addEventListener('close',()=>{if(dialog.open)return;stopVoice();const target=returnFocus;returnFocus=null;if(target?.isConnected&&(document.activeElement===document.body||dialog.contains(document.activeElement)))target.focus({preventScroll:true});});
 function toast(text){clearTimeout(toast.timer);$('toast').hidden=true;let target=$('toast');if(dialog.open){target=$('dialogStatus');if(!target){target=document.createElement('p');target.id='dialogStatus';target.className='alert';target.setAttribute('role','status');$('sheetBody').appendChild(target);}}target.textContent=text;target.hidden=false;if(dialog.open)target.scrollIntoView({block:'nearest'});toast.timer=setTimeout(()=>target.hidden=true,4500);}

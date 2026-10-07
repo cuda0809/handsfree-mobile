@@ -2,6 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+test('detail opens outside native modal top layer and Escape/close remains available',()=>{
+ const source=fs.readFileSync('kmt-sa2/mobile.js','utf8');
+ assert.doesNotMatch(source,/\.showModal\(/);
+ let shows=0,closes=0,keyHandler,voiceStops=0;
+ const target={},sheet={innerHTML:''},dialog={open:false,scrollTop:40,show(){shows++;this.open=true;},close(){closes++;this.open=false;}};
+ const c=vm.createContext({document:{activeElement:target,addEventListener:(name,f)=>{if(name==='keydown')keyHandler=f;}},dialog,$:()=>sheet,stopVoice:()=>voiceStops++,returnFocus:null});
+ vm.runInContext(source.slice(source.indexOf('function open(html)'),source.indexOf("dialog.addEventListener('click'")),c);
+ c.open('first');assert.equal(dialog.open,true);assert.equal(shows,1);assert.equal(sheet.innerHTML,'first');assert.equal(dialog.scrollTop,0);assert.equal(c.returnFocus,target);
+ c.open('nested editor');assert.equal(shows,1);assert.equal(sheet.innerHTML,'nested editor');assert.equal(voiceStops,2);
+ let prevented=false;keyHandler({key:'Escape',preventDefault(){prevented=true;}});assert.equal(closes,1);assert.equal(dialog.open,false);assert.equal(prevented,true);
+ c.open('reopen');assert.equal(shows,2);
+ assert.match(fs.readFileSync('kmt-sa2/hybrid05.css','utf8'),/#detail\[open\]\{[^}]*position:fixed[^}]*overflow-y:auto/);
+});
 test('late detail-close event never steals a following navigation click or scrolls the page',()=>{
  const source=fs.readFileSync('kmt-sa2/mobile.js','utf8'),code=source.match(/dialog\.addEventListener\('close',[^\n]+/)[0];
  for(const followingNav of [false,true]){

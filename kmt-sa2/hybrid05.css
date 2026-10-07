@@ -845,3 +845,6 @@ main{padding-bottom:84px!important}
 .bottom{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:#fff!important}
 #detail::backdrop{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 .hf-card:active{transform:none!important}
+/* Detail is a normal scrollable page, without a modal backdrop or background inertness. */
+#detail[open]{position:fixed;inset:0;margin:0 auto;width:100%;max-width:520px;height:100%;max-height:100%;border-radius:0;z-index:30;overflow-y:auto;box-shadow:none;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+#detail .sheet{min-height:100%;padding-top:max(10px,env(safe-area-inset-top))}

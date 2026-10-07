@@ -7,7 +7,7 @@ const source=baseline?execFileSync('git',['show','e8d6199:kmt-sa2/mobile.js'],{e
 const row={team:'B',projectId:'PRJ-A',orderId:'JOB-A',issueId:'ISS-A',state:'조립 진행',nextAction:'검수',issueStatus:'OPEN',since:'2026-09-01',sourceLatestUpdate:'2026-10-01',currentIssue:'old',recentEvent:'old'};
 function harness(fetcher,cache){
  const storage=new Map(cache?[['hf-core-status-v1',JSON.stringify(cache)]]:[]),stub={addEventListener(){},classList:{toggle(){}},querySelector(){return null},replaceChildren(){},after(){}};
- const context=vm.createContext({document:{getElementById:()=>stub,querySelector:()=>stub,querySelectorAll:()=>[],visibilityState:'visible'},window:{addEventListener(){}},navigator:{},localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)},setTimeout:()=>1,clearTimeout(){},setInterval(){},AbortController,Date,console,fetch:fetcher});
+ const context=vm.createContext({document:{addEventListener(){},getElementById:()=>stub,querySelector:()=>stub,querySelectorAll:()=>[],visibilityState:'visible'},window:{addEventListener(){}},navigator:{},localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)},setTimeout:()=>1,clearTimeout(){},setInterval(){},AbortController,Date,console,fetch:fetcher});
  vm.runInContext(source.slice(0,source.indexOf('\nfunction card(')),context);
  vm.runInContext('banner=()=>{}; home=()=>{};',context);
  return {run:s=>vm.runInContext(s,context),storage};
