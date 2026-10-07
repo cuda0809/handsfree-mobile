@@ -15,7 +15,7 @@ function lifecycleCacheSet(orderId,history){
   const trimmed={};keys.forEach(k=>trimmed[k]=all[k]);persist(LIFECYCLE_CACHE_KEY,trimmed);
  }catch{}
 }
-const appCall=b=>api('/api/sa2-app',b,55000);
+const appCall=b=>b.action==='edit'?api('/api/sa2-app',b,55000):readApp(b);
 function appError(e){if(!e.status&&!e.data)return '연결 실패 또는 응답 미확인입니다. 자동 재전송하지 않습니다.';const code=e.data?.error||e.message;return ({unauthorized:'로그인 상태를 확인할 수 없습니다. 개인 로그인을 다시 확인하세요.',invalid_identity:'개인 인증을 확인하지 못했습니다. 다시 로그인하세요.',identity_denied:'개인 인증 또는 허용 계정을 확인하세요.',invalid_origin:'앱 주소와 인증 출처 설정을 확인하세요.',personal_login_required:'사용자 등록이 필요합니다.',activation_required:'사용자 등록이 필요합니다.',forbidden:'이 계정의 권한을 확인하세요.',stale_record:'다른 변경이 있습니다. 최신 내용을 다시 열어 수정하세요.',project_mismatch:'프로젝트 연결을 확인하세요.',ambiguous_receipt:'같은 내용의 요청이 여러 건입니다. 요청 번호로 확인하세요.',invalid_reason:'변경 사유를 입력하세요.',invalid_next_action:'다음 행동을 입력하세요.',no_change:'변경한 내용이 없습니다.',edit_gate_closed:'수정 기능 연결을 확인 중입니다.'})[code]||scheduleErrors[code]||'연결 결과를 확인하지 못했습니다. 잠시 후 다시 확인하세요.';}
 function appFailure(el,e){if(el?.isConnected)el.innerHTML=esc(appError(e))+(e.status===401?' <a href="./login.html">사용자 등록</a>':'');}
 function appDay(v){if(/^\d{5}(?:\.\d+)?$/.test(String(v)))return new Date(Date.UTC(1899,11,30)+Math.floor(Number(v))*86400000).toISOString().slice(0,10);return String(v||'');}
@@ -758,7 +758,7 @@ async function syncPlanOverview(force=false){
   if((changed||cacheChanged)&&screen==='projects')projects(filter,true);
   if((changed||cacheChanged)&&screen==='issues')todayIssues();
   return {byOrder,candidateCount:grouped.size,changed,cacheChanged};
- })().catch(()=>{planReadStale=true;toast('생산계획 최신 조회 실패 · 이전 계획 유지');return null;}).finally(()=>{planOverviewPending=null;});
+ })().catch(e=>{planReadStale=true;console.warn('HF_PLAN_READ_FAILED',e.status||0,['invalid_plans','core_unverified'].includes(e.message)?e.message:'upstream_unavailable');toast(e.message==='invalid_plans'?'생산계획 응답 형식 확인 필요 · 이전 계획 유지':'생산계획 최신 조회 실패 · 이전 계획 유지');return null;}).finally(()=>{planOverviewPending=null;});
  return planOverviewPending;
 }
 function productionPlanRows(){return operationalRows(false);}

@@ -1,5 +1,5 @@
 'use strict';
-const BUILD='2026.10.07.SA2.8.3-MOBILE5', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
+const BUILD='2026.10.07.SA2.8.3-MOBILE6', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
 const main=document.getElementById('main'),dialog=document.getElementById('detail');
 let coreSnapshot=false;
 let items=[],live=false,readPending=null,sourceDate='',lastRead='',screen='home',filter='all',returnFocus=null,readMessage='현재 상태를 불러오는 중…',recognition=null,installPrompt=null,readStale=false,lastReadErrorStatus=0,lastCoreAttempt=0;
@@ -72,6 +72,18 @@ function notes(){const a=readStore(KEY,[]);return Array.isArray(a)?a:[];}
 function visibleNotes(){return notes().filter(r=>!r.orderId||items.some(x=>x.orderId===r.orderId&&isBTeam(x)));}
 function updateNote(id,patch){const a=notes(),r=a.find(r=>r.id===id);if(!r)throw Error('missing_note');Object.assign(r,patch);persist(KEY,a);return r;}
 async function api(path,body,timeout=25000){const c=new AbortController(),timer=setTimeout(()=>c.abort(),timeout);try{const r=await fetch(path,{credentials:'same-origin',cache:'no-store',signal:c.signal,...(body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});let d;try{d=await r.json();}catch{throw Error('invalid_response');}if(!r.ok||d.ok!==true){const e=Error(d.error||'request_failed');e.status=r.status;e.data=d;throw e;}return d;}finally{clearTimeout(timer);}}
+async function readApp(body){
+ const reads=['core','catalog','plans','reports','history','receipt','issue'];
+ if(!reads.includes(body.action))throw Error('read_action_required');
+ for(let attempt=0;attempt<2;attempt++){
+  try{return await api('/api/sa2-app',body,55000);}
+  catch(e){
+   const transient=e.name==='AbortError'||e.name==='TypeError'||e.message==='app_unavailable'||e.status===429||e.status===503||e.status===504;
+   if(attempt||!transient||navigator.onLine===false)throw e;
+   await new Promise(resolve=>setTimeout(resolve,1500));
+  }
+ }
+}
 function coreProcessFromState(state,next,previous=''){
  const t=norm([state,next].join(' '));
  if(/출고|납품|포장/.test(t))return '출고';
@@ -94,8 +106,8 @@ function corePriorityFromState(state,next,status,previous=2){
 async function refreshCachedCore(){
  // Both complete contracts are required; catalog alone cannot establish Core freshness.
  const [d,catalog]=await Promise.all([
-  api('/api/sa2-app',{action:'core'},22000),
-  api('/api/sa2-app',{action:'catalog'},22000)
+  readApp({action:'core'}),
+  readApp({action:'catalog'})
  ]);
  if(d.coreFallback)throw Error('partial_core');
  if(!Array.isArray(d.projects)||!d.generatedAt)throw Error('invalid_core');
