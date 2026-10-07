@@ -2,6 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+test('status refresh leaves navigation touch targets attached in their current position',()=>{
+ const source=fs.readFileSync('kmt-sa2/mobile.js','utf8');let moves=0;
+ const span={},demo={innerHTML:'',querySelector:()=>span,after:()=>moves++},status={previousElementSibling:demo,replaceChildren(){}},nav={previousElementSibling:status};
+ const c=vm.createContext({document:{querySelector:s=>s==='.demo'?demo:s==='.bottom'?nav:status},BUILD:'test',live:true,readMessage:'fresh',esc:s=>s});
+ vm.runInContext(source.slice(source.indexOf('function banner('),source.indexOf('async function refresh(')),c);
+ for(let i=0;i<30;i++)c.banner();assert.equal(moves,0);
+});
 test('card classification reuses one date formatter and rolls over at Seoul midnight',()=>{
  let constructed=0;
  const c=vm.createContext({Intl:{DateTimeFormat:class {constructor(...args){constructed++;this.formatter=new Intl.DateTimeFormat(...args);}format(d){return this.formatter.format(d);}}},Date,module:{exports:{}}});

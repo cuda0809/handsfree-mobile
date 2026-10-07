@@ -1,5 +1,5 @@
 'use strict';
-const BUILD='2026.09.29.SA2.8.3-CORE', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
+const BUILD='2026.10.07.SA2.8.3-MOBILE2', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
 const main=document.getElementById('main'),dialog=document.getElementById('detail');
 let coreSnapshot=false;
 let items=[],live=false,readPending=null,sourceDate='',lastRead='',screen='home',filter='all',returnFocus=null,readMessage='현재 상태를 불러오는 중…',recognition=null,installPrompt=null,readStale=false,lastReadErrorStatus=0,lastCoreAttempt=0;
@@ -130,7 +130,9 @@ function banner(){
  if(!status){status=document.createElement('div');status.className='hf-connection-row';}
  const span=demo.querySelector('span');
  if(span)status.replaceChildren(span);
- if(nav){demo.after(status);status.after(nav);}else demo.after(status);
+ // Do not detach/reinsert touch targets on each status refresh or Home render.
+ if(status.previousElementSibling!==demo)demo.after(status);
+ if(nav&&nav.previousElementSibling!==status)status.after(nav);
 }
 async function refresh(force=true){
  if(readPending)return readPending;

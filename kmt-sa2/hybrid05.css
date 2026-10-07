@@ -841,4 +841,7 @@ main{padding-bottom:84px!important}
 #detail .sheet-head{position:sticky;top:0;z-index:10;background:#fff;padding-bottom:8px}
 #detail .sheet-head .icon{flex-shrink:0;min-width:44px;min-height:44px}
 #detail{overscroll-behavior:contain}
-
+/* Avoid full-screen blur compositing while mobile cards and sheets redraw. */
+.bottom{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:#fff!important}
+#detail::backdrop{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.hf-card:active{transform:none!important}
