@@ -34,12 +34,12 @@ function formatHfDate(v){
 function isCompletedOperational(x){
  return productionClass(x)==='출고완료';
 }
-function currentProductionRows(){const today=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});return operationalRows(true).filter(x=>String(x.team||'').trim()==='B'&&HfProductionRules.manufacturingNow(x,today));}
+function currentProductionRows(){const today=HfProductionRules.today();return operationalRows(true).filter(x=>String(x.team||'').trim()==='B'&&HfProductionRules.manufacturingNow(x,today));}
 function displayedNextAction(x){
  const manual=String(x.nextAction||'').trim();
  if(manual&&manual!=='미정'&&manual!=='미등록')return manual;
  if(planReadStale)return '계획 재조회 필요';
- return HfProductionRules.nextAction(x,new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'}));
+ return HfProductionRules.nextAction(x,HfProductionRules.today());
 }
 function projectBucket(x){if(isCompletedOperational(x))return 'completed';const c=productionClass(x);return c==='출고대기'?'waiting':c==='확인 필요'?'review':'active';}
 function latestUnifiedInputByOrder(){
@@ -110,7 +110,7 @@ function dueUrgency(x){
  if(isCompletedOperational(x))return {level:'none',days:null,label:''};
  const due=formatHfDate(x?.due);
  if(!/^\d{4}-\d{2}-\d{2}$/.test(due))return {level:'none',days:null,label:''};
- const today=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
+ const today=HfProductionRules.today();
  const dueMs=ymdTime(due),todayMs=ymdTime(today);
  if(!Number.isFinite(dueMs)||!Number.isFinite(todayMs))return {level:'none',days:null,label:''};
  const days=Math.round((dueMs-todayMs)/86400000);
@@ -138,7 +138,7 @@ function hfCardTone(x,kind='active'){
 function hfCardIdentity(x,badge=''){
  return '<div class="hf-card-head"><div><small class="hf-card-job">JOB NO. '+esc(x.orderId||'미등록')+'</small><b class="hf-card-title">'+esc(x.customer||'고객 미등록')+' · '+esc(x.model||'모델 미등록')+'</b></div>'+(badge?'<span class="hf-card-badge">'+esc(badge)+'</span>':'')+'</div>';
 }
-function productionClass(x){return HfProductionRules.classify(x,new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'}));}
+function productionClass(x){return HfProductionRules.classify(x,HfProductionRules.today());}
 function projectCurrentFields(x){
  const completed=isCompletedOperational(x);
  const issue=String(x.currentIssue||'').trim(),event=String(x.recentEvent||'').trim();
@@ -791,9 +791,10 @@ function productionPlan(mode='plan',skipMeta=false){
  if(!skipMeta){setTimeout(()=>syncProjectMeta(false),0);setTimeout(()=>syncPlanOverview(false),80);}
  const allPlanRows=productionPlanRows();
  const secondary=allPlanRows.filter(x=>['출고대기','확인 필요'].includes(productionClass(x)));
+ const planToday=HfProductionRules.today();
  const selected=(mode==='delivery'?allPlanRows:allPlanRows.filter(x=>!secondary.includes(x))).sort((a,b)=>{
   const rank=x=>productionClass(x)==='진행 중'?0:1;
-  const date=x=>(x.planTimeline||[]).map(r=>formatHfDate(r.date)).filter(d=>d>=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'})).sort()[0]||'9999';
+  const date=x=>(x.planTimeline||[]).map(r=>formatHfDate(r.date)).filter(d=>d>=planToday).sort()[0]||'9999';
   return rank(a)-rank(b)||date(a).localeCompare(date(b))||String(a.orderId).localeCompare(String(b.orderId));
  });allPlanRows.forEach(rememberProjectDetail);
  const tabs='<div class="plan-switch"><button class="'+(mode==='plan'?'active':'')+'" onclick="productionPlan(\'plan\')">생산계획</button><button class="'+(mode==='delivery'?'active':'')+'" onclick="productionPlan(\'delivery\')">납기 · 출고</button></div>';

@@ -10,7 +10,7 @@ const fixture=[{orderId:'WORK',team:'B',state:'조립 진행',planTimeline:[]},{
  {orderId:'WAIT',team:'B',state:'출고대기'},{orderId:'CHECK',team:'B',state:'설계 대기'},{orderId:'DONE',team:'B',state:'출고완료'}];
 function render(stale,mode='plan',view='active'){
  const main={innerHTML:'',querySelectorAll:()=>[]};
- const ctx=vm.createContext({main,Date,screen:'home',readStale:stale,planReadStale:stale,
+ const ctx=vm.createContext({main,Date,HfProductionRules:rules,screen:'home',readStale:stale,planReadStale:stale,
   operationalRows:all=>all?fixture:fixture.filter(x=>x.state!=='출고완료'),productionClass:x=>rules.classify(x,'2026-10-06'),formatHfDate:v=>rules.day(v)||'미정',isCompletedOperational:x=>x.state==='출고완료',$:()=>main,hybridStageFlow:()=>'',
   displayedNextAction:x=>rules.nextAction(x,'2026-10-07'),active(){},rememberProjectDetail(){},esc:v=>String(v||''),hfCardTone:()=>'',hfDueAlert:()=>''});
  vm.runInContext(code+';deliveryView='+JSON.stringify(view)+';productionPlan('+JSON.stringify(mode)+',true);',ctx);return main.innerHTML;

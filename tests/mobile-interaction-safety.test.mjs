@@ -2,6 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+test('card classification reuses one date formatter and rolls over at Seoul midnight',()=>{
+ let constructed=0;
+ const c=vm.createContext({Intl:{DateTimeFormat:class {constructor(...args){constructed++;this.formatter=new Intl.DateTimeFormat(...args);}format(d){return this.formatter.format(d);}}},Date,module:{exports:{}}});
+ vm.runInContext(fs.readFileSync('kmt-sa2/production-rules.js','utf8'),c);
+ const rules=c.module.exports;
+ for(let i=0;i<1000;i++)assert.equal(rules.today(new Date('2026-10-07T14:59:59Z')),'2026-10-07');
+ assert.equal(rules.today(new Date('2026-10-07T15:00:00Z')),'2026-10-08');assert.equal(constructed,1);
+ const source=fs.readFileSync('kmt-sa2/app-flow.js','utf8');
+ for(const name of ['currentProductionRows','displayedNextAction','dueUrgency','productionClass']){
+  const start=source.indexOf('function '+name+'('),end=source.indexOf('\nfunction ',start+1),body=source.slice(start,end);
+  assert.match(body,/HfProductionRules\.today\(/);assert.doesNotMatch(body,/toLocaleDateString/);
+ }
+});
 test('cache remains bounded across watch URLs and quota failure cannot replace a fresh response',async()=>{
  const handlers={},cache=new Map();let fail=false,offline=false;
  const fresh={ok:true,clone(){return this;},version:'new'};

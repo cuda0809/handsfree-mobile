@@ -1,5 +1,10 @@
 /* Pure production-plan rules. Plans never establish actual completion. */
 (function(root){
+ let seoulDayFormatter;
+ function today(value=new Date()){
+  if(!seoulDayFormatter)seoulDayFormatter=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'});
+  return seoulDayFormatter.format(value);
+ }
  function day(v){
   const s=String(v||'').trim();
   if(/^\d{5}(?:\.\d+)?$/.test(s))return new Date(Date.UTC(1899,11,30)+Math.floor(Number(s))*86400000).toISOString().slice(0,10);
@@ -67,6 +72,6 @@
   const date=day(r.date);
   return r.process+' · '+date+(date<today?' (일정 경과 · 진행 확인)':'');
  }
- const rules={day,classify,resolve,manufacturingNow,nextAction};root.HfProductionRules=rules;
+ const rules={day,today,classify,resolve,manufacturingNow,nextAction};root.HfProductionRules=rules;
  if(typeof module==='object'&&module.exports)module.exports=rules;
 })(typeof window==='object'?window:globalThis);
