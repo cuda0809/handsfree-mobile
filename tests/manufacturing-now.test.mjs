@@ -3,6 +3,18 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 const rules=createRequire(import.meta.url)('../kmt-sa2/production-rules.js');
 const today='2026-10-06';
+test('source-verified actual work includes Cosmos materials label and completed electrical follow-up',()=>{
+ const evidence={recordId:'BVERIFIED|20261006T095639Z|JOB|META',status:'진행 중',sourceMonth:'2026-10',date:'2026-10-01',sourceRef:'원본 대조 확정 · 실제 진행 근거: 생산B팀!R1542 (#10/5~10/9)'};
+ for(const state of ['생산팀 조립자재 수령중','전장 완료']){
+  const x={state,planSourceVerified:true,productionEvidence:evidence};
+  assert.equal(rules.manufacturingNow(x,today),true);
+  assert.equal(rules.manufacturingNow({...x,planSourceVerified:false},today),false);
+  for(const patch of [{sourceRef:'일정만 존재'},{sourceMonth:'2026-09'},{date:'2026-10-12'},{recordId:'unverified'}])
+   assert.equal(rules.manufacturingNow({...x,productionEvidence:{...evidence,...patch}},today),false);
+ }
+ for(const state of ['출고완료','출고대기','제작 종료','작업 중단','작업 취소'])
+  assert.equal(rules.manufacturingNow({state,planSourceVerified:true,productionEvidence:evidence},today),false);
+});
 test('today issues require actual fabrication evidence rather than broad active or plan labels',()=>{
  for(const x of [
   {state:'납품 전 마무리 작업 중'},

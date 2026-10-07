@@ -51,6 +51,15 @@
  function manufacturingNow(x,today){
   const c=classify(x,today);
   if(c==='출고완료'||c==='출고대기'||x.productionEvidence?.status==='확인 필요')return false;
+  // Source-verified actual work is separate from calendar-only stages.
+  // It remains fabrication when Core shows materials receipt or an
+  // intermediate stage is complete and follow-up fabrication remains.
+  const evidence=x.productionEvidence;
+  if(x.planSourceVerified===true&&evidence?.status==='진행 중'&&
+   String(evidence.recordId||'').startsWith('BVERIFIED|')&&
+   evidence.sourceMonth===today.slice(0,7)&&day(evidence.date)&&day(evidence.date)<=today&&
+   /실제 진행 근거\s*:\s*\S/.test(String(evidence.sourceRef||''))&&
+   !/제작\s*(?:완료|종료)|작업\s*(?:중단|취소)/.test(String(x.state||'')))return true;
   // A schedule label or generic pre-delivery finishing is not evidence of fabrication.
   // Partial assembly can continue while other parts are awaited.
   return [x.state,x.currentIssue,x.recentEvent].some(v=>String(v||'').split(/[\n;]+/).some(line=>{
