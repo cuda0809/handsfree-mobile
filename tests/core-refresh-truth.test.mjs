@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 const baseline=process.argv.includes('--baseline');
 const source=baseline?execFileSync('git',['show','e8d6199:kmt-sa2/mobile.js'],{encoding:'utf8'}):fs.readFileSync('kmt-sa2/mobile.js','utf8');
-const row={projectId:'PRJ-A',orderId:'JOB-A',issueId:'ISS-A',state:'조립 진행',nextAction:'검수',issueStatus:'OPEN',since:'2026-09-01',sourceLatestUpdate:'2026-10-01',currentIssue:'old',recentEvent:'old'};
+const row={team:'B',projectId:'PRJ-A',orderId:'JOB-A',issueId:'ISS-A',state:'조립 진행',nextAction:'검수',issueStatus:'OPEN',since:'2026-09-01',sourceLatestUpdate:'2026-10-01',currentIssue:'old',recentEvent:'old'};
 function harness(fetcher,cache){
  const storage=new Map(cache?[['hf-core-status-v1',JSON.stringify(cache)]]:[]),stub={addEventListener(){},classList:{toggle(){}},querySelector(){return null},replaceChildren(){},after(){}};
  const context=vm.createContext({document:{getElementById:()=>stub,querySelector:()=>stub,querySelectorAll:()=>[],visibilityState:'visible'},window:{addEventListener(){}},navigator:{},localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)},setTimeout:()=>1,clearTimeout(){},setInterval(){},AbortController,Date,console,fetch:fetcher});

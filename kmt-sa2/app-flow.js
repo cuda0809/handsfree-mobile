@@ -73,7 +73,7 @@ function operationalRows(includeCompleted=true){
   if(confirmed||map.has(orderId))continue;
   map.set(orderId,{orderId,...p,state:'계획',priority:2});
  }
- const rows=[...map.values()].map(x=>{
+ const rows=[...map.values()].filter(x=>String(x.team||'').trim()==='B').map(x=>{
   const local=x.coreVerified?null:localInputs.get(String(x.orderId||''));
   const naturalState=local?.stateSyncVersion==='natural-v3'?String(local.displayState||'').trim():'';
   const localIssue=String(local?.text||'').trim();
@@ -235,7 +235,7 @@ async function syncProjectMeta(force=false){
   try{
    const d=await appCall({action:'core'});
    const issueByOrder=new Map((Array.isArray(d.issues)?d.issues:[]).map(v=>[String(v.orderId||''),v]));
-   const projects=(Array.isArray(d.projects)?d.projects:[]).map(p=>{
+ const projects=(Array.isArray(d.projects)?d.projects:[]).filter(x=>String(x.team||'').trim()==='B').map(p=>{
     const masterState=String(p.masterState||p.state||'');
     const issue=issueByOrder.get(String(p.orderId||''));
     return issue?{...p,masterState,issueStatus:String(issue.status||''),state:String(issue.state||p.state||'')}:{...p,masterState};
@@ -298,7 +298,13 @@ function renderAppReport(){
 }
 const appWorkBase=work;
 work=function(f='all',query=''){appWorkBase(f,query);main.insertAdjacentHTML('afterbegin','<button class="secondary" onclick="allProjects()">전체 프로젝트 · 계획 · 이력</button>');};
-async function getAppProjects(){const d=await appCall({action:'catalog'});if(!Array.isArray(d.projects))throw Error('invalid_catalog');appIssues=d.issues||[];const issueByOrder=new Map(appIssues.map(v=>[String(v.orderId||''),v]));appProjects=d.projects.map(p=>{const masterState=String(p.masterState||p.state||'');const issue=issueByOrder.get(String(p.orderId||''));return issue?{...p,masterState,issueStatus:String(issue.status||''),state:String(issue.state||p.state||'')}:{...p,masterState};});return appProjects;}
+async function getAppProjects(){
+ const [d,core]=await Promise.all([appCall({action:'catalog'}),appCall({action:'core'})]);
+ if(!Array.isArray(d.projects)||!Array.isArray(core.projects))throw Error('invalid_catalog');
+ const byOrder=new Map(core.projects.filter(x=>String(x.team||'').trim()==='B').map(x=>[String(x.orderId),x]));
+ appIssues=(d.issues||[]).filter(x=>byOrder.has(String(x.orderId)));
+ appProjects=[...byOrder.values()];return appProjects;
+}
 async function allProjects(prefix='',purpose='detail'){
  open(heading('프로젝트',prefix?'장비를 선택하세요':'전체 프로젝트','발주번호를 기준으로 일정과 이력을 연결합니다')+'<div id="projectResults">프로젝트를 불러오는 중…</div>');const el=$('projectResults');
  try{const rows=await getAppProjects();if(!el.isConnected)return;const selected=rows.filter(x=>!prefix||x.orderId.startsWith(prefix));
@@ -353,6 +359,7 @@ function lifecyclePreview(history,limit=4,item=null){
  return shown.length?shown.map(r=>'<div class="lifecycle-row '+esc(r.kind)+'"><time>'+esc(lifecycleDisplayAt(r.at))+'</time><div><span class="lifecycle-type">'+esc(r.type)+'</span><b>'+esc(r.text)+'</b>'+(r.change?'<p class="lifecycle-change">'+esc(r.change)+'</p>':'')+'<small>'+esc(r.actor)+'</small></div></div>').join(''):'<p class="empty">연결된 라이프사이클 기록이 없습니다.</p>';
 }
 async function projectLifecycle(orderId){
+ if(!operationalRows(true).some(x=>x.orderId===orderId))return toast('B팀 장비의 최신 조회가 필요합니다.');
  const cached=projectHistoryCache.get(orderId)||lifecycleCacheGet(orderId)?.history||null;
  open(heading('LIFECYCLE','전체 라이프사이클',orderId)+'<div id="lifecycleResult"></div>');
  const el=$('lifecycleResult');
@@ -423,6 +430,7 @@ function applyLatestHistoryState(orderId,history){
  return true;
 }
 async function openProjectPlan(orderId,fallback={}){
+ if(!operationalRows(true).some(x=>x.orderId===orderId))return toast('B팀 장비의 최신 조회가 필요합니다.');
  open(heading('계획일정',fallback.customer||orderId,fallback.model||'')+'<div id="projectDirectPlan">원본 계획을 불러오는 중…</div>');
  const el=$('projectDirectPlan');
  try{
@@ -442,6 +450,7 @@ function rememberProjectDetail(x){
  return x;
 }
 function projectDetailRow(orderId,fallback={}){
+ if(!operationalRows(true).some(x=>x.orderId===orderId))return {orderId};
  const snap=PROJECT_DETAIL_SNAPSHOT.get(String(orderId))||{};
  const canonical=operationalRows(true).find(x=>x.orderId===orderId)||{};
  // An authoritative empty field is a deletion, not a reason to revive a prior value.
@@ -464,6 +473,7 @@ function projectDetailRow(orderId,fallback={}){
  };
 }
 async function openProject(orderId,purpose='detail',sourceSnapshot=null){
+ if(!operationalRows(true).some(x=>x.orderId===orderId))return toast('B팀 장비의 최신 조회가 필요합니다.');
  if(sourceSnapshot?.orderId)rememberProjectDetail(sourceSnapshot);
  const entrySnapshot=sourceSnapshot?.orderId===orderId?{...sourceSnapshot}:{...(PROJECT_DETAIL_SNAPSHOT.get(String(orderId))||{})};
  let p=projectDetailRow(orderId,sourceSnapshot||appProjects.find(x=>x.orderId===orderId)||items.find(x=>x.orderId===orderId)||{});
@@ -483,8 +493,8 @@ async function openProject(orderId,purpose='detail',sourceSnapshot=null){
   if(!el?.isConnected)return;
   linked=projectDetailRow(p.orderId,linked||p);
   const currentState=linked.state||p.state||'미등록';
-  const summaryDue=formatHfDate(entrySnapshot.due||linked.due||p.due);
-  const summaryActual=formatHfDate(entrySnapshot.actualDelivery||linked.actualDelivery||p.actualDelivery);
+  const summaryDue=formatHfDate(linked.due);
+  const summaryActual=formatHfDate(linked.actualDelivery);
   const stageNames=['자재','조립','전장','검수','출고'];
   const closed=isCompletedOperational(linked);
   const currentStage=closed?4:strictCurrentStageIndex({state:currentState,process:linked.process||''});
@@ -493,7 +503,7 @@ async function openProject(orderId,purpose='detail',sourceSnapshot=null){
   const currentDate=closed&&actualDay!=='미정'?actualDay:(appDay(linked.since)||appDay(linked.sourceLatestUpdate)||(bTeam?'미등록':new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'})));
   const planByStage={자재:'',조립:linked.planAssembly||'',전장:linked.planElectrical||linked.planProgram||'',검수:linked.planInspection||'',출고:linked.planDelivery||''};
   const scheduleBlock='<div class="hybrid-timeline">'+stageNames.map((name,i)=>{
-   const cls=closed||(!bTeam&&i<currentStage)?'done':i===currentStage?'now':'';
+   const cls=(closed&&(!bTeam||i===4))||(!bTeam&&i<currentStage)?'done':!closed&&i===currentStage?'now':'';
    const planDate=formatHfDate(planByStage[name]);
    const label=bTeam?'계획 '+planDate:(closed||i<currentStage?'종료':i===currentStage?(planDate!=='미정'?planDate:currentDate):planDate);
    return '<div class="hybrid-step '+cls+'"><i></i><b>'+name+'</b><small>'+esc(label)+'</small></div>';
@@ -746,8 +756,10 @@ async function syncPlanOverview(force=false){
   if(!coreSnapshot&&!await refresh(false))throw Error('core_unverified');
   const d=await appCall({action:'plans'});
   if(!Array.isArray(d.records)||!d.generatedAt)throw Error('invalid_plans');
+  const allowed=new Set(items.filter(x=>String(x.team||'').trim()==='B').map(x=>x.orderId));
   const grouped=new Map();
   for(const r of d.records){
+   if(!allowed.has(r?.orderId))continue;
    if(!r||typeof r.orderId!=='string'||!r.orderId||typeof r.process!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(r.date||''))throw Error('invalid_plans');
    if(!grouped.has(r.orderId))grouped.set(r.orderId,[]);
    grouped.get(r.orderId).push(r);

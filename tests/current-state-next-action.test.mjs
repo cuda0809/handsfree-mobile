@@ -29,10 +29,10 @@ test('planned next action respects actual stage, preserved manual action and lat
  const records=[{recordId:'BVERIFIED|1|a',sourceMonth:'2026-09',date:'2026-09-20',process:'검수',sourceRef:'old',status:'진행 중'},
  ...[['조립','2026-10-13'],['전장','2026-10-06'],['프로그램','2026-10-07'],['검수','2026-10-14'],['출고','2026-10-26']].map(([process,date],i)=>({recordId:'BVERIFIED|2|'+i,sourceMonth:'2026-10',process,date,sourceRef:'source',status:'진행 중'}))];
  const x={...base,...rules.resolve(records),state:'전장 완료'},before=JSON.stringify(x);
- assert.equal(rules.nextAction(x,today),'계획상 · 프로그램 · 2026-10-07');assert.equal(JSON.stringify(x),before);
+ assert.equal(rules.nextAction(x,today),'프로그램 · 2026-10-07');assert.equal(JSON.stringify(x),before);
  assert.equal(rules.nextAction({...x,nextAction:'추가 점검'},today),'추가 점검');
  assert.equal(rules.nextAction({...x,planSourceVerified:false},today),'다음 행동 확인 필요');
- assert.equal(rules.nextAction({...x,state:'전장 진행'},today),'계획상 · 전장 · 2026-10-06 (일정 경과 · 진행 확인)');
+ assert.equal(rules.nextAction({...x,state:'전장 진행'},today),'전장 · 2026-10-06 (일정 경과 · 진행 확인)');
  assert.equal(rules.nextAction({...x,state:'출고완료'},today),'출고완료 · 이력 확인');
 });
 test('equipment receipt stays unverified when journal saved but current server state is stale',async()=>{

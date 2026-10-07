@@ -65,7 +65,7 @@
    .sort((a,b)=>stage(a.process)-stage(b.process)||day(a.date).localeCompare(day(b.date)));
   const r=rows[0];if(!r)return '다음 행동 확인 필요';
   const date=day(r.date);
-  return '계획상 · '+r.process+' · '+date+(date<today?' (일정 경과 · 진행 확인)':'');
+  return r.process+' · '+date+(date<today?' (일정 경과 · 진행 확인)':'');
  }
  const rules={day,classify,resolve,manufacturingNow,nextAction};root.HfProductionRules=rules;
  if(typeof module==='object'&&module.exports)module.exports=rules;

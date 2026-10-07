@@ -42,6 +42,7 @@ setInterval(checkForLiveUpdate,60000);
 window.addEventListener('focus',()=>setTimeout(checkForLiveUpdate,300));
 function coreCacheRead(){const v=readStore(CORE_CACHE_KEY,null);return v&&Array.isArray(v.items)?v:null;}
 function itemIdentity(x){return String(x.projectId||x.issueId||x.orderId||'');}
+function isBTeam(x){return String(x?.team||'').trim()==='B';}
 function itemById(id){return typeof id==='object'?id:items.find(x=>x.id===String(id));}
 function coreCacheSave(verified=false){
  if(!verified)return;
@@ -49,7 +50,7 @@ function coreCacheSave(verified=false){
 }
 function coreCacheRestore(){
  const c=coreCacheRead();if(!c)return false;coreSnapshot=c.completeCore===true;
- items=c.items.map(x=>({...x,priority:corePriorityFromState(x.state,x.nextAction,x.issueStatus,x.priority),id:itemIdentity(x)}));sourceDate=String(c.sourceDate||'');lastRead=c.cachedAt?new Date(c.cachedAt).toLocaleString('ko-KR'):'';
+ items=c.items.filter(isBTeam).map(x=>({...x,priority:corePriorityFromState(x.state,x.nextAction,x.issueStatus,x.priority),id:itemIdentity(x)}));sourceDate=String(c.sourceDate||'');lastRead=c.cachedAt?new Date(c.cachedAt).toLocaleString('ko-KR'):'';
  live=true;readStale=true;readMessage='이전 조회값 · 최신 동기화 대기';
  return true;
 }
@@ -96,7 +97,7 @@ async function refreshCachedCore(){
   if(priorActive&&active&&prior.issueId!==v.issueId)throw Error('ambiguous_issue');
   if(!prior||active&&!priorActive)byOrder.set(v.orderId,v);
  }
- const next=d.projects.map(p=>{
+ const next=d.projects.filter(isBTeam).map(p=>{
   const issue=byOrder.get(p.orderId),status=String(issue?.status||'');
   return {...p,issueId:String(issue?.issueId||''),issueStatus:status,
    cause:p.currentIssue||p.recentEvent||'',
