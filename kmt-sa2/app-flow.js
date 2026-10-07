@@ -140,10 +140,12 @@ function hfCardIdentity(x,badge=''){
 }
 function productionClass(x){return HfProductionRules.classify(x,HfProductionRules.today());}
 function currentStatusLabel(x){
- const parts=[String(x.state||'상태 미등록').trim()];
- const recent=String(x.recentEvent||'').trim(),issue=String(x.currentIssue||'').trim();
- if(recent&&/조립|전장|프로그램|검수|테스트|연결|설치|세팅|셋팅|입고|반출|수정|대기|지연/.test(recent)&&!parts.includes(recent))parts.push(recent);
- if(issue&&!parts.includes(issue))parts.push(issue);
+ const parts=[],seen=new Set();
+ const add=value=>String(value||'').split(/\r?\n/).forEach(line=>{const text=line.replace(/^[·\s]+/,'').trim(),key=text.replace(/\s+/g,'');if(text&&!seen.has(key)){seen.add(key);parts.push(text);}});
+ add(x.state||'상태 미등록');
+ const recent=String(x.recentEvent||'').trim();
+ if(/조립|전장|프로그램|검수|테스트|연결|설치|세팅|셋팅|입고|반출|수정|대기|지연/.test(recent))add(recent);
+ add(x.currentIssue);
  return parts.join(' · ');
 }
 function projectCurrentFields(x){
@@ -1049,9 +1051,14 @@ async function submitUnifiedEvent(key,text,statusEl){
   updateNote(id,{status:'saved_unverified',requestId:d.requestId||'',ack:'저장 완료 · 해당 장비 반영 확인 중',respondedAt:new Date().toISOString(),verifiedAt:''});
   if(statusEl)statusEl.textContent='저장 완료 · 해당 장비 반영 확인 중…';
   if(d.status!=='WRITTEN')return {ok:false,partial:true,classification,eventSaved:true,requestId:d.requestId||''};
-  if(x.issueId&&classification.changesState)await syncUnifiedStateBackground(id,{...x},classification,bodyText);
-  const verified=await verifyEventNote(id,d);
-  return {ok:verified,partial:!verified,classification,eventSaved:true,stateApplied:verified&&classification.changesState,requestId:d.requestId||''};
+  // The durable write is confirmed; keep readback pending without blocking the editor.
+  setTimeout(async()=>{
+   try{
+    if(x.issueId&&classification.changesState)await syncUnifiedStateBackground(id,{...x},classification,bodyText);
+    await verifyEventNote(id,d);
+   }catch(e){updateNote(id,{status:'saved_unverified',verifiedAt:'',ack:'이력 저장 확인 · 화면 반영 확인 중. 자동 재전송하지 않습니다.'});}
+  },0);
+  return {ok:true,statePending:true,classification,eventSaved:true,stateApplied:false,requestId:d.requestId||''};
  }catch(e){
   const saved=notes().find(r=>r.id===id)?.requestId;
   if(saved){updateNote(id,{status:'saved_unverified',verifiedAt:'',ack:'이력 저장 완료 · 현재상태 반영 확인 필요. 자동 재전송하지 않습니다.'});return {ok:false,partial:true,eventSaved:true,requestId:saved};}
@@ -1093,7 +1100,7 @@ function todayIssues(){
  '</section>';}).join(''):'<div class="empty">현재 진행 중인 생산계획 장비가 없습니다.</div>')+
  '</div>'+generalIssueForm()+
  '<div class="hybrid-section today-records-head"><b>오늘 기록</b><span>'+todayLocal.length+'건</span></div>'+
- (todayLocal.length?todayLocal.slice(0,12).map(r=>'<button class="hybrid-record hf-card tone-neutral" data-note="'+esc(r.id)+'"><b>'+esc(r.target)+'</b><p>'+esc(r.text)+'</p><small>'+esc(new Date(r.createdAt).toLocaleString('ko-KR'))+' · '+esc(r.autoClassification||labels[r.status]||r.status)+'</small></button>').join(''):'<p class="empty">오늘 입력한 이슈가 없습니다.</p>')+
+ (todayLocal.length?todayLocal.slice(0,12).map(r=>'<button class="hybrid-record hf-card tone-neutral" data-note="'+esc(r.id)+'"><b>'+esc(r.target)+'</b><p>'+esc(r.text)+'</p><small>'+esc(new Date(r.createdAt).toLocaleString('ko-KR'))+' · '+esc((labels[r.status]||r.status)+(r.autoClassification?' · '+r.autoClassification:''))+'</small></button>').join(''):'<p class="empty">오늘 입력한 이슈가 없습니다.</p>')+
  '<button id="allInputHistory" class="secondary">전체 입력 이력 보기</button>';
  main.querySelectorAll('[data-today-save]').forEach(b=>b.onclick=()=>saveTodayIssue(b.dataset.todaySave));
  main.querySelectorAll('[data-today-voice]').forEach(b=>b.onclick=()=>voiceTodayIssue(b.dataset.todayVoice));

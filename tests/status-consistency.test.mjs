@@ -55,3 +55,14 @@ test('multiline continuation keeps exact selected equipment and rejects conflict
  assert.equal(c.resolveUnifiedProject_(null,'10/8 입고예정',p).orderId,job);
  assert.equal(c.resolveUnifiedProject_(null,'260727A-060-02 전장 완료',p).ambiguous,true);
 });
+test('multiline saved progress and issue render once per distinct line',()=>{
+ assert.equal(ctx.currentStatusLabel({state:'프로그램 완료',recentEvent:'프로그램 완료\n가공수정품 입고 대기 10/21',currentIssue:'가공수정품 입고 대기 10/21'}),'프로그램 완료 · 가공수정품 입고 대기 10/21');
+});
+test('durable acknowledgement releases editor while failed readback remains pending',async()=>{
+ let notes=[],task,writes=0;
+ const c=vm.createContext({navigator:{onLine:true},crypto:{randomUUID:()=> 'stable-request-id'},KEY:'notes',todayIssueTarget:()=>({orderId:'JOB'}),classifyUnifiedEvent:()=>({type:'NOTE',changesState:false}),resolveUnifiedImpact:()=>({label:'메모'}),notes:()=>notes,persist:(k,v)=>notes=v,updateNote:(id,p)=>Object.assign(notes.find(n=>n.id===id),p),projectHistoryCache:new Map(),api:async()=>{writes++;return {applied:true,status:'WRITTEN',requestId:'saved-request'};},setTimeout:f=>task=f,verifyEventNote:async()=>{throw Error('readback timeout');}});
+ vm.runInContext(flow.slice(flow.indexOf('async function submitUnifiedEvent('),flow.indexOf('let todayIssueOpenId=')),c);
+ const result=await c.submitUnifiedEvent('JOB','원문 보존');
+ assert.equal(result.statePending,true);assert.equal(notes[0].status,'saved_unverified');
+ await task();assert.equal(notes[0].status,'saved_unverified');assert.equal(notes[0].text,'원문 보존');assert.equal(notes[0].submissionId,'stable-request-id');assert.equal(writes,1);
+});
