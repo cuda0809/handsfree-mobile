@@ -20,10 +20,17 @@ test('ContentService redirect follows a GET without replaying POST or forwarding
  assert.equal(f.calls.length,2);assert.equal(f.calls[0].method,'POST');assert.match(f.calls[0].body,/isolated-fixture/);
  assert.equal(f.calls[1].method,'GET');assert.equal(f.calls[1].body,undefined);assert.equal(f.calls[1].headers['Content-Type'],undefined);
 });
-test('untrusted, insecure and authentication redirects are rejected before another request',async()=>{
- for(const location of ['https://example.invalid/','http://script.googleusercontent.com/','https://accounts.google.com/','https://script.google.com/macros/s/fixture/exec']){
+test('untrusted, insecure, different-execution and authentication redirects are rejected before another request',async()=>{
+ for(const location of ['https://example.invalid/','http://script.googleusercontent.com/','https://accounts.google.com/','https://script.google.com/macros/s/different/exec']){
   const f=fixture([{status:302,headers:{location}}]);await assert.rejects(readAppsScript('https://script.google.com/macros/s/fixture/exec',{},1000,f.request),/upstream_invalid_redirect/);assert.equal(f.calls.length,1);
  }
+});
+test('same-execution ingress redirect preserves authenticated READ and nonce avoids cached one-time redirects',async()=>{
+ const f=fixture([{status:302,headers:{location:'https://script.google.com/macros/s/fixture/exec?ingress=1'}},{status:302,headers:{location:'https://script.googleusercontent.com/macros/echo?fixture=2'}},{text:'{"ok":true}'}]);
+ await readAppsScript('https://script.google.com/macros/s/fixture/exec',{token:'isolated-fixture'},1000,f.request);
+ assert.ok(new URL(f.calls[0].url).searchParams.get('hf_read_request'));
+ assert.deepEqual(f.calls.map(x=>x.method),['POST','POST','GET']);assert.equal(f.calls[1].body,f.calls[0].body);assert.equal(f.calls[2].body,undefined);
+ for(const call of f.calls)assert.equal(call.headers['Cache-Control'],'no-cache, no-store');
 });
 test('invalid response, rejection and network failure cannot become a fresh successful read',async()=>{
  for(const response of [{status:503,text:'<html>Unavailable</html>'},{text:'{"ok":false,"error":"forbidden"}'},{error:Object.assign(Error('connection failed'),{code:'ECONNRESET'})}]){
