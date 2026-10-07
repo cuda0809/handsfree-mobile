@@ -1121,7 +1121,7 @@ function openUnifiedEvent(issueId){
 }
 
 const eventRefreshBase=refresh;
-refresh=async function(){const ok=await eventRefreshBase();if(screen==='issues')todayIssues();return ok;};
+refresh=async function(force=true){const ok=await eventRefreshBase(force);if(screen==='issues')todayIssues();return ok;};
 home();
 
-applyProjectMeta(projectMetaCache()?.projects||[],projectMetaCache()?.source||'catalog');applyPlanOverview(planOverviewCache()?.byOrder||{});setTimeout(()=>syncProjectMeta(true),300);setTimeout(()=>syncPlanOverview(true),500);
+applyProjectMeta(projectMetaCache()?.projects||[],projectMetaCache()?.source||'catalog');applyPlanOverview(planOverviewCache()?.byOrder||{});setTimeout(()=>{Promise.allSettled([syncProjectMeta(false),syncPlanOverview(false)]);},80);
