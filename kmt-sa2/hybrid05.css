@@ -848,3 +848,8 @@ main{padding-bottom:84px!important}
 /* Detail is a normal scrollable page, without a modal backdrop or background inertness. */
 #detail[open]{position:fixed;inset:0;margin:0 auto;width:100%;max-width:520px;height:100%;max-height:100%;border-radius:0;z-index:30;overflow-y:auto;box-shadow:none;touch-action:pan-y;-webkit-overflow-scrolling:touch}
 #detail .sheet{min-height:100%;padding-top:max(10px,env(safe-area-inset-top))}
+
+/* Seven separate stages; scroll on phones instead of squeezing date labels. */
+.hybrid-timeline{grid-template-columns:repeat(7,minmax(76px,1fr));overflow-x:auto;overscroll-behavior-x:contain}
+.hybrid-flow{grid-template-columns:repeat(7,minmax(42px,1fr));overflow-x:auto}
+.production-plan-stages{grid-template-columns:repeat(6,minmax(72px,1fr));overflow-x:auto}

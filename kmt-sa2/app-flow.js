@@ -222,7 +222,7 @@ function applyProjectMeta(projects,source='catalog'){
     if(p.recentEventAt!==undefined)patch.recentEventAt=String(p.recentEventAt||'');
     if(p.recentEvent)patch.cause=String(p.recentEvent);
     else if(p.currentIssue)patch.cause=String(p.currentIssue);
-    for(const key of ['planAssembly','planElectrical','planProgram','planInspection','planDelivery','confidence','updatedAt'])if(p[key]!==undefined)patch[key]=String(p[key]||'');
+    for(const key of ['planAssembly','planElectrical','planProgram','planFinishing','planInspection','planDelivery','confidence','updatedAt'])if(p[key]!==undefined)patch[key]=String(p[key]||'');
    }
    if(Object.keys(patch).some(k=>String(patch[k]||'')!==String(x[k]||'')))changed=true;
    return {...x,...patch,id:itemIdentity(x)};
@@ -377,8 +377,10 @@ async function projectLifecycle(orderId){
 function canonicalProjectStage(v){
  const t=norm(v);
  if(/자재|입고|구매|발주/.test(t))return '자재';
- if(/조립|기구|마감|갭세팅|프레임/.test(t))return '조립';
- if(/전장|배선|전기|프로그램|프로그래밍/.test(t))return '전장';
+ if(/마감\s*조립/.test(t))return '마감조립';
+ if(/프로그램|프로그래밍/.test(t))return '프로그램';
+ if(/조립|기구|갭세팅|프레임/.test(t))return '조립';
+ if(/전장|배선|전기/.test(t))return '전장';
  if(/검수|점검|테스트|시험/.test(t))return '검수';
  if(/출고|납품|포장/.test(t))return '출고';
  return '';
@@ -453,6 +455,7 @@ function projectDetailRow(orderId,fallback={}){
   planAssembly:pick(snap.planAssembly,fallback.planAssembly,canonical.planAssembly),
   planElectrical:pick(snap.planElectrical,fallback.planElectrical,canonical.planElectrical),
   planProgram:pick(snap.planProgram,fallback.planProgram,canonical.planProgram),
+  planFinishing:pick(snap.planFinishing,fallback.planFinishing,canonical.planFinishing),
   planInspection:pick(snap.planInspection,fallback.planInspection,canonical.planInspection),
   planDelivery:pick(snap.planDelivery,fallback.planDelivery,canonical.planDelivery),
   process:pick(canonical.process,snap.process,fallback.process),
@@ -483,15 +486,16 @@ async function openProject(orderId,purpose='detail',sourceSnapshot=null){
   const currentState=linked.state||p.state||'미등록';
   const summaryDue=formatHfDate(linked.due);
   const summaryActual=formatHfDate(linked.actualDelivery);
-  const stageNames=['자재','조립','전장','검수','출고'];
+  const stageNames=HYBRID_FLOW_STAGES;
   const closed=isCompletedOperational(linked);
-  const currentStage=closed?4:strictCurrentStageIndex({state:currentState,process:linked.process||''});
+  const currentStage=closed?stageNames.length-1:strictCurrentStageIndex({state:currentState,process:linked.process||''});
   const actualDay=formatHfDate(linked.actualDelivery||p.actualDelivery);
   const bTeam=String(linked.team||'').trim()==='B';
   const currentDate=closed&&actualDay!=='미정'?actualDay:(appDay(linked.since)||appDay(linked.sourceLatestUpdate)||(bTeam?'미등록':new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'})));
-  const planByStage={자재:'',조립:linked.planAssembly||'',전장:linked.planElectrical||linked.planProgram||'',검수:linked.planInspection||'',출고:linked.planDelivery||''};
+  const savedPlanStages=projectPlanStageMap(linked.planTimeline||[]);
+  const planByStage={자재:'',조립:linked.planAssembly||'',전장:linked.planElectrical||'',프로그램:linked.planProgram||'',마감조립:linked.planFinishing||savedPlanStages.get('마감조립')?.start||'',검수:linked.planInspection||'',출고:linked.planDelivery||''};
   const scheduleBlock='<div class="hybrid-timeline">'+stageNames.map((name,i)=>{
-   const cls=(closed&&(!bTeam||i===4))||(!bTeam&&i<currentStage)?'done':!closed&&i===currentStage?'now':'';
+   const cls=(closed&&(!bTeam||i===stageNames.length-1))||(!bTeam&&i<currentStage)?'done':!closed&&i===currentStage?'now':'';
    const planDate=formatHfDate(planByStage[name]);
    const label=bTeam?'계획 '+planDate:(closed||i<currentStage?'종료':i===currentStage?(planDate!=='미정'?planDate:currentDate):planDate);
    return '<div class="hybrid-step '+cls+'"><i></i><b>'+name+'</b><small>'+esc(label)+'</small></div>';
@@ -655,31 +659,27 @@ async function verifyIssueReceipt(d){
 
 function hybridProjectMatch(orderId){const id=String(orderId||''),exact=items.find(x=>x.orderId===id);if(exact)return exact;return items.find(x=>x.orderId?.includes('*')&&id.startsWith(x.orderId.replace(/\*.*$/,'')))||null;}
 function hybridDueKey(v){const d=appDay(v);return /^\d{4}-\d{2}-\d{2}$/.test(d)?d:'9999-12-31';}
-const HYBRID_FLOW_STAGES=['자재','조립','전장','검수','출고'];
+const HYBRID_FLOW_STAGES=['자재','조립','전장','프로그램','마감조립','검수','출고'];
 function strictCurrentStageIndex(x){
  const rank=t=>{
   const v=norm(t);
-  if(/출고완료|납품완료|출고대기|납품대기|출고|납품|포장/.test(v))return 4;
-  if(/검수|점검|테스트|시험|FAT|SAT/.test(v))return 3;
-  if(/전장|배선|전기|프로그램|프로그래밍|셋업/.test(v))return 2;
-  if(/조립|기구|마감|갭세팅|프레임|본체/.test(v))return 1;
+  if(/출고완료|납품완료|출고대기|납품대기|출고|납품|포장/.test(v))return 6;
+  if(/검수|점검|테스트|시험|FAT|SAT/.test(v))return 5;
+  if(/마감조립|마감/.test(v))return 4;
+  if(/프로그램|프로그래밍/.test(v))return 3;
+  if(/전장|배선|전기|셋업/.test(v))return 2;
+  if(/조립|기구|갭세팅|프레임|본체/.test(v))return 1;
   if(/자재|입고|구매|발주/.test(v))return 0;
   return -1;
  };
  const byState=rank(x?.state);
  if(byState>=0)return byState;
  const byProcess=rank(x?.process);
- if(byProcess>=0)return byProcess;
- return 0;
+ return byProcess>=0?byProcess:0;
 }
 function hybridStageIndex(x){
- const text=norm([x.process,x.state,x.nextAction].join(' '));
- if(/출고완료|납품완료|출고대기|출고|포장/.test(text))return 4;
- if(/검수|점검|테스트|시험/.test(text))return 3;
- if(/갭세팅|마감조립|조립|본체|기구|프레임/.test(text))return 1;
- if(/전장|배선|전기|프로그램|프로그램밍|셋업/.test(text))return 2;
- if(/자재|입고|구매|발주/.test(text))return 0;
- return /조립/.test(norm(x.process))?1:/전장/.test(norm(x.process))?2:/검수/.test(norm(x.process))?3:/출고/.test(norm(x.process))?4:0;
+ // Next action is future work, never evidence of the current stage.
+ return strictCurrentStageIndex(x);
 }
 function hybridStageFlow(x){
  const current=hybridStageIndex(x),complete=x.priority===3||/출고완료|납품완료/.test(String(x.state||''));
@@ -710,9 +710,10 @@ function summarizePlanRecords(records,bTeam=false){
   .filter((r,i,a)=>a.findIndex(v=>String(v.date)===String(r.date)&&String(v.process)===String(r.process)&&String(v.sourceMonth||'')===String(r.sourceMonth||''))===i)
   .sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.process).localeCompare(String(b.process)));
  return {
-  planAssembly:first(/조립/),
+  planAssembly:first(/^(?!.*마감).*조립/),
   planElectrical:first(/전장|전기/),
-  planProgram:first(/프로그램/),
+  planProgram:first(/프로그램|프로그래밍/),
+  planFinishing:first(/마감\s*조립/),
   planInspection:last(/검수|테스트|시험|FAT/),
   planDelivery:last(/출고|납품/),
   planSourceMonth:latestMonth,
@@ -800,9 +801,9 @@ function productionPlan(mode='plan',skipMeta=false){
   const el=$('deliveryList');el?.querySelectorAll('[data-delivery-order]').forEach(b=>b.onclick=()=>openProject(b.dataset.deliveryOrder));
   return;
  }
- const allStages=['조립','전장','프로그램','검수','출고'];
+ const allStages=['조립','전장','프로그램','마감조립','검수','출고'];
  const planValue=(x,name)=>({
-  '조립':x.planAssembly,'전장':x.planElectrical,'프로그램':x.planProgram,'검수':x.planInspection,'출고':x.planDelivery
+  '조립':x.planAssembly,'전장':x.planElectrical,'프로그램':x.planProgram,'마감조립':x.planFinishing,'검수':x.planInspection,'출고':x.planDelivery
  }[name]||'');
  const missingCount=selected.reduce((n,x)=>n+allStages.filter(s=>formatHfDate(planValue(x,s))==='미정').length,0);
  main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">PRODUCTION CONTROL</div><h1>생산계획</h1></div></div>'+tabs+

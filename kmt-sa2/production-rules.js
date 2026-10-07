@@ -40,8 +40,8 @@
    .filter((r,i,a)=>a.findIndex(v=>v.date===r.date&&v.process===r.process)===i)
    .sort((a,b)=>a.date.localeCompare(b.date)||a.process.localeCompare(b.process));
   const dates=re=>timeline.filter(r=>re.test(r.process)).map(r=>r.date);
-  return {planAssembly:dates(/조립/)[0]||'',planElectrical:dates(/전장|전기/)[0]||'',
-   planProgram:dates(/프로그램/)[0]||'',planInspection:dates(/검수|테스트|시험|FAT/).at(-1)||'',
+  return {planAssembly:dates(/^(?!.*마감).*조립/)[0]||'',planElectrical:dates(/전장|전기/)[0]||'',
+   planProgram:dates(/프로그램|프로그래밍/)[0]||'',planFinishing:dates(/마감\s*조립/)[0]||'',planInspection:dates(/검수|테스트|시험|FAT/).at(-1)||'',
    planDelivery:dates(/출고|납품/).at(-1)||'',planSourceMonth:month,
    planTimeline:timeline.map(r=>({date:r.date,process:r.process,sourceMonth:r.sourceMonth||''})),
    planHistory:list.filter(r=>r.process).map(r=>({date:day(r.date),process:r.process,sourceMonth:r.sourceMonth||''})),
@@ -72,9 +72,9 @@
   if(manual&&manual!=='미정'&&manual!=='미등록')return manual;
   if(classify(x,today)==='출고완료')return '출고완료 · 이력 확인';
   if(!x.planSourceVerified)return '다음 행동 확인 필요';
-  const stage=v=>/출고|납품/.test(v)?5:/검수|테스트|시험|FAT/.test(v)?4:/프로그램/.test(v)?3:/전장|배선|전기/.test(v)?2:/조립/.test(v)?1:0;
+  const stage=v=>/출고|납품/.test(v)?6:/검수|테스트|시험|FAT/.test(v)?5:/마감\s*조립/.test(v)?4:/프로그램|프로그래밍/.test(v)?3:/전장|배선|전기/.test(v)?2:/조립/.test(v)?1:0;
   const current=String(x.state||''),level=stage(current),complete=/완료/.test(current)&&!/미완료|예정|계획|아님/.test(current);
-  const floor=/출고\s*대기|보관\s*중/.test(current)?5:level+(complete?1:0);
+  const floor=/출고\s*대기|보관\s*중/.test(current)?6:level+(complete?1:0);
   const rows=(x.planTimeline||[]).filter(r=>day(r.date)&&stage(r.process)>=floor)
    .sort((a,b)=>stage(a.process)-stage(b.process)||day(a.date).localeCompare(day(b.date)));
   const r=rows[0];if(!r)return '다음 행동 확인 필요';
