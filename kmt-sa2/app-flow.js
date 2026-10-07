@@ -825,7 +825,7 @@ function hybridStageFlow(x){
  }).join('')+'</div><div class="hybrid-flow-now">현재 공정 · <b>'+HYBRID_FLOW_STAGES[current]+'</b>'+(complete?' · 완료':'')+'</div>';
 }
 const PLAN_OVERVIEW_KEY='hf-production-plan-overview-v2';
-let planOverviewPending=null,planReadStale=true;
+let planOverviewPending=null,planReadStale=true,lastPlanAttempt=0;
 function planOverviewCache(){const v=readStore(PLAN_OVERVIEW_KEY,null);return v&&v.byOrder? v:null;}
 function summarizePlanRecords(records,bTeam=false){
  if(bTeam)return HfProductionRules.resolve(records);
@@ -879,6 +879,8 @@ async function syncPlanOverview(force=false){
  const fresh=cached&&cached.completePlan===true&&Date.now()-Date.parse(cached.cachedAt||0)<15*60*1000;
  if(!force&&fresh&&!planReadStale)return cached;
  if(planOverviewPending)return planOverviewPending;
+ if(!force&&Date.now()-lastPlanAttempt<60000)return cached||null;
+ lastPlanAttempt=Date.now();
  planOverviewPending=(async()=>{
   // Start the read immediately; join only after the authoritative Core is ready.
   // Waiting for Core before sending plans stacked two external-service waits.
@@ -909,6 +911,11 @@ async function syncPlanOverview(force=false){
  })().catch(e=>{planReadStale=true;const reason=/^(upstream_timeout|upstream_invalid_json|invalid_source_month|ENOTFOUND|EAI_AGAIN|ECONNRESET|ETIMEDOUT|UND_ERR_CONNECT_TIMEOUT|UND_ERR_HEADERS_TIMEOUT|UND_ERR_SOCKET)$/.test(e.data?.reason||'')?e.data.reason:['invalid_plans','core_unverified'].includes(e.message)?e.message:'upstream_unavailable';console.warn('HF_PLAN_READ_FAILED',e.status||0,reason);toast(e.message==='invalid_plans'?'생산계획 응답 형식 확인 필요 · 이전 계획 유지':'생산계획 최신 조회 실패 · 이전 계획 유지');return null;}).finally(()=>{planOverviewPending=null;});
  return planOverviewPending;
 }
+function planCountLabel(count,needsPlans=true){
+ if(lastReadErrorStatus===401||lastReadErrorStatus===403||!coreSnapshot)return '확인 불가';
+ if(needsPlans&&planOverviewCache()?.completePlan!==true)return '확인 불가';
+ return count+'대'+(readStale||(needsPlans&&planReadStale)?' · 최근 확인':'');
+}
 function productionPlanRows(){return operationalRows(false);}
 
 let productionPlanMode='plan',deliveryView='active';
@@ -928,7 +935,7 @@ function productionPlan(mode='plan',skipMeta=false){
   const completed=operationalRows(true).filter(isCompletedOperational).sort((a,b)=>String(formatHfDate(b.actualDelivery)).localeCompare(String(formatHfDate(a.actualDelivery))));
   const deliveryRows=deliveryView==='completed'?completed:selected;
   deliveryRows.forEach(rememberProjectDetail);
-  const count=rows=>readStale||planReadStale?'확인 중':rows.length;
+  const count=rows=>planCountLabel(rows.length,false);
   const deliveryTabs='<div class="plan-switch"><button class="'+(deliveryView==='active'?'active':'')+'" onclick="deliveryView=\'active\';productionPlan(\'delivery\',true)">진행 · 출고대기 · '+count(selected)+'</button><button class="'+(deliveryView==='completed'?'active':'')+'" onclick="deliveryView=\'completed\';productionPlan(\'delivery\',true)">출고완료 · '+count(completed)+'</button></div>';
   main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">PRODUCTION CONTROL</div><h1>계획</h1></div></div>'+tabs+
   (readStale||planReadStale?'<div class="alert">최신 조회 미확인 · 이전 정상값 표시</div>':'')+'<p class="hybrid-desc">납기는 고객 약속일입니다. 실납기일은 확인된 실제 출고일이며, 입력한 날짜나 출고 예정일로 대신하지 않습니다.</p>'+deliveryTabs+'<div id="deliveryList" class="hybrid-promise-list">'+
@@ -944,8 +951,8 @@ function productionPlan(mode='plan',skipMeta=false){
  const reviewCount=selected.filter(x=>planReviewReasons(x).length>0).length;
  main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">PRODUCTION CONTROL</div><h1>생산계획</h1></div></div>'+tabs+
  '<p class="hybrid-desc">진행 중과 작업 예정의 제작일정입니다. 마감조립 자동 계획은 토·일 제외, 프로그램 후 검수 전 1~2일입니다. 계획은 실적이 아닙니다.</p>'+
- (readStale||planReadStale?'<div class="alert" role="status">최신 조회 미확인 · 이전 정상값 표시. 건수는 최신 확인 전입니다.</div>':'')+
- '<div class="plan-summary"><div><small>현재 작업</small><b>'+(!readStale&&!planReadStale?selected.length:'확인 불가')+'</b></div><button type="button" class="plan-review-summary" aria-pressed="false" onclick="togglePlanReview(this)"><small>일정 확인 필요</small><b>'+(!readStale&&!planReadStale?reviewCount+'대':'확인 불가')+'</b></button></div><p id="planReviewFilterHint" class="note" hidden>일정 확인이 필요한 장비만 표시합니다. 위 버튼을 다시 누르면 전체가 표시됩니다.</p>'+
+ (readStale||planReadStale?'<div class="alert" role="status">최신 조회 미확인 · 수량과 목록은 최근 정상 조회 기준입니다.</div>':'')+
+ '<div class="plan-summary"><div><small>현재 작업</small><b>'+planCountLabel(selected.length)+'</b></div><button type="button" class="plan-review-summary" aria-pressed="false" onclick="togglePlanReview(this)"><small>일정 확인 필요</small><b>'+planCountLabel(reviewCount)+'</b></button></div><p id="planReviewFilterHint" class="note" hidden>일정 확인이 필요한 장비만 표시합니다. 위 버튼을 다시 누르면 전체가 표시됩니다.</p>'+
  '<div class="production-plan-list hf-card-list">'+
  (selected.length?selected.map(x=>{
    const planned=allStages.some(s=>formatHfDate(planValue(x,s))!=='미정');
@@ -955,7 +962,7 @@ function productionPlan(mode='plan',skipMeta=false){
    '<div class="production-plan-stages">'+allStages.map(name=>'<div><small>'+name+'</small><b>'+esc(name==='마감조립'?finishingPlan(x).label:formatHfDate(planValue(x,name)))+'</b></div>').join('')+'</div>'+
    '<p class="production-plan-next"><span>다음 행동</span>'+esc(displayedNextAction(x))+'</p></button>';
  }).join(''):'<p class="empty">'+(readStale||planReadStale?'최신 목록을 확인하지 못했습니다.':'현재 작업 중이거나 예정된 장비가 없습니다.')+'</p>')+
- '</div>'+['출고대기','확인 필요'].map(label=>{const rows=secondary.filter(x=>productionClass(x)===label);return '<details><summary>'+esc(label)+' · '+(!readStale&&!planReadStale?rows.length:'최신 확인 불가')+'</summary>'+rows.map(x=>'<button class="production-plan-card hf-card" data-plan-order="'+esc(x.orderId)+'"><small>JOB NO. '+esc(x.orderId)+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(x.state||'미등록')+'</p><p>다음 행동 · '+esc(displayedNextAction(x))+'</p></button>').join('')+'</details>';}).join('');
+ '</div>'+['출고대기','확인 필요'].map(label=>{const rows=secondary.filter(x=>productionClass(x)===label);return '<details><summary>'+esc(label)+' · '+planCountLabel(rows.length)+'</summary>'+rows.map(x=>'<button class="production-plan-card hf-card" data-plan-order="'+esc(x.orderId)+'"><small>JOB NO. '+esc(x.orderId)+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(x.state||'미등록')+'</p><p>다음 행동 · '+esc(displayedNextAction(x))+'</p></button>').join('')+'</details>';}).join('');
  main.querySelectorAll('[data-plan-order]').forEach(b=>b.onclick=()=>{const x=productionPlanRows().find(v=>v.orderId===b.dataset.planOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.planOrder,'plan',x);});
 }
 function delivery(skipMeta=false){return productionPlan('delivery',skipMeta);}

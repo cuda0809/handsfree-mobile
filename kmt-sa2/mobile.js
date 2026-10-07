@@ -76,11 +76,12 @@ async function api(path,body,timeout=25000){const c=new AbortController(),timer=
 async function readApp(body){
  const reads=['core','catalog','plans','reports','history','receipt','issue'];
  if(!reads.includes(body.action))throw Error('read_action_required');
- for(let attempt=0;attempt<2;attempt++){
-  try{return await api('/api/sa2-app',body,55000);}
+ const overview=['core','catalog','plans'].includes(body.action);
+ for(let attempt=0;attempt<(overview?1:2);attempt++){
+  try{return await api('/api/sa2-app',body,overview?30000:55000);}
   catch(e){
    const transient=e.name==='AbortError'||e.name==='TypeError'||e.message==='app_unavailable'||e.message==='busy'||e.status===429||e.status===503||e.status===504;
-   if(attempt||!transient||navigator.onLine===false){e.readAction=body.action;throw e;}
+   if(overview||attempt||!transient||navigator.onLine===false){e.readAction=body.action;throw e;}
    await new Promise(resolve=>setTimeout(resolve,1500));
   }
  }
