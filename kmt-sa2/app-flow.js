@@ -94,14 +94,34 @@ function operationalRows(includeCompleted=true){
  return (includeCompleted?rows:rows.filter(x=>!isCompletedOperational(x)))
    .sort((a,b)=>hybridDueKey(a.due).localeCompare(hybridDueKey(b.due))||(a.priority||9)-(b.priority||9));
 }
+// Display-only derived plan: company calendar excludes Saturday/Sunday only.
+function finishingPlan(x){
+ const date=v=>{const d=formatHfDate(v);return /^\d{4}-\d{2}-\d{2}$/.test(d)&&!isNaN(Date.parse(d+'T00:00:00Z'))?d:'';};
+ const rows=Array.isArray(x.planTimeline)?x.planTimeline:[];
+ const dates=re=>rows.filter(r=>re.test(String(r.process||''))).map(r=>date(r.date)).filter(Boolean).sort();
+ const explicit=dates(/마감\s*조립/),manual=date(x.planFinishing);
+ if(manual||explicit.length){const start=manual||explicit[0],end=date(x.planFinishingEnd)||explicit.at(-1)||start;return {start,end,automatic:false,days:explicit.length?explicit:[start],label:start+(end!==start?' ~ '+end:'')};}
+ const program=dates(/프로그램|프로그래밍/).at(-1)||date(x.planProgram);
+ const inspection=dates(/검수|테스트|시험|FAT/)[0]||date(x.planInspection);
+ if(!program||!inspection)return {start:'',end:'',automatic:true,days:[],label:'선행 일정 확인 필요'};
+ const days=[];const d=new Date(program+'T00:00:00Z');
+ for(d.setUTCDate(d.getUTCDate()+1);d.toISOString().slice(0,10)<inspection&&days.length<2;d.setUTCDate(d.getUTCDate()+1)){
+  if(d.getUTCDay()!==0&&d.getUTCDay()!==6)days.push(d.toISOString().slice(0,10));
+ }
+ if(!days.length)return {start:'',end:'',automatic:true,days:[],label:'일정 조정 필요'};
+ return {start:days[0],end:days.at(-1),automatic:true,days,label:days[0]+(days.length>1?' ~ '+days.at(-1):'')+' · 자동 계획'};
+}
 function planStagesOnDay(x,day){
- const rows=Array.isArray(x?.planTimeline)?x.planTimeline:[];
+ const rows=[...(Array.isArray(x?.planTimeline)?x.planTimeline:[])];
+ const finishing=finishingPlan(x);
+ if(finishing.automatic&&finishing.days.includes(day))rows.push({date:day,process:'마감조립'});
  return [...new Set(rows.filter(r=>formatHfDate(r.date)===day).map(r=>{
   const p=String(r.process||'');
   if(/출고|납품/.test(p))return '출고';
   if(/검수|테스트|시험|FAT/.test(p))return '검수';
   if(/프로그램/.test(p))return '프로그램';
   if(/전장|전기/.test(p))return '전장';
+  if(/마감\s*조립/.test(p))return '마감조립';
   if(/조립/.test(p))return '조립';
   if(/자재/.test(p))return '자재';
   return p;
@@ -541,7 +561,7 @@ async function openProject(orderId,purpose='detail',sourceSnapshot=null){
   const scheduleBlock='<div class="hybrid-timeline">'+stageNames.map((name,i)=>{
    const stageComplete=/완료/.test(currentState)&&!/미완료|예정|아님/.test(currentState);
    const cls=(closed&&(!bTeam||i===stageNames.length-1))||(!bTeam&&i<currentStage)||(i===currentStage&&stageComplete)?'done':!closed&&i===currentStage?'now':'';
-   const planDate=formatHfDate(planByStage[name]);
+   const planDate=name==='마감조립'?finishingPlan(linked).label:formatHfDate(planByStage[name]);
    const label=bTeam?(i===currentStage&&stageComplete?'완료 · ':'')+'계획 '+planDate:(closed||i<currentStage?'종료':i===currentStage?(planDate!=='미정'?planDate:currentDate):planDate);
    return '<div class="hybrid-step '+cls+'"><i></i><b>'+name+'</b><small>'+esc(label)+'</small></div>';
   }).join('')+'</div><div class="project-schedule-status '+(closed?'closed':'active')+'">'+(closed?'<b>제작 종료</b><span>실납기 '+esc(actualDay)+'</span>':'<b>'+esc(bTeam?productionClass(linked):'진행중')+'</b><span>'+esc(currentStatusLabel(linked))+' · 기준 '+esc(currentDate)+'</span>')+'</div>';
@@ -868,9 +888,9 @@ function productionPlan(mode='plan',skipMeta=false){
  const planValue=(x,name)=>({
   '조립':x.planAssembly,'전장':x.planElectrical,'프로그램':x.planProgram,'마감조립':x.planFinishing,'검수':x.planInspection,'출고':x.planDelivery
  }[name]||'');
- const missingCount=selected.reduce((n,x)=>n+allStages.filter(s=>formatHfDate(planValue(x,s))==='미정').length,0);
+ const missingCount=selected.reduce((n,x)=>n+allStages.filter(s=>s==='마감조립'?!finishingPlan(x).start:formatHfDate(planValue(x,s))==='미정').length,0);
  main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">PRODUCTION CONTROL</div><h1>생산계획</h1></div></div>'+tabs+
- '<p class="hybrid-desc">진행 중과 작업 예정의 제작일정입니다. 계획은 실적이 아닙니다.</p>'+
+ '<p class="hybrid-desc">진행 중과 작업 예정의 제작일정입니다. 마감조립 자동 계획은 토·일 제외, 프로그램 후 검수 전 1~2일입니다. 계획은 실적이 아닙니다.</p>'+
  (readStale||planReadStale?'<div class="alert" role="status">최신 조회 미확인 · 이전 정상값 표시. 건수는 최신 확인 전입니다.</div>':'')+
  '<div class="plan-summary"><div><small>현재 작업</small><b>'+(!readStale&&!planReadStale?selected.length:'확인 불가')+'</b></div><div><small>미정 공정</small><b>'+(!readStale&&!planReadStale?missingCount:'확인 불가')+'</b></div></div>'+
  '<div class="production-plan-list hf-card-list">'+
@@ -878,7 +898,7 @@ function productionPlan(mode='plan',skipMeta=false){
    const planned=allStages.some(s=>formatHfDate(planValue(x,s))!=='미정');
    return '<button class="production-plan-card hf-card '+hfCardTone(x,'plan')+'" data-plan-order="'+esc(x.orderId)+'"><div class="production-plan-head"><div><small>JOB NO. '+esc(x.orderId||'미등록')+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b></div><span class="'+(planned?'set':'unset')+'">'+(String(x.team||'').trim()==='B'?productionClass(x):(planned?'일정 있음':'제작일정 미정'))+'</span></div>'+hfDueAlert(x)+
    '<div class="production-plan-meta"><div><small>납기</small><b>'+esc(formatHfDate(x.due))+'</b></div><div><small>현재</small><b>'+esc(x.state||'미등록')+'</b></div></div>'+
-   '<div class="production-plan-stages">'+allStages.map(name=>'<div><small>'+name+'</small><b>'+esc(formatHfDate(planValue(x,name)))+'</b></div>').join('')+'</div>'+
+   '<div class="production-plan-stages">'+allStages.map(name=>'<div><small>'+name+'</small><b>'+esc(name==='마감조립'?finishingPlan(x).label:formatHfDate(planValue(x,name)))+'</b></div>').join('')+'</div>'+
    '<p class="production-plan-next"><span>다음 행동</span>'+esc(displayedNextAction(x))+'</p></button>';
  }).join(''):'<p class="empty">'+(readStale||planReadStale?'최신 목록을 확인하지 못했습니다.':'현재 작업 중이거나 예정된 장비가 없습니다.')+'</p>')+
  '</div>'+['출고대기','확인 필요'].map(label=>{const rows=secondary.filter(x=>productionClass(x)===label);return '<details><summary>'+esc(label)+' · '+(!readStale&&!planReadStale?rows.length:'최신 확인 불가')+'</summary>'+rows.map(x=>'<button class="production-plan-card hf-card" data-plan-order="'+esc(x.orderId)+'"><small>JOB NO. '+esc(x.orderId)+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(x.state||'미등록')+'</p><p>다음 행동 · '+esc(displayedNextAction(x))+'</p></button>').join('')+'</details>';}).join('');

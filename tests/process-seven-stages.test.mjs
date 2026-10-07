@@ -32,6 +32,7 @@ test('actual project renderer shows seven plans with electrical and program date
  formatHfDate:v=>v||'미정',isCompletedOperational:()=>false,appDay:v=>v||'',projectPlanStageMap:()=>new Map(),esc:v=>String(v||''),productionClass:()=> '진행 중',
  projectCurrentFields:()=>'',lifecyclePreview:()=>'',projectLifecycle(){},projectHistory(){},openProjectPlan(){},input(){},$:()=>({})});
  vm.runInContext(code,c);
+ vm.runInContext(source.slice(source.indexOf('function finishingPlan('),source.indexOf('function planStagesOnDay(')),c);
  vm.runInContext(source.slice(source.indexOf('function currentStatusLabel('),source.indexOf('function projectCurrentFields(')),c);
  const start=source.indexOf(' const render=()=>{',source.indexOf('async function openProject('));
  const end=source.indexOf('\n render();',start);
@@ -39,5 +40,5 @@ test('actual project renderer shows seven plans with electrical and program date
  assert.equal((el.innerHTML.match(/class="hybrid-step /g)||[]).length,7);
  assert.match(el.innerHTML,/<b>전장<\/b><small>완료 · 계획 2026-10-06/);
  assert.match(el.innerHTML,/<b>프로그램<\/b><small>계획 2026-10-07/);
- assert.match(el.innerHTML,/<b>마감조립<\/b><small>계획 미정/);
+ assert.match(el.innerHTML,/<b>마감조립<\/b><small>계획 선행 일정 확인 필요/);
 });
