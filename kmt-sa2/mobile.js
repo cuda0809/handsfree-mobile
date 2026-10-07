@@ -1,5 +1,5 @@
 'use strict';
-const BUILD='2026.10.07.SA2.8.3-MOBILE7', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
+const BUILD='2026.10.07.SA2.8.3-MOBILE8', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
 const main=document.getElementById('main'),dialog=document.getElementById('detail');
 let coreSnapshot=false;
 let items=[],live=false,readPending=null,sourceDate='',lastRead='',screen='home',filter='all',returnFocus=null,readMessage='현재 상태를 불러오는 중…',recognition=null,installPrompt=null,readStale=false,lastReadErrorStatus=0,lastCoreAttempt=0;
@@ -71,14 +71,14 @@ coreCacheRestore();
 function notes(){const a=readStore(KEY,[]);return Array.isArray(a)?a:[];}
 function visibleNotes(){return notes().filter(r=>!r.orderId||items.some(x=>x.orderId===r.orderId&&isBTeam(x)));}
 function updateNote(id,patch){const a=notes(),r=a.find(r=>r.id===id);if(!r)throw Error('missing_note');Object.assign(r,patch);persist(KEY,a);return r;}
-async function api(path,body,timeout=25000){const c=new AbortController(),timer=setTimeout(()=>c.abort(),timeout);try{const r=await fetch(path,{credentials:'same-origin',cache:'no-store',signal:c.signal,...(body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});let d;try{d=await r.json();}catch{throw Error('invalid_response');}if(!r.ok||d.ok!==true){const e=Error(d.error||'request_failed');e.status=r.status;e.data=d;throw e;}return d;}finally{clearTimeout(timer);}}
+async function api(path,body,timeout=25000){const c=new AbortController(),timer=setTimeout(()=>c.abort(),timeout);try{const r=await fetch(path,{credentials:'same-origin',cache:'no-store',signal:c.signal,...(body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});let d;try{d=await r.json();}catch{const e=Error(!r.ok&&[429,502,503,504].includes(r.status)?'app_unavailable':'invalid_response');e.status=r.status;throw e;}if(!r.ok||d.ok!==true){const e=Error(d.error||'request_failed');e.status=r.status;e.data=d;throw e;}return d;}finally{clearTimeout(timer);}}
 async function readApp(body){
  const reads=['core','catalog','plans','reports','history','receipt','issue'];
  if(!reads.includes(body.action))throw Error('read_action_required');
  for(let attempt=0;attempt<2;attempt++){
   try{return await api('/api/sa2-app',body,55000);}
   catch(e){
-   const transient=e.name==='AbortError'||e.name==='TypeError'||e.message==='app_unavailable'||e.status===429||e.status===503||e.status===504;
+   const transient=e.name==='AbortError'||e.name==='TypeError'||e.message==='app_unavailable'||e.message==='busy'||e.status===429||e.status===503||e.status===504;
    if(attempt||!transient||navigator.onLine===false)throw e;
    await new Promise(resolve=>setTimeout(resolve,1500));
   }

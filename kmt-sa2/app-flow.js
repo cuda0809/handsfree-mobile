@@ -736,8 +736,11 @@ async function syncPlanOverview(force=false){
  if(!force&&fresh&&!planReadStale)return cached;
  if(planOverviewPending)return planOverviewPending;
  planOverviewPending=(async()=>{
-  if(!coreSnapshot&&!await refresh(false))throw Error('core_unverified');
-  const d=await appCall({action:'plans'});
+  // Start the read immediately; join only after the authoritative Core is ready.
+  // Waiting for Core before sending plans stacked two external-service waits.
+  const coreReady=coreSnapshot?Promise.resolve(true):refresh(false);
+  const [d,confirmed]=await Promise.all([appCall({action:'plans'}),coreReady]);
+  if(!confirmed)throw Error('core_unverified');
   if(!Array.isArray(d.records)||!d.generatedAt)throw Error('invalid_plans');
   const allowed=new Set(items.filter(x=>String(x.team||'').trim()==='B').map(x=>x.orderId));
   const grouped=new Map();

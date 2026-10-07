@@ -26,3 +26,16 @@ test('failed or malformed plan reads preserve prior cache without a fresh timest
 test('verified empty plan response clears prior plans',async()=>{
  const h=harness({generatedAt:'now',records:[]});await h.run();assert.equal(Object.keys(h.ctx.saved.byOrder).length,0);
 });
+test('cold start sends plans before Core completes and never accepts plans when Core fails',async()=>{
+ for(const confirmed of [true,false]){
+  const h=harness({generatedAt:'now',records:[{orderId:'NEW',date:'2026-10-06',process:'전장'}]});
+  h.ctx.coreSnapshot=false;let release;
+  h.ctx.refresh=()=>new Promise(r=>release=r);
+  const pending=h.run();await Promise.resolve();
+  assert.equal(h.ctx.calls.length,1,'plans must start while Core is pending');
+  assert.equal(h.ctx.saved,null,'unverified Core cannot establish plan freshness');
+  release(confirmed);const result=await pending;
+  if(confirmed){assert.ok(result);assert.equal(h.ctx.saved.completePlan,true);}
+  else{assert.equal(result,null);assert.equal(h.ctx.saved,null);assert.equal(h.ctx.planReadStale,true);}
+ }
+});
