@@ -43,6 +43,8 @@ function installRows(h){
  h.run('var appProjects=[]; function projectMetaCache(){return {projects:[{orderId:"REMOVED",state:"조립",currentIssue:"stale"}]}}; function planOverviewCache(){return {byOrder:{REMOVED:{state:"조립"}}}}; function latestUnifiedInputByOrder(){return new Map([["JOB-A",{stateSyncVersion:"natural-v3",displayState:"old local",text:"old local"}]])}; function formatHfDate(x){return x||"미정"}; function hybridDueKey(x){return x||""}');
  h.run(fs.readFileSync('kmt-sa2/production-rules.js','utf8'));
  h.run('var HfProductionRules=window.HfProductionRules;');
+ h.run(app.slice(app.indexOf('function priorityAssessment('),app.indexOf('function priorityReasonHtml(')));
+ h.run(app.slice(app.indexOf('function ymdTime('),app.indexOf('function deliveryPerformance(')));
  h.run(app.slice(app.indexOf('function productionClass('),app.indexOf('function projectCurrentFields(')));
  for(const [start,end] of [['function isCompletedOperational(','function latestUnifiedInputByOrder('],['function operationalRows(','function planStagesOnDay(']])h.run(app.slice(app.indexOf(start),app.indexOf(end)));
 }
