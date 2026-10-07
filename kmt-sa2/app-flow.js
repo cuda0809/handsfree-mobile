@@ -95,6 +95,20 @@ function operationalRows(includeCompleted=true){
    .sort((a,b)=>hybridDueKey(a.due).localeCompare(hybridDueKey(b.due))||(a.priority||9)-(b.priority||9));
 }
 // Display-only derived plan: company calendar excludes Saturday/Sunday only.
+function planReviewReasons(x){
+ const fields=[['조립','planAssembly'],['전장','planElectrical'],['프로그램','planProgram'],['검수','planInspection'],['출고','planDelivery']];
+ const missing=fields.filter(([,key])=>formatHfDate(x[key])==='미정').map(([name])=>name);
+ const reasons=missing.length?[missing.join('·')+' 일정 미등록']:[];
+ const finishing=finishingPlan(x);
+ if(!finishing.start)reasons.push('마감조립 · '+finishing.label);
+ return reasons;
+}
+function togglePlanReview(button){
+ const on=button.getAttribute('aria-pressed')!=='true';
+ button.setAttribute('aria-pressed',String(on));
+ main.querySelectorAll('.production-plan-list [data-plan-review]').forEach(card=>{card.hidden=on&&card.dataset.planReview!=='true';});
+ const hint=$('planReviewFilterHint');if(hint)hint.hidden=!on;
+}
 function finishingPlan(x){
  const date=v=>{const d=formatHfDate(v);return /^\d{4}-\d{2}-\d{2}$/.test(d)&&!isNaN(Date.parse(d+'T00:00:00Z'))?d:'';};
  const rows=Array.isArray(x.planTimeline)?x.planTimeline:[];
@@ -927,15 +941,16 @@ function productionPlan(mode='plan',skipMeta=false){
  const planValue=(x,name)=>({
   '조립':x.planAssembly,'전장':x.planElectrical,'프로그램':x.planProgram,'마감조립':x.planFinishing,'검수':x.planInspection,'출고':x.planDelivery
  }[name]||'');
- const missingCount=selected.reduce((n,x)=>n+allStages.filter(s=>s==='마감조립'?!finishingPlan(x).start:formatHfDate(planValue(x,s))==='미정').length,0);
+ const reviewCount=selected.filter(x=>planReviewReasons(x).length>0).length;
  main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">PRODUCTION CONTROL</div><h1>생산계획</h1></div></div>'+tabs+
  '<p class="hybrid-desc">진행 중과 작업 예정의 제작일정입니다. 마감조립 자동 계획은 토·일 제외, 프로그램 후 검수 전 1~2일입니다. 계획은 실적이 아닙니다.</p>'+
  (readStale||planReadStale?'<div class="alert" role="status">최신 조회 미확인 · 이전 정상값 표시. 건수는 최신 확인 전입니다.</div>':'')+
- '<div class="plan-summary"><div><small>현재 작업</small><b>'+(!readStale&&!planReadStale?selected.length:'확인 불가')+'</b></div><div><small>미정 공정</small><b>'+(!readStale&&!planReadStale?missingCount:'확인 불가')+'</b></div></div>'+
+ '<div class="plan-summary"><div><small>현재 작업</small><b>'+(!readStale&&!planReadStale?selected.length:'확인 불가')+'</b></div><button type="button" class="plan-review-summary" aria-pressed="false" onclick="togglePlanReview(this)"><small>일정 확인 필요</small><b>'+(!readStale&&!planReadStale?reviewCount+'대':'확인 불가')+'</b></button></div><p id="planReviewFilterHint" class="note" hidden>일정 확인이 필요한 장비만 표시합니다. 위 버튼을 다시 누르면 전체가 표시됩니다.</p>'+
  '<div class="production-plan-list hf-card-list">'+
  (selected.length?selected.map(x=>{
    const planned=allStages.some(s=>formatHfDate(planValue(x,s))!=='미정');
-   return '<button class="production-plan-card hf-card '+hfCardTone(x,'plan')+'" data-plan-order="'+esc(x.orderId)+'"><div class="production-plan-head"><div><small>JOB NO. '+esc(x.orderId||'미등록')+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b></div><span class="'+(planned?'set':'unset')+'">'+(String(x.team||'').trim()==='B'?productionClass(x):(planned?'일정 있음':'제작일정 미정'))+'</span></div>'+hfDueAlert(x)+
+   const review=planReviewReasons(x);
+   return '<button class="production-plan-card hf-card '+hfCardTone(x,'plan')+'" data-plan-review="'+(review.length?'true':'false')+'" data-plan-order="'+esc(x.orderId)+'"><div class="production-plan-head"><div><small>JOB NO. '+esc(x.orderId||'미등록')+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b></div><span class="'+(planned?'set':'unset')+'">'+(String(x.team||'').trim()==='B'?productionClass(x):(planned?'일정 있음':'제작일정 미정'))+'</span></div>'+hfDueAlert(x)+(review.length?'<div class="plan-review-notice"><b>일정 확인 필요</b><p>'+esc(review.join(' / '))+'</p></div>':'')+
    '<div class="production-plan-meta"><div><small>납기</small><b>'+esc(formatHfDate(x.due))+'</b></div><div><small>현재</small><b>'+esc(x.state||'미등록')+'</b></div></div>'+
    '<div class="production-plan-stages">'+allStages.map(name=>'<div><small>'+name+'</small><b>'+esc(name==='마감조립'?finishingPlan(x).label:formatHfDate(planValue(x,name)))+'</b></div>').join('')+'</div>'+
    '<p class="production-plan-next"><span>다음 행동</span>'+esc(displayedNextAction(x))+'</p></button>';
