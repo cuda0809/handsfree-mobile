@@ -14,6 +14,7 @@ function toast(text){clearTimeout(toast.timer);$('toast').hidden=true;let target
 function readStore(key,fallback){try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback;}catch{return fallback;}}
 function persist(key,value){localStorage.setItem(key,JSON.stringify(value));if(localStorage.getItem(key)!==JSON.stringify(value))throw Error('storage_failed');}
 const APP_ASSET_HASH_KEY='hf-ui-assets-hash-v2';
+let assetCheckPending=null;
 async function liveAssetHash(){
  try{
   const stamp=Date.now(),paths=['./app-flow.js','./hybrid05.css','./mobile.js','./index.html'];
@@ -28,14 +29,22 @@ async function liveAssetHash(){
 }
 async function checkForLiveUpdate(){
  if(document.visibilityState==='hidden'||navigator.onLine===false)return;
+ if(assetCheckPending)return assetCheckPending;
+ assetCheckPending=(async()=>{
  const hash=await liveAssetHash();if(!hash)return;
  const prior=sessionStorage.getItem(APP_ASSET_HASH_KEY)||'';
  if(!prior){sessionStorage.setItem(APP_ASSET_HASH_KEY,hash);return;}
  if(prior!==hash){
-  sessionStorage.setItem(APP_ASSET_HASH_KEY,hash);
-  toast('새 화면 버전을 반영합니다…');
-  setTimeout(()=>location.reload(),350);
+  // An automatic reload can interrupt a touch, keyboard input, or pending save.
+  // Keep the current screen usable and let the user choose when to update.
+  if(!$('hfUpdateAvailable')){
+   const button=document.createElement('button');button.id='hfUpdateAvailable';button.className='chip';button.textContent='새 버전 적용';
+   button.onclick=()=>{if(dialog.open||Array.from(document.querySelectorAll('textarea')).some(t=>t.value.trim())||notes().some(n=>n.status==='sending')||document.querySelector('button[data-today-save]:disabled,#generalIssueSave:disabled')){toast('입력·저장을 마친 뒤 새 버전을 적용하세요.');return;}sessionStorage.setItem(APP_ASSET_HASH_KEY,hash);location.reload();};
+   (document.querySelector('.hf-connection-row')||document.querySelector('.demo')).appendChild(button);
+  }
  }
+ })().finally(()=>{assetCheckPending=null;});
+ return assetCheckPending;
 }
 setTimeout(checkForLiveUpdate,2500);
 setInterval(checkForLiveUpdate,60000);

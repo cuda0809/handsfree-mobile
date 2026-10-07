@@ -836,3 +836,9 @@ main{padding-bottom:84px!important}
   white-space:pre-line;
   overflow-wrap:anywhere;
 }
+
+/* Keep the escape control visible while long mobile detail sheets scroll. */
+#detail .sheet-head{position:sticky;top:0;z-index:10;background:#fff;padding-bottom:8px}
+#detail .sheet-head .icon{flex-shrink:0;min-width:44px;min-height:44px}
+#detail{overscroll-behavior:contain}
+
