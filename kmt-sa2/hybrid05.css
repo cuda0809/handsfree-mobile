@@ -882,3 +882,70 @@ main{padding-bottom:84px!important}
 .plan-review-notice{background:#fff5e7;border-left:3px solid #c97721;border-radius:6px;padding:9px 11px;margin:12px 0;color:#805018}
 .plan-review-notice b{font-size:12px}.plan-review-notice p{font-size:12px;margin:5px 0 0;line-height:1.5}
 .production-plan-list [hidden]{display:none!important}
+
+/* PC presentation only: preserve all content, actions and mobile layout. */
+@media(min-width:900px){
+ body{padding:20px 24px!important;font-size:16px}
+ body .app{width:100%;max-width:1200px!important;min-height:calc(100dvh - 40px);padding-bottom:32px!important}
+ body .top{padding:24px 32px 18px!important}
+ body .demo,body .hf-connection-row{margin-left:32px!important;margin-right:32px!important;font-size:13px!important;line-height:1.6}
+ body main{padding:12px 32px 40px!important}
+ body .bottom{width:calc(100% - 64px)!important;margin:0 32px 12px!important;min-height:82px!important;border-radius:14px!important}
+ body .bottom button{font-size:15px!important;gap:7px}
+ body .desktop-note{position:static!important;max-width:1200px;width:100%;margin:18px auto 0;font-size:14px}
+ body .hybrid-title,body .hybrid-page-head h1{font-size:36px!important;line-height:1.25}
+ body .hybrid-desc,body .date,body .lead{font-size:15px!important;line-height:1.6}
+ body .hybrid-section{align-items:center;gap:20px;margin:24px 0 14px}
+ body .hybrid-section b{font-size:20px!important}
+ body .hybrid-section span{font-size:14px!important}
+ body .hybrid-section .secondary{width:auto;margin:0;flex-shrink:0;padding:11px 18px;font-size:15px}
+ body .hf-stat-grid{gap:16px;margin:20px 0 28px}
+ body .hf-stat-card{padding:20px 22px}
+ body .hf-stat-card small{font-size:16px!important}
+ body .hf-stat-card b{font-size:34px!important;margin:9px 0}
+ body .hf-stat-card span{font-size:13px!important;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.5}
+ body .hf-card-list{gap:18px!important;grid-template-columns:minmax(0,1fr)}
+ body .hf-card{box-sizing:border-box;min-width:0;max-width:100%;padding:22px!important}
+ body .hf-card-head>div,body .production-plan-head>div,body .project-card-top>div{flex:1;min-width:0}
+ body .hf-card-title,body .project-card-top b,body .production-plan-head b,body .today-issue-ident h3,body .delivery-main>b{font-size:20px!important;line-height:1.5!important;word-break:keep-all;overflow-wrap:anywhere}
+ body .hf-card-job,body .project-job,body .production-plan-head small,body .today-issue-ident>small,body .delivery-job{font-size:13px!important;line-height:1.5!important}
+ body .hf-card-head small,body .project-card-top small{font-size:13px!important;line-height:1.6!important}
+ body .hf-card-badge,body .project-stage-badge,body .delivery-performance,body .production-plan-head>span,body .today-issue-priority{font-size:13px!important;padding:7px 12px!important;max-width:40%;white-space:normal;overflow-wrap:anywhere}
+ body .hf-card-meta,body .production-plan-meta,body .today-issue-summary,body .delivery-dates{gap:12px!important;margin-top:16px!important}
+ body .hf-card-meta>div,body .production-plan-meta>div,body .today-issue-summary>div,body .delivery-dates>div{padding:12px 14px!important}
+ body .hf-card-meta small,body .production-plan-meta small,body .today-issue-summary small,body .delivery-dates small{font-size:13px!important}
+ body .hf-card-meta b,body .production-plan-meta b,body .today-issue-summary b,body .delivery-dates strong{font-size:16px!important;line-height:1.55!important}
+ body .hf-card-line,body .hf-card-next,body .project-row-state,body .project-row-next,body .production-plan-next,body .delivery-main p{grid-template-columns:64px minmax(0,1fr)!important;gap:14px!important;font-size:16px!important;line-height:1.65!important;margin-top:14px!important;padding-top:13px!important;word-break:keep-all;overflow-wrap:anywhere}
+ body .hf-card-line span,body .hf-card-next span,body .project-row-state span,body .project-row-next span,body .production-plan-next span,body .delivery-main p span{font-size:13px!important;white-space:nowrap}
+ body .hf-card-line b,body .hf-card-next b,body .project-row-state b{font-size:16px!important;min-width:0;line-height:1.65!important}
+ body .hf-due-alert,body .hf-card-issue p,body .project-linked-issue p,body .today-issue-linked p,body .plan-review-notice p{font-size:15px!important;line-height:1.65!important;word-break:keep-all;overflow-wrap:anywhere}
+ body .hf-card-issue span,body .project-linked-issue small,body .today-issue-linked small{font-size:13px!important}
+ body .hybrid-search{padding:15px 18px;font-size:17px}
+ body .project-group>summary{padding:17px 20px!important;font-size:17px!important}
+ body .project-group>summary b{font-size:15px!important}
+ body .project-group-body{padding:16px!important}
+ body .compact-project{margin-bottom:0!important}
+ body .project-compact-line{grid-template-columns:64px minmax(0,1fr) auto;gap:14px;margin-top:14px;font-size:16px}
+ body .project-compact-line b{font-size:16px!important;white-space:normal;overflow:visible;text-overflow:clip;word-break:keep-all;overflow-wrap:anywhere;line-height:1.65}
+ body .project-compact-line span,body .project-compact-line em{font-size:13px!important}
+ body .project-report-links button,body .project-state-tabs .chip,body .project-review-tabs .chip{font-size:15px!important;padding:14px 12px!important}
+ body .project-report-links small{font-size:13px!important}
+ body .production-plan-stages{grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+ body .production-plan-stages small,body .project-plan-cell small{font-size:12px!important}
+ body .production-plan-stages b,body .project-plan-cell b{font-size:13px!important;line-height:1.5}
+ body .hybrid-timeline{grid-template-columns:repeat(7,minmax(90px,1fr))}
+ body .hybrid-step b{font-size:13px!important}
+ body .hybrid-step small{font-size:12px!important;line-height:1.5}
+ body dialog,body #detail[open]{max-width:1200px!important}
+ body .sheet{padding:24px 32px 40px!important}
+ body .sheet h2{font-size:30px!important}
+ body .sheet p,body .sheet .sub,body .sheet label{font-size:16px!important;line-height:1.7}
+ body .note{font-size:13px!important;line-height:1.65!important}
+ body .primary,body .secondary,body .chip{font-size:16px}
+ body .hybrid-voice-fab{left:auto!important;right:28px!important;width:64px;height:64px}
+}
+@media(min-width:1200px){
+ body .hf-card-list,body .project-group-body{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:18px!important;align-items:start}
+ body .hf-card-list>.completed-year,body .hf-card-list>.empty{grid-column:1/-1}
+ body .hf-card-list>.completed-year .project-group-body{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
