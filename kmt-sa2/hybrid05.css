@@ -346,6 +346,10 @@ main{padding-bottom:210px!important}
  color:var(--hy-ink,#183047);
 }
 .hf-card:active{transform:scale(.995)}
+.hf-card[data-home-stat-order]{box-sizing:border-box;min-width:0;max-width:100%}
+.hf-card[data-home-stat-order] .hf-card-head>div{flex:1;overflow-wrap:anywhere}
+.hf-card[data-home-stat-order] .hf-card-line b,
+.hf-card[data-home-stat-order] .hf-card-next b{min-width:0;overflow-wrap:anywhere;white-space:normal}
 .hf-card.tone-plan{--hf-border:var(--hf-blue)}
 .hf-card.tone-active{--hf-border:var(--hf-teal)}
 .hf-card.tone-issue{--hf-border:var(--hf-orange)}
