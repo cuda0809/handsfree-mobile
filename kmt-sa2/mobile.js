@@ -1,5 +1,5 @@
 'use strict';
-const BUILD='2026.10.07.SA2.8.3-MOBILE4', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
+const BUILD='2026.10.07.SA2.8.3-MOBILE5', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
 const main=document.getElementById('main'),dialog=document.getElementById('detail');
 let coreSnapshot=false;
 let items=[],live=false,readPending=null,sourceDate='',lastRead='',screen='home',filter='all',returnFocus=null,readMessage='현재 상태를 불러오는 중…',recognition=null,installPrompt=null,readStale=false,lastReadErrorStatus=0,lastCoreAttempt=0;
@@ -7,9 +7,10 @@ const $=id=>document.getElementById(id);
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function norm(s){return String(s||'').toLowerCase().replace(/[\s\-‐‑–—]/g,'');}
 function heading(k,t,sub=''){return `<div class="sheet-head"><div><div class="eyebrow">${esc(k)}</div><h2>${esc(t)}</h2></div><button class="icon" aria-label="상세 닫기" onclick="dialog.close()">×</button></div><div class="sub">${esc(sub)}</div>`;}
-// A normal fixed detail page avoids the native modal top layer making the entire app inert.
-// Keep HTMLDialogElement.close/open for existing save, refresh and editor guards.
-function open(html){stopVoice();if(!dialog.open)returnFocus=document.activeElement;$('sheetBody').innerHTML=html;if(!dialog.open)dialog.show();dialog.scrollTop=0;}
+// Attribute-managed detail: never enter the browser's native dialog show/close algorithms.
+// Keep dialog[open] and close() compatible with the installed Android Back handler.
+dialog.close=function(){if(!dialog.open)return;dialog.removeAttribute('open');dialog.dispatchEvent(new Event('close'));};
+function open(html){stopVoice();if(!dialog.open)returnFocus=document.activeElement;$('sheetBody').innerHTML=html;dialog.setAttribute('open','');dialog.scrollTop=0;$('sheetBody').querySelector('[aria-label="상세 닫기"]')?.focus({preventScroll:true});}
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&dialog.open){e.preventDefault();dialog.close();}});
 dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});
 dialog.addEventListener('close',()=>{if(dialog.open)return;stopVoice();const target=returnFocus;returnFocus=null;if(target?.isConnected&&(document.activeElement===document.body||dialog.contains(document.activeElement)))target.focus({preventScroll:true});});
@@ -92,7 +93,10 @@ function corePriorityFromState(state,next,status,previous=2){
 }
 async function refreshCachedCore(){
  // Both complete contracts are required; catalog alone cannot establish Core freshness.
- const d=await api('/api/sa2-app',{action:'core'},22000);
+ const [d,catalog]=await Promise.all([
+  api('/api/sa2-app',{action:'core'},22000),
+  api('/api/sa2-app',{action:'catalog'},22000)
+ ]);
  if(d.coreFallback)throw Error('partial_core');
  if(!Array.isArray(d.projects)||!d.generatedAt)throw Error('invalid_core');
  const seen=new Set(),projectIds=new Set();
@@ -100,7 +104,6 @@ async function refreshCachedCore(){
   if(!p||typeof p!=='object'||!String(p.projectId||'').trim()||!String(p.orderId||'').trim()||typeof p.state!=='string'||typeof p.nextAction!=='string'||typeof p.currentIssue!=='string'||typeof p.recentEvent!=='string'||seen.has(p.orderId)||projectIds.has(p.projectId))throw Error('invalid_core');
   seen.add(p.orderId);projectIds.add(p.projectId);
  }
- const catalog=await api('/api/sa2-app',{action:'catalog'},22000);
  if(!Array.isArray(catalog.issues))throw Error('partial_core');
  const byOrder=new Map();
  for(const v of catalog.issues){

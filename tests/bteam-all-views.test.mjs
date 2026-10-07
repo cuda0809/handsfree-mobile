@@ -22,10 +22,13 @@ test('all operational views fail closed for other teams and stale metadata; comp
  assert.equal(c.projectDetailRow('A-other',{customer:'A'}).customer,undefined);
 });
 test('equipment picker joins the authoritative team rather than catalog status or job year',async()=>{
- const c=vm.createContext({appCall:async b=>b.action==='catalog'?{projects:[{orderId:'A',state:'조립'},{orderId:'B25',state:'조립'}],issues:[{orderId:'A'},{orderId:'B25'}]}:{projects:[{orderId:'A',team:'A'},{orderId:'B25',team:'B',state:'출고완료'}]},appProjects:[],appIssues:[]});
+ let queries=0;
+ const c=vm.createContext({refresh:async force=>{assert.equal(force,false);queries++;return true;},items:[{orderId:'A',team:'A',issueId:'IA'},{orderId:'B25',team:'B',issueId:'IB',state:'출고완료'}],appProjects:[],appIssues:[]});
  vm.runInContext(source.slice(source.indexOf('async function getAppProjects('),source.indexOf('async function allProjects(')),c);
  assert.deepEqual(Array.from((await c.getAppProjects()).map(x=>x.orderId)),['B25']);
  assert.deepEqual(Array.from(c.appIssues.map(x=>x.orderId)),['B25']);
+ assert.equal(queries,1);
+ c.refresh=async()=>false;await assert.rejects(c.getAppProjects(),/core_unverified/);
 });
 test('completed lifecycle uses shipment business date and preserves the later receipt timestamp',()=>{
  const c=vm.createContext({HfProductionRules:rules,appDay:String,norm:v=>String(v||''),isCompletedOperational:x=>rules.classify(x,'2026-10-07')==='출고완료'});

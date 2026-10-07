@@ -228,31 +228,17 @@ function applyProjectMeta(projects,source='catalog'){
 }
 async function syncProjectMeta(force=false){
  const cached=projectMetaCache();
- if(cached)applyProjectMeta(cached.projects,cached.source||'catalog');
- const freshEnough=cached&&Date.now()-Date.parse(cached.cachedAt||0)<15*60*1000;
- if(!force&&freshEnough)return cached;
  if(projectMetaPending)return projectMetaPending;
  projectMetaPending=(async()=>{
   try{
-   const d=await appCall({action:'core'});
-   const issueByOrder=new Map((Array.isArray(d.issues)?d.issues:[]).map(v=>[String(v.orderId||''),v]));
- const projects=(Array.isArray(d.projects)?d.projects:[]).filter(x=>String(x.team||'').trim()==='B').map(p=>{
-    const masterState=String(p.masterState||p.state||'');
-    const issue=issueByOrder.get(String(p.orderId||''));
-    return issue?{...p,masterState,issueStatus:String(issue.status||''),state:String(issue.state||p.state||'')}:{...p,masterState};
-   });
-   const source=d.coreFallback?'catalog':'core';
-   const cacheChanged=JSON.stringify(projects)!==JSON.stringify(cached?.projects||[]);
-   persist(PROJECT_META_KEY,{cachedAt:new Date().toISOString(),source,projects});
-   const changed=applyProjectMeta(projects,source);
-   if(changed||cacheChanged){
-    if(screen==='home')home();
-    if(screen==='plan')productionPlan(productionPlanMode,true);
-    if(screen==='projects')projects(filter,true);
-    if(screen==='issues')todayIssues();
-   }
-   return {projects,source};
-  }catch{return cached||{projects:[],source:'catalog'};}
+   // Metadata comes from the same verified snapshot, not another competing Core read.
+   if(!coreSnapshot&&!await refresh(false))return cached||null;
+   const metadataRows=items.filter(x=>String(x.team||'').trim()==='B').map(x=>({...x}));
+   appProjects=metadataRows;
+   appIssues=metadataRows.filter(x=>x.issueId);
+   if(!readStale)persist(PROJECT_META_KEY,{cachedAt:new Date().toISOString(),source:'core',projects:metadataRows});
+   return {projects:metadataRows,source:'core'};
+  }catch{return cached||null;}
   finally{projectMetaPending=null;}
  })();
  return projectMetaPending;
@@ -300,11 +286,9 @@ function renderAppReport(){
 const appWorkBase=work;
 work=function(f='all',query=''){appWorkBase(f,query);main.insertAdjacentHTML('afterbegin','<button class="secondary" onclick="allProjects()">전체 프로젝트 · 계획 · 이력</button>');};
 async function getAppProjects(){
- const [d,core]=await Promise.all([appCall({action:'catalog'}),appCall({action:'core'})]);
- if(!Array.isArray(d.projects)||!Array.isArray(core.projects))throw Error('invalid_catalog');
- const byOrder=new Map(core.projects.filter(x=>String(x.team||'').trim()==='B').map(x=>[String(x.orderId),x]));
- appIssues=(d.issues||[]).filter(x=>byOrder.has(String(x.orderId)));
- appProjects=[...byOrder.values()];return appProjects;
+ if(!await refresh(false))throw Error('core_unverified');
+ appProjects=items.filter(x=>String(x.team||'').trim()==='B').map(x=>({...x}));
+ appIssues=appProjects.filter(x=>x.issueId);return appProjects;
 }
 async function allProjects(prefix='',purpose='detail'){
  open(heading('프로젝트',prefix?'장비를 선택하세요':'전체 프로젝트','발주번호를 기준으로 일정과 이력을 연결합니다')+'<div id="projectResults">프로젝트를 불러오는 중…</div>');const el=$('projectResults');
@@ -520,16 +504,10 @@ async function openProject(orderId,purpose='detail',sourceSnapshot=null){
  };
  render();
 
- // Keep detail aligned with the same due/plan data used by Today and Plan cards.
- Promise.allSettled([syncProjectMeta(false),syncPlanOverview(false)]).then(()=>{
-  if(!el?.isConnected)return;
-  p=projectDetailRow(orderId,p);
-  linked=projectDetailRow(orderId,linked||p);
-  render();
- });
+ // Detail uses the synchronized card snapshot; do not restart full Core/plan reads here.
 
  // Always refresh just this JOB NO. in the background. No manual refresh is required.
- if(linked.issueId){
+ if(linked.issueId&&!coreSnapshot){
   appCall({action:'issue',issueId:linked.issueId}).then(fresh=>{
    if(!el?.isConnected||fresh.orderId!==p.orderId||coreSnapshot)return;
    const idx=items.findIndex(x=>x.issueId===fresh.issueId);
@@ -1196,7 +1174,7 @@ function openUnifiedEvent(issueId){
 }
 
 const eventRefreshBase=refresh;
-refresh=async function(){const ok=await eventRefreshBase();if(screen==='issues')todayIssues();return ok;};
+refresh=async function(force=true){const ok=await eventRefreshBase(force);if(screen==='issues')todayIssues();return ok;};
 home();
 
-applyProjectMeta(projectMetaCache()?.projects||[],projectMetaCache()?.source||'catalog');applyPlanOverview(planOverviewCache()?.byOrder||{});setTimeout(()=>syncProjectMeta(true),300);setTimeout(()=>syncPlanOverview(true),500);
+applyProjectMeta(projectMetaCache()?.projects||[],projectMetaCache()?.source||'catalog');applyPlanOverview(planOverviewCache()?.byOrder||{});setTimeout(()=>refresh(false),300);setTimeout(()=>syncPlanOverview(true),500);
