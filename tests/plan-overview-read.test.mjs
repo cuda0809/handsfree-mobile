@@ -39,3 +39,12 @@ test('cold start sends plans before Core completes and never accepts plans when 
   else{assert.equal(result,null);assert.equal(h.ctx.saved,null);assert.equal(h.ctx.planReadStale,true);}
  }
 });
+test('unchanged successful plan read still replaces the pending screen with confirmed freshness',async()=>{
+ const records=[{orderId:'NEW',date:'2026-10-06',process:'전장'}];
+ const h=harness({generatedAt:'now',records});
+ h.ctx.planOverviewCache=()=>({completePlan:true,cachedAt:'2000-01-01',byOrder:{NEW:{planTimeline:records}}});
+ h.ctx.applyPlanOverview=()=>false;
+ const result=await h.run();
+ assert.equal(result.changed,false);assert.equal(result.cacheChanged,false);
+ assert.equal(h.ctx.planReadStale,false);assert.equal(h.ctx.rendered,1);
+});

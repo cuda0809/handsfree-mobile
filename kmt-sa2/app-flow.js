@@ -759,10 +759,11 @@ async function syncPlanOverview(force=false){
   const cacheChanged=JSON.stringify(byOrder)!==JSON.stringify(cached?.byOrder||{});
   persist(PLAN_OVERVIEW_KEY,{completePlan:true,cachedAt:new Date().toISOString(),byOrder,candidateCount:grouped.size});
   const changed=applyPlanOverview(byOrder);
-  if((changed||cacheChanged)&&screen==='home')home();
+  // Completion changes freshness even when the business data is unchanged.
+  if(screen==='home')home();
   if(screen==='plan')productionPlan(productionPlanMode,true);
-  if((changed||cacheChanged)&&screen==='projects')projects(filter,true);
-  if((changed||cacheChanged)&&screen==='issues')todayIssues();
+  if(screen==='projects')projects(filter,true);
+  if(screen==='issues')todayIssues();
   return {byOrder,candidateCount:grouped.size,changed,cacheChanged};
  })().catch(e=>{planReadStale=true;console.warn('HF_PLAN_READ_FAILED',e.status||0,['invalid_plans','core_unverified'].includes(e.message)?e.message:'upstream_unavailable');toast(e.message==='invalid_plans'?'생산계획 응답 형식 확인 필요 · 이전 계획 유지':'생산계획 최신 조회 실패 · 이전 계획 유지');return null;}).finally(()=>{planOverviewPending=null;});
  return planOverviewPending;
