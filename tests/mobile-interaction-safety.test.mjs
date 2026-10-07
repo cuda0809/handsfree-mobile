@@ -2,6 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+test('late detail-close event never steals a following navigation click or scrolls the page',()=>{
+ const source=fs.readFileSync('kmt-sa2/mobile.js','utf8'),code=source.match(/dialog\.addEventListener\('close',[^\n]+/)[0];
+ for(const followingNav of [false,true]){
+  let listener,focusCalls=0,options;
+  const body={},nav={},target={isConnected:true,focus:o=>{focusCalls++;options=o;}};
+  const c=vm.createContext({document:{body,activeElement:followingNav?nav:body},dialog:{open:false,contains:()=>false,addEventListener:(_,f)=>listener=f},returnFocus:target,stopVoice(){}});
+  vm.runInContext(code,c);listener();assert.equal(focusCalls,followingNav?0:1);if(!followingNav)assert.equal(options.preventScroll,true);assert.equal(c.returnFocus,null);
+ }
+});
 test('status refresh leaves navigation touch targets attached in their current position',()=>{
  const source=fs.readFileSync('kmt-sa2/mobile.js','utf8');let moves=0;
  const span={},demo={innerHTML:'',querySelector:()=>span,after:()=>moves++},status={previousElementSibling:demo,replaceChildren(){}},nav={previousElementSibling:status};
