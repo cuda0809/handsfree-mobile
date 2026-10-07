@@ -7,7 +7,7 @@ test('complete saved counts remain visible during refresh, auth or missing snaps
  c.coreSnapshot=true;c.planOverviewCache=()=>null;assert.equal(c.planCountLabel(12),'확인 불가');assert.equal(c.planCountLabel(12,false),'12대 · 최근 확인');
 });
 test('overview read timeout is bounded and never immediately retried',async()=>{
- let calls=0;const c=vm.createContext({navigator:{onLine:true},api:async(path,body,timeout)=>{calls++;assert.equal(timeout,30000);throw Object.assign(Error('app_unavailable'),{status:503});}});
+ let calls=0;const c=vm.createContext({navigator:{onLine:true},api:async(path,body,timeout)=>{calls++;assert.equal(timeout,55000);throw Object.assign(Error('app_unavailable'),{status:503});}});
  vm.runInContext(mobile.slice(mobile.indexOf('async function readApp('),mobile.indexOf('function coreProcessFromState(')),c);
  for(const action of ['core','catalog','plans'])await assert.rejects(c.readApp({action}));assert.equal(calls,3);
 });

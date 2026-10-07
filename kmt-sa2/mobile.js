@@ -78,7 +78,7 @@ async function readApp(body){
  if(!reads.includes(body.action))throw Error('read_action_required');
  const overview=['core','catalog','plans'].includes(body.action);
  for(let attempt=0;attempt<(overview?1:2);attempt++){
-  try{return await api('/api/sa2-app',body,overview?30000:55000);}
+  try{return await api('/api/sa2-app',body,55000);}
   catch(e){
    const transient=e.name==='AbortError'||e.name==='TypeError'||e.message==='app_unavailable'||e.message==='busy'||e.status===429||e.status===503||e.status===504;
    if(overview||attempt||!transient||navigator.onLine===false){e.readAction=body.action;throw e;}

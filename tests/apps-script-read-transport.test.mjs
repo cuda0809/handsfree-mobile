@@ -42,3 +42,12 @@ test('only whitelisted signed light reads select the alternate transport; writes
  for(const action of ['edit','safe_write','unknown'])assert.equal(isLightRead({op:'light_app',signed:JSON.stringify({action})}),false);
  assert.equal(isLightRead({op:'safe_write',signed:'{"action":"core"}'}),false);assert.equal(isLightRead({op:'light_app',signed:'invalid'}),false);
 });
+
+test('expired result URL is recovered once with a new read nonce and never replays credentials to result host',async()=>{
+ const f=fixture([{status:302,headers:{location:'https://script.googleusercontent.com/macros/echo?first=1'}},{status:404,text:'gone'},{status:302,headers:{location:'https://script.googleusercontent.com/macros/echo?second=1'}},{text:'{"ok":true}'}]);
+ assert.equal((await readAppsScript('https://script.google.com/macros/s/fixture/exec',{token:'fixture'},1000,f.request)).ok,true);
+ assert.deepEqual(f.calls.map(c=>c.method),['POST','GET','POST','GET']);assert.notEqual(f.calls[0].url,f.calls[2].url);
+ for(const c of f.calls.filter(c=>c.method==='GET'))assert.equal(c.body,undefined);
+ const bad=fixture([{status:302,headers:{location:'https://script.googleusercontent.com/macros/echo?first=1'}},{status:404},{status:302,headers:{location:'https://script.googleusercontent.com/macros/echo?second=1'}},{status:404}]);
+ await assert.rejects(readAppsScript('https://script.google.com/macros/s/fixture/exec',{},1000,bad.request),e=>e.upstreamStatus===404&&e.upstreamPhase==='result');assert.equal(bad.calls.length,4);
+});
