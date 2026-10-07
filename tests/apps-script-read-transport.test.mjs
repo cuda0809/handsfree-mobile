@@ -14,6 +14,34 @@ function fixture(responses){
  };
  return {request,calls};
 }
+const corePayload={op:'light_app',signed:JSON.stringify({action:'core'}),token:'fixture'};
+test('signed core read recovers a reset once with a new nonce and never retries rejection',async()=>{
+ const f=fixture([{error:Object.assign(Error('reset'),{code:'ECONNRESET'})},{text:'{"ok":true,"projects":[]}'}]);
+ assert.equal((await readAppsScript('https://script.google.com/macros/s/fixture/exec',corePayload,1000,f.request)).ok,true);
+ assert.equal(f.calls.length,2);assert.notEqual(f.calls[0].url,f.calls[1].url);assert.equal(f.calls[0].body,f.calls[1].body);
+ const bad=fixture([{error:Object.assign(Error('reset'),{code:'ECONNRESET'})},{error:Object.assign(Error('reset'),{code:'ECONNRESET'})}]);
+ await assert.rejects(readAppsScript('https://script.google.com/macros/s/fixture/exec',corePayload,1000,bad.request));assert.equal(bad.calls.length,2);
+ const denied=fixture([{text:'{"ok":false,"error":"forbidden"}'}]);
+ await assert.rejects(readAppsScript('https://script.google.com/macros/s/fixture/exec',corePayload,1000,denied.request),/forbidden/);assert.equal(denied.calls.length,1);
+});
+test('stalled core result recovers within the original deadline without forwarding credentials',async()=>{
+ const calls=[];let n=0;
+ const request=(url,options,callback)=>{
+  const req=new EventEmitter();req.destroy=e=>req.emit('error',e);
+  req.end=body=>{calls.push({url:String(url),...options,body});const i=n++;
+   if(i===1)return;
+   queueMicrotask(()=>{const res=Readable.from([Buffer.from(i===3?'{"ok":true}':'')]);res.statusCode=i===3?200:302;res.headers=i===3?{}:{location:'https://script.googleusercontent.com/macros/echo?attempt='+i};callback(res);});
+  };return req;
+ };
+ const started=Date.now();assert.equal((await readAppsScript('https://script.google.com/macros/s/fixture/exec',corePayload,120,request)).ok,true);
+ assert.ok(Date.now()-started<120);assert.deepEqual(calls.map(c=>c.method),['POST','GET','POST','GET']);
+ assert.notEqual(calls[0].url,calls[2].url);for(const c of calls.filter(c=>c.method==='GET'))assert.equal(c.body,undefined);
+});
+test('a second stall fails at the shared deadline rather than extending the wait',async()=>{
+ let count=0;const request=()=>{const req=new EventEmitter();req.destroy=e=>req.emit('error',e);req.end=()=>count++;return req;};
+ const started=Date.now();await assert.rejects(readAppsScript('https://script.google.com/macros/s/fixture/exec',corePayload,80,request),/upstream_timeout/);
+ assert.equal(count,2);assert.ok(Date.now()-started<160);
+});
 test('ContentService redirect follows a GET without replaying POST or forwarding credentials',async()=>{
  const f=fixture([{status:302,headers:{location:'https://script.googleusercontent.com/macros/echo?fixture=1'}},{text:'{"ok":true,"records":[]}'}]);
  assert.equal((await readAppsScript('https://script.google.com/macros/s/fixture/exec',{token:'isolated-fixture'},1000,f.request)).ok,true);
