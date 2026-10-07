@@ -218,4 +218,4 @@ document.addEventListener('visibilitychange',resumeRead);
 dialog.addEventListener('close',()=>{if(resumeReadNeeded)resumeRead();});
 window.addEventListener('online',()=>{toast('연결이 복구되었습니다. 최신 상태를 확인합니다.');lastResumeRead=0;refresh(true);});
 window.addEventListener('offline',()=>{if(!items.length)coreCacheRestore();live=!!items.length;readStale=true;readMessage=items.length?'오프라인 · 최근 정상값 유지':'오프라인 · 초안 보관 가능';banner();if(screen==='home')home();if(screen==='work')work(filter);if(screen==='plan'&&typeof productionPlan==='function')productionPlan(productionPlanMode,true);if(screen==='projects'&&typeof projects==='function')projects();if(screen==='issues'&&typeof todayIssues==='function')todayIssues();});
-if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(()=>toast('오프라인 앱 준비에 실패했습니다. 온라인으로 사용할 수 있습니다.'));
+if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js?v=20261007h21',{scope:'./',updateViaCache:'none'}).catch(()=>toast('오프라인 앱 준비에 실패했습니다. 온라인으로 사용할 수 있습니다.'));
