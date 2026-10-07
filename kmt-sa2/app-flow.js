@@ -34,15 +34,15 @@ function formatHfDate(v){
 function isCompletedOperational(x){
  return productionClass(x)==='출고완료';
 }
-function currentProductionRows(){const today=HfProductionRules.today();return operationalRows(true).filter(x=>String(x.team||'').trim()==='B'&&HfProductionRules.manufacturingNow(x,today));}
+function currentProductionRows(){const today=HfProductionRules.today();return operationalRows(true).filter(x=>String(x.team||'').trim()==='B'&&!isCarryoverStock(x)&&HfProductionRules.manufacturingNow(x,today));}
 function displayedNextAction(x){
- if(isCarryoverStock(x))return '출고대기 · 출고 일정 확정 시 확인';
+ if(isCarryoverStock(x))return '고객 배정 시 제작·출고 계획 확인';
  const manual=String(x.nextAction||'').trim();
  if(manual&&manual!=='미정'&&manual!=='미등록')return manual;
  if(planReadStale)return '계획 재조회 필요';
  return HfProductionRules.nextAction(x,HfProductionRules.today());
 }
-function projectBucket(x){if(isCompletedOperational(x))return 'completed';const c=productionClass(x);return c==='출고대기'?'waiting':c==='확인 필요'?'review':'active';}
+function projectBucket(x){if(isCarryoverStock(x))return 'stock';if(isCompletedOperational(x))return 'completed';const c=productionClass(x);return c==='출고대기'?'waiting':c==='확인 필요'?'review':'active';}
 function latestUnifiedInputByOrder(){
  const out=new Map();
  notes().forEach(r=>{
@@ -121,7 +121,7 @@ function dueUrgency(x){
  return {level:'none',days,label:''};
 }
 function priorityAssessment(x){
- if(isCarryoverStock(x))return {reasons:[],review:'이월 재고 · 출고대기'};
+ if(isCarryoverStock(x))return {reasons:[],review:'미배정 보유 재고'};
  if(isCompletedOperational(x))return {reasons:[],review:''};
  const reasons=[],due=formatHfDate(x.due),today=HfProductionRules.today();
  const customerWait=/출고\s*대기|납품\s*대기/.test(String(x.state||''))&&/고객|고객사|현장\s*요청/.test(String(x.currentIssue||'')+' '+String(x.nextAction||''));
@@ -139,8 +139,9 @@ function priorityAssessment(x){
  return {reasons:[...new Set(reasons)],review:customerWait?'고객 요청 출고대기 · 합의 일정 확인':!/^\d{4}-\d{2}-\d{2}$/.test(due)?'납기 확인 필요':''};
 }
 function isCarryoverStock(x){
- const match=String(x.orderId||'').match(/^(?:[A-Z]+-)?(\d{2})\d{4}[A-Z]-/);
- return !!match&&Number('20'+match[1])<Number(HfProductionRules.today().slice(0,4))&&/^재고(?:\s*\([^)]*\))?\s*$/.test(String(x.customer||'').trim())&&/출고\s*대기|납품\s*대기|보관\s*중/.test(String(x.state||'')+' '+String(x.deliveryState||''))&&!isCompletedOperational(x);
+ const state=String(x.state||'');
+ if(isCompletedOperational(x)||/(조립|전장|프로그램|검수|작업).*진행/.test(state))return false;
+ return /^재고(?:\s*\([^)]*\))?\s*$/.test(String(x.customer||'').trim())&&/출고\s*대기|납품\s*대기|보관\s*중|제작\s*완료/.test(state+' '+String(x.deliveryState||''));
 }
 function priorityReasonHtml(x){const a=priorityAssessment(x);return a.reasons.length?'<p class="hf-due-alert overdue">우선 조치 · '+esc(a.reasons.join(' · '))+'</p>':a.review?'<p class="note">'+esc(a.review)+'</p>':'';}
 function hfDueAlert(x){
@@ -160,11 +161,12 @@ function hfCardTone(x,kind='active'){
  return base+(d.level!=='none'?' due-'+d.level:'');
 }
 function hfCardIdentity(x,badge=''){
- if(isCarryoverStock(x))badge='출고대기';
+ if(isCarryoverStock(x))badge='보유 재고';
  return '<div class="hf-card-head"><div><small class="hf-card-job">JOB NO. '+esc(x.orderId||'미등록')+'</small><b class="hf-card-title">'+esc(x.customer||'고객 미등록')+' · '+esc(x.model||'모델 미등록')+'</b><small>담당 PM: '+esc(x.pm||'PM 미등록')+'</small></div>'+(badge?'<span class="hf-card-badge">'+esc(badge)+'</span>':'')+'</div>'+priorityReasonHtml(x);
 }
 function productionClass(x){return HfProductionRules.classify(x,HfProductionRules.today());}
 function currentStatusLabel(x){
+ if(typeof isCarryoverStock==='function'&&isCarryoverStock(x))return '보유 재고';
  const parts=[],seen=new Set();
  const add=value=>String(value||'').split(/\r?\n/).forEach(line=>{const text=line.replace(/^[·\s]+/,'').trim(),key=text.replace(/\s+/g,'');if(text&&!seen.has(key)){seen.add(key);parts.push(text);}});
  add(x.state||'상태 미등록');
@@ -184,7 +186,7 @@ function projectCurrentFields(x){
 function renderUnifiedHome(){
  active('home');screen='home';
  setTimeout(()=>syncProjectMeta(false),0);setTimeout(()=>syncPlanOverview(false),80);
- const all=operationalRows(true),activeRows=all.filter(x=>!isCompletedOperational(x));
+ const all=operationalRows(true),activeRows=all.filter(x=>!isCompletedOperational(x)&&!isCarryoverStock(x));
  const workingRows=activeRows.filter(x=>['진행 중','작업 예정'].includes(productionClass(x)));
  const today=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
  const plannedToday=workingRows.filter(x=>planStagesOnDay(x,today).length);
@@ -282,9 +284,17 @@ async function syncProjectMeta(force=false){
 }
 function scheduleText(v){return formatHfDate(v)==='미정'?'미정':formatHfDate(v);}
 function appQuantity(v){const n=Number(String(v).replaceAll(',',''));if(!String(v).trim()||!Number.isFinite(n)||n<0)throw Error('invalid_report');return n;}
-reports=function(){return '<section><div class="section-title"><h2>생산 · 지원 집계</h2></div><div class="report-links compact"><button onclick="productionReport()">▥ 생산 실적<small>월별 누적 · 과거 연도 합계 ›</small></button><button onclick="supportReport()">⇄ 타부서 지원<small>월별 인원 · 연간 합계 ›</small></button></div></section>';};
+reports=function(){return '<section><div class="section-title"><h2>생산 · 지원 집계</h2></div><div class="report-links compact"><button onclick="productionReport()">▥ 생산 실적<small>월별 누적 · 과거 연도 합계 ›</small></button><button onclick="supportReport()">⇄ 타부서 지원<small>월별 인원 · 연간 합계 ›</small></button>'+(screen==='projects'?'<button onclick="showStockInventory()">▦ 재고현황<small>미배정 보유 장비 ›</small></button>':'')+'</div></section>';};
 productionReport=async function(){await loadAppReport('production');};
 supportReport=async function(){await loadAppReport('support');};
+function showStockInventory(){
+ const rows=operationalRows(true).filter(isCarryoverStock);
+ const stale=readStale;
+ open(heading('재고현황','미배정 보유 재고')+'<p class="note">제작 중인 장비와 고객이 배정된 출고대기 장비는 별도로 관리합니다.</p>'+
+ '<p>'+(stale?'최근 확인 자료 · 최신 조회 필요':rows.length+'대 보유')+'</p>'+
+ (rows.map(x=>'<button class="hf-card tone-neutral" data-stock-order="'+esc(x.orderId)+'">'+hfCardIdentity(x,'보유 재고')+'<p>잡넘버 연도 '+esc((String(x.orderId).match(/^(\d{2})/)||[])[1]?'20'+String(x.orderId).slice(0,2):'미등록')+' · 수량 '+esc(x.qty||1)+'</p><p>최근 기록: '+esc(x.recentEvent||'미등록')+'</p></button>').join('')||'<p class="empty">'+(stale?'최신 재고현황 확인 필요':'확인된 미배정 보유 재고가 없습니다.')+'</p>'));
+ $('sheetBody').querySelectorAll('[data-stock-order]').forEach(b=>b.onclick=()=>openProject(b.dataset.stockOrder,'detail',rows.find(x=>x.orderId===b.dataset.stockOrder)));
+}
 async function loadAppReport(mode){const title=mode==='support'?'타부서 지원':'생산 실적';open(heading('생산 · 지원 집계',title)+'<div id="appReportResult">원본 집계를 불러오는 중…</div>');const el=$('appReportResult');try{const d=await appCall({action:'reports'});if(mode==='production'){const core=await appCall({action:'core'});if(!Array.isArray(core.projects))throw Error('invalid_core');d.projects=core.projects;}if(!el.isConnected)return;appReport={mode,data:d};renderAppReport();}catch(e){appFailure(el,e);}}
 function productionReportMonths(data){
  const old=(data.monthly||[]).slice(1).filter(r=>r[0]&&r[1]);

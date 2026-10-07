@@ -12,6 +12,7 @@ test('current issue filter uses evidence, not job year; storage and history cann
  {orderId:'26-UNKNOWN',state:'상태 확인'}, {orderId:'26-WORK',state:'조립 진행'}];
  rows.forEach(x=>x.team='B');rows.push({orderId:'260319A-020',team:'A',state:'조립 진행'},{orderId:'260319A-021',team:'A',state:'납품 전 마무리 작업 중'});
  const c=vm.createContext({HfProductionRules:rules,operationalRows:()=>rows,productionClass:x=>rules.classify(x,'2026-10-06')});
+ vm.runInContext(src.slice(src.indexOf('function isCarryoverStock('),src.indexOf('function priorityReasonHtml(')),c);
  vm.runInContext(src.slice(src.indexOf('function isCompletedOperational('),src.indexOf('function latestUnifiedInputByOrder(')),c);
  assert.deepEqual(Array.from(c.currentProductionRows(),x=>x.orderId),['25-REAL-WORK','26-WORK']);
  assert.equal(c.projectBucket(rows[0]),'waiting');assert.equal(c.projectBucket(rows[2]),'completed');assert.equal(c.projectBucket(rows[4]),'review');
@@ -64,4 +65,15 @@ test('isolated Queue -> normalization -> safety gate -> journal readback across 
  assert.equal(statuses.filter(x=>x.status==='REVIEW').length,12);assert.equal(statuses.filter(x=>x.status==='EXCLUDED').length,12);assert.equal(statuses.filter(x=>x.status==='WRITTEN').length,12);
  assert.equal(written.length,12);assert.ok(written.every(e=>!e.orderId&&!e.link&&e.actor==='fixture@example.test'));
  assert.equal(queue.filter(([col,v])=>col===6&&v==='DONE').length,36);
+});
+test('unallocated finished stock is separate from waiting shipment and active fabrication',()=>{
+ const c=vm.createContext({productionClass:x=>rules.classify(x,'2026-10-07')});
+ vm.runInContext(src.slice(src.indexOf('function isCompletedOperational('),src.indexOf('function latestUnifiedInputByOrder(')),c);
+ vm.runInContext(src.slice(src.indexOf('function isCarryoverStock('),src.indexOf('function priorityReasonHtml(')),c);
+ const stock={orderId:'251215A-144-04',customer:'재고',state:'출고대기'};
+ assert.equal(c.projectBucket(stock),'stock');
+ assert.equal(c.projectBucket({...stock,customer:'재고 -> 고객'}),'waiting');
+ assert.equal(c.projectBucket({...stock,orderId:'260727A-061-01',state:'조립 진행'}),'active');
+ assert.equal(c.projectBucket({...stock,actualDelivery:'2026-10-01'}),'completed');
+ assert.equal(stock.state,'출고대기');
 });
