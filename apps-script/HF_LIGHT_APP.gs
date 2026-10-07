@@ -18,17 +18,25 @@ function hfAppCore_(ss){
 // Confirmed, precisely linked field events are operational evidence, not local drafts.
 // This read projection preserves Core/RAW, manual Next_Action, and shipping history.
 function hfAppCurrentEvidence_(projects,events,today){
- var byJob={},latest={},content={};projects.forEach(function(p){byJob[p.orderId]=p;});
+ var byJob={},latest={},content={},issueContent={};projects.forEach(function(p){byJob[p.orderId]=p;});
  events.forEach(function(e){
-  if(e[17]!=='WRITTEN'||e[2]!=='FIELD_INPUT'||e[7]!=='일일작업'||!e[20]||e[15]!==e[20])return;
-  var p=byJob[e[20]],date=hfAppDeliveryDay_(e[6]);if(!p||p.team!=='B'||!date||date>today||date==='2026-09-14')return;
+  if(e[17]!=='WRITTEN'||e[2]!=='FIELD_INPUT'||!e[20]||e[15]!==e[20])return;
+  var p=byJob[e[20]],date=hfAppDeliveryDay_(e[6]);if(!p||p.team!=='B'||!date||String(e[1]||'').slice(0,10)>today||date==='2026-09-14')return;
   var raw=String(e[3]||''),jobs=raw.match(/(?:[A-Z]{2,4}-)?\d{6}[A-Z]-\d{3}(?:-\d+)?/g)||[];
   if(!jobs.length||jobs.some(function(j){return j!==p.orderId;}))return;
-  var text=String(e[10]||'').replace(/^[·\s]+/,'').trim();
+  var text=String(e[10]||'').replace(/^[·\s]+/,'').replace(/^\[(?:NOTE|PROGRESS|WAIT|ISSUE)\]\s*/,'').trim();
+  [p.orderId,p.customer,p.model].forEach(function(v){if(v)text=text.split(String(v)).join(' ');});
+  text=text.replace(/^[·\s]+/,'').replace(/\s+/g,' ').trim();
   var request=String(e[22]||e[0]||'').replace(/-E\d+$/,''),stamp=String(e[1]||''),c=content[p.orderId];
   if(text&&(!c||stamp>c.stamp&&c.requestId!==request)){c=content[p.orderId]={requestId:request,stamp:stamp,date:date,lines:[],ids:[]};}
   if(text&&c&&c.requestId===request){c.lines.push(text);c.ids.push(e[0]);if(date>c.date)c.date=date;if(stamp>c.stamp)c.stamp=stamp;}
-  var match=text.match(/^(조립|마감조립|전장|배선|프로그램|검수)\s*(완료|진행(?:\s*중)?|중)(?:\s+(?:20\d{2}[-/.])?\d{1,2}[-/.]\d{1,2})?\s*$/);
+  if(/대기|지연|불량|문제|고장|수정|불가|미입고|입고|반출|누락|이상|간섭/.test(text)){
+   var issue=issueContent[p.orderId];
+   if(!issue||stamp>issue.stamp&&issue.requestId!==request)issue=issueContent[p.orderId]={requestId:request,stamp:stamp,lines:[]};
+   if(issue.requestId===request){if(issue.lines.indexOf(text)<0)issue.lines.push(text);if(stamp>issue.stamp)issue.stamp=stamp;}
+  }
+  if(e[7]!=='일일작업'||date>today)return;
+  var match=text.match(/^(?:조립\s*가능\s*파트\s*)?(조립|마감\s*조립|전장|배선|프로그램|검수)\s*(완료|진행(?:\s*중)?|중)(?:\s+(?:20\d{2}[-/.])?\d{1,2}[-/.]\d{1,2})?\s*$/);
   if(!match)return;
   var stamp=String(e[1]||''),prior=latest[p.orderId];
   if(!prior||date>prior.date||date===prior.date&&stamp>prior.stamp)latest[p.orderId]={date:date,stamp:stamp,state:match[1]+' '+match[2],process:/전장|배선/.test(match[1])?'전장':match[1],id:e[0],raw:text};
@@ -37,11 +45,12 @@ function hfAppCurrentEvidence_(projects,events,today){
   var e=latest[p.orderId];if(!e||p.actualDelivery||/출고\s*완료|납품\s*완료|출고\s*대기/.test(p.state||''))return p;
   // Generic collection timestamps do not establish a newer business state.
   var currentDay=hfAppDeliveryDay_(p.since||p.stateSince),eventDay=String(p.recentEventAt||'').slice(0,10);
-  if(currentDay>e.date||eventDay>e.date)return p;
-  function stage(v){return /출고|납품/.test(v)?5:/검수|테스트|시험/.test(v)?4:/프로그램/.test(v)?3:/전장|배선/.test(v)?2:/조립/.test(v)?1:0;}
+  var generic=p.state==='생산팀 조립자재 수령중'&&/입고|반출/.test(String(p.recentEvent||''));
+  if(currentDay>e.date||!generic&&eventDay>e.date)return p;
+  function stage(v){return /출고|납품/.test(v)?6:/검수|테스트|시험/.test(v)?5:/마감\s*조립/.test(v)?4:/프로그램/.test(v)?3:/전장|배선/.test(v)?2:/조립/.test(v)?1:0;}
   if(stage(p.state||'')>stage(e.state))return p;
   // A newer explicit Core state remains authoritative (including same-day edits).
-  if(String(p.recentEventAt||'')>e.stamp)return p;
+  if(!generic&&String(p.recentEventAt||'')>e.stamp)return p;
   var out={};Object.keys(p).forEach(function(k){out[k]=p[k];});
   out.state=e.state;out.process=e.process;out.since=e.date;out.recentEvent=e.raw;out.recentEventAt=e.stamp;out.updatedAt=e.stamp;
   out.stateEvidence={source:'확정 Event',entryId:e.id,businessDate:e.date};return out;
@@ -49,7 +58,9 @@ function hfAppCurrentEvidence_(projects,events,today){
  return projected.map(function(p){
   var c=content[p.orderId];if(!c||String(p.recentEventAt||'')>c.stamp||hfAppDeliveryDay_(p.since||p.stateSince)>c.date)return p;
   var out={};Object.keys(p).forEach(function(k){out[k]=p[k];});
-  out.currentIssue=c.lines.join('\n');out.recentEvent=out.currentIssue;out.recentEventAt=c.stamp;out.updatedAt=c.stamp;
+  var issue=issueContent[p.orderId];
+  if(issue&&String(p.recentEventAt||'')<=issue.stamp){out.currentIssue=issue.lines.join('\n');out.issueEvidence={source:'확정 Event',requestId:issue.requestId};}
+  out.recentEvent=c.lines.join('\n');out.recentEventAt=c.stamp;out.updatedAt=c.stamp;
   out.contentEvidence={source:'확정 Event',requestId:c.requestId,entryIds:c.ids,businessDate:c.date};return out;
  });
 }
@@ -158,7 +169,7 @@ function hfAppIssueBuild_(s,b,now){
 function hfAppIssueApply_(ss,b){var built=hfAppIssueBuild_(hfAppIssueSnapshot_(ss),b,new Date().toISOString());if(!built.requests.length)return built.receipt;hfLsBatch_(ss,built.requests);var fresh=hfAppIssueSnapshot_(ss),receipt=hfAppIssueReceipt_(fresh,b);if(!receipt||JSON.stringify(hfAppIssueRecord_(fresh,b.issueId).row)!==JSON.stringify(built.after))hfLsFail_('pending_verification');return receipt;}
 function hfLightAppDispatch_(body){
  var ss=SpreadsheetApp.openById(HF_SPREADSHEET_ID),b=hfLsActor_(body,ss);
- if(b.action==='core')return {ok:true,projects:hfAppCore_(ss),generatedAt:new Date().toISOString()};
+ if(b.action==='core'){var projects=hfAppCore_(ss);if(b.orderId)projects=projects.filter(function(p){return p.orderId===b.orderId;});return {ok:true,projects:projects,generatedAt:new Date().toISOString()};}
  if(b.action==='plans')return {ok:true,records:hfAppPlanOverview_(ss),generatedAt:new Date().toISOString()};
  if(b.action==='catalog')return {ok:true,projects:hfAppCatalog_(ss),issues:hfAppRows_(ss,HF_APP.issue,19).slice(1).filter(function(r){return r[0];}).map(function(r){return {issueId:r[0],orderId:r[3],status:r[8],state:r[16]};})};
  if(b.action==='reports')return {ok:true,annual:hfAppRows_(ss,'HF_DATA_납품집계',5),monthly:hfAppRows_(ss,'HF_DATA_납품월집계',6),support:hfAppRows_(ss,'HF_DATA_지원이력',12),generatedAt:new Date().toISOString()};

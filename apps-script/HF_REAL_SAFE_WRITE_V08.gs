@@ -128,9 +128,21 @@ function splitEvents_(raw){const a=String(raw).split(/\r?\n|;/).map(x=>x.trim())
 
 function normalEvent_(ss,line,index,p){
   if(String(p.channel||'').split('|').includes('GENERAL_EVENT')&&p.targetHint==='GENERAL_ISSUE')return generalEvent_(ss,line,index,p);
-  const now=new Date(),project=resolveProject_(ss,line),type=workType_(line),people=extractPeople_(line),date=parseDate_(line,now),excludedDate=safety_(ss,'Excluded Actual Date')||'2026-09-14',dateKey=Utilities.formatDate(date,HF_SW.TZ,'yyyy-MM-dd');
+  const now=new Date(),project=resolveUnifiedProject_(ss,line,p),type=workType_(line),people=extractPeople_(line),date=parseDate_(line,now),excludedDate=safety_(ss,'Excluded Actual Date')||'2026-09-14',dateKey=Utilities.formatDate(date,HF_SW.TZ,'yyyy-MM-dd');
   const excluded=dateKey===excludedDate,conf=confidence_(type,project,people,line),safe=!excluded&&highConfidence_(type,project,people,conf),reason=excluded?`EXCLUDED_DATE:${excludedDate}`:safe?'':'LOW_CONFIDENCE_OR_AMBIGUOUS_TARGET';
   return {receivedAt:now,source:'FIELD_INPUT',raw:line,eventIndex:index,target:type==='재입고완료'?'반출일지':'업무이력',date,type,customer:project.customer||'',model:project.model||'',orderId:project.orderId||'',actor:String(p.requester||'UNKNOWN'),work:workContent_(line,project,people),people:people.join(', '),link:project.orderId||'',confidence:conf,safe,excluded,reason,inputSheet:p.inputSheet,inputRow:p.inputRow};
+}
+
+function resolveUnifiedProject_(ss,line,p){
+ if(!String(p.channel||'').split('|').includes('UNIFIED_EVENT'))return resolveProject_(ss,line);
+ const jobs=String(p.targetHint||'').match(/(?:[A-Z]{2,4}-)?\d{6}[A-Z]-\d{3}(?:-\d+)?/g)||[];
+ const ids=Array.from(new Set(jobs));
+ const invalid={orderId:'',customer:'',model:'',ambiguous:true,score:0};
+ if(ids.length!==1)return invalid;
+ const explicit=String(line).match(/(?:[A-Z]{2,4}-)?\d{6}[A-Z]-\d{3}(?:-\d+)?/g)||[];
+ if(explicit.some(id=>id!==ids[0]))return invalid;
+ const target=resolveProject_(ss,ids[0]);
+ return target.orderId===ids[0]&&!target.ambiguous?target:invalid;
 }
 
 function workType_(raw){const t=norm_(HF_SW.PEOPLE.reduce((s,n)=>s.split(n).join(' '),String(raw)));if(/재입고완료|수정품.*입고완료|반출품.*입고완료/.test(t))return'재입고완료';if(/출고완료|납품완료/.test(t))return'출고완료';if(/불량|문제|이상|소음|끼임|동심|재가공|고장|파손/.test(t))return'불량발생';if(/일정.*변경|연기|미뤄|당겨|재조정/.test(t))return'일정변경';if(/지연|대기|미입고|발주누락|누락/.test(t))return'지연사유';if(/외주입고/.test(t))return'외주입고';if(/(^|[^a-z])pt([^a-z]|$)|pt지원/.test(t))return'PT';if(/a\/s|as지원|a\/s지원/.test(t))return'A/S';if(/출장/.test(t))return'출장';if(/반차/.test(t))return'반차';if(/연차/.test(t))return'연차';if(/타팀지원|지원/.test(t))return'타팀지원';if(/검수/.test(t))return'검수';return'일일작업';}

@@ -18,6 +18,7 @@ export default async function handler(req,res){
   if(!['owner','writer'].includes(actor.role))return res.status(403).json({ok:false,error:'forbidden'});
 
   const body=req.body&&typeof req.body==='object'?req.body:{};
+  if(typeof body.text!=='string'||body.text.trim().length>1000)return res.status(400).json({ok:false,error:'invalid_text_length'});
   const text=clean(body.text,1000);
   if(!text) return res.status(400).json({ok:false,error:'empty_text'});
   if(body.submissionId!==undefined&&!/^[a-zA-Z0-9-]{16,80}$/.test(body.submissionId))return res.status(400).json({ok:false,error:'invalid_submission_id'});

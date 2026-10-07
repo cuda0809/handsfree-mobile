@@ -1,3 +1,4 @@
+let coreReadGeneration=0;
 'use strict';
 const BUILD='2026.10.07.SA2.8.3-MOBILE15', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
 const main=document.getElementById('main'),dialog=document.getElementById('detail');
@@ -85,12 +86,14 @@ async function readApp(body){
  }
 }
 function coreProcessFromState(state,next,previous=''){
- const t=norm([state,next].join(' '));
+ const t=norm(state);
  if(/출고|납품|포장/.test(t))return '출고';
  if(/검수|점검|테스트|시험/.test(t))return '검수';
- if(/전장|배선|전기|프로그램|프로그래밍/.test(t))return '전장';
- if(/조립|기구|마감|갭세팅|프레임/.test(t))return '조립';
- if(/자재|입고|구매|발주/.test(t))return '자재';
+ if(/마감조립|마감/.test(t))return '마감조립';
+ if(/프로그램|프로그래밍/.test(t))return '프로그램';
+ if(/전장|배선|전기/.test(t))return '전장';
+ if(/조립|기구|갭세팅|프레임/.test(t))return '조립';
+ if(/자재|입고|구매|발주/.test(t))return previous||'자재';
  return previous;
 }
 function corePriorityFromState(state,next,status,previous=2){
@@ -158,15 +161,17 @@ async function refresh(force=true){
  lastCoreAttempt=Date.now();readStale=true;
  readMessage=live?'이전 조회값 표시 · 전체 최신값 확인 중…':'현재 상태를 불러오는 중…';banner();
  readPending=(async()=>{
-  const previous={items,live,sourceDate,lastRead,coreSnapshot};
+  const previous={items,live,sourceDate,lastRead,coreSnapshot},readGeneration=coreReadGeneration;
   try{
    const full=await refreshCachedCore();
+   if(readGeneration!==coreReadGeneration)return false;
    items=full.items;coreSnapshot=true;live=true;sourceDate=full.sourceDate;
    renderCoreScreen(); // A failed application must not advance freshness or the cache.
    readStale=false;lastReadErrorStatus=0;lastRead=new Date().toLocaleString('ko-KR');
    readMessage='CORE · '+items.length+'건 · 전체 최신 상태 확인 · '+(sourceDate||'원천 기준시각 미등록');
    coreCacheSave(true);return true;
   }catch(e){
+   if(readGeneration!==coreReadGeneration)return false;
    ({items,live,sourceDate,lastRead,coreSnapshot}=previous);lastReadErrorStatus=e.status||0;readStale=true;
    const action=['core','catalog'].includes(e.readAction)?e.readAction:'validation';
    const reason=/^(upstream_timeout|upstream_invalid_json|upstream_failed|invalid_source_month|upstream_unavailable|not_configured|ENOTFOUND|EAI_AGAIN|ECONNRESET|ETIMEDOUT|UND_ERR_CONNECT_TIMEOUT|UND_ERR_HEADERS_TIMEOUT|UND_ERR_SOCKET)$/.test(e.data?.reason||'')?e.data.reason:e.name==='AbortError'?'upstream_timeout':e.name==='TypeError'?'network_unavailable':/^(invalid_core|invalid_catalog|ambiguous_issue|partial_core)$/.test(e.message)?e.message:'read_failed';

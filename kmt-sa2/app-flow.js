@@ -85,7 +85,7 @@ function operationalRows(includeCompleted=true){
    state:naturalState||String(x.state||'계획'),
    nextAction:String(x.nextAction||''),
    priority:Number(x.priority||2),
-   cause:localIssue||String(x.recentEvent||x.cause||''),
+   cause:localIssue||String(x.currentIssue||x.cause||x.recentEvent||''),
    recentEvent:localIssue||String(x.recentEvent||''),
    recentEventAt:localIssue?String(local.respondedAt||local.updatedAt||local.createdAt||''):String(x.recentEventAt||'')
   };
@@ -139,6 +139,13 @@ function hfCardIdentity(x,badge=''){
  return '<div class="hf-card-head"><div><small class="hf-card-job">JOB NO. '+esc(x.orderId||'미등록')+'</small><b class="hf-card-title">'+esc(x.customer||'고객 미등록')+' · '+esc(x.model||'모델 미등록')+'</b></div>'+(badge?'<span class="hf-card-badge">'+esc(badge)+'</span>':'')+'</div>';
 }
 function productionClass(x){return HfProductionRules.classify(x,HfProductionRules.today());}
+function currentStatusLabel(x){
+ const parts=[String(x.state||'상태 미등록').trim()];
+ const recent=String(x.recentEvent||'').trim(),issue=String(x.currentIssue||'').trim();
+ if(recent&&/조립|전장|프로그램|검수|테스트|연결|설치|세팅|셋팅|입고|반출|수정|대기|지연/.test(recent)&&!parts.includes(recent))parts.push(recent);
+ if(issue&&!parts.includes(issue))parts.push(issue);
+ return parts.join(' · ');
+}
 function projectCurrentFields(x){
  const completed=isCompletedOperational(x);
  const issue=String(x.currentIssue||'').trim(),event=String(x.recentEvent||'').trim();
@@ -170,7 +177,7 @@ function renderUnifiedHome(){
   const stages=planStagesOnDay(x,today);
   return '<button class="hf-card '+hfCardTone(x,'plan')+'" data-home-order="'+esc(x.orderId)+'">'+hfCardIdentity(x,stages.join(' · '))+hfDueAlert(x)+
    '<div class="hf-card-meta"><div><small>오늘 계획</small><b>'+esc(stages.join(' · '))+'</b></div><div><small>납기</small><b>'+esc(formatHfDate(x.due))+'</b></div></div>'+
-   '<div class="hf-card-line"><span>현재</span><b>'+esc(x.state||'계획')+'</b></div>'+
+   '<div class="hf-card-line"><span>현재</span><b>'+esc(currentStatusLabel(x))+'</b></div>'+
    '<div class="hf-card-next"><span>다음</span>'+esc(displayedNextAction(x))+'</div></button>';
  }).join('');
  const issueCards=issueActive.sort((a,b)=>(a.priority||9)-(b.priority||9)).map(x=>{
@@ -495,12 +502,13 @@ async function openProject(orderId,purpose='detail',sourceSnapshot=null){
   const savedPlanStages=projectPlanStageMap(linked.planTimeline||[]);
   const planByStage={자재:'',조립:linked.planAssembly||'',전장:linked.planElectrical||'',프로그램:linked.planProgram||'',마감조립:linked.planFinishing||savedPlanStages.get('마감조립')?.start||'',검수:linked.planInspection||'',출고:linked.planDelivery||''};
   const scheduleBlock='<div class="hybrid-timeline">'+stageNames.map((name,i)=>{
-   const cls=(closed&&(!bTeam||i===stageNames.length-1))||(!bTeam&&i<currentStage)?'done':!closed&&i===currentStage?'now':'';
+   const stageComplete=/완료/.test(currentState)&&!/미완료|예정|아님/.test(currentState);
+   const cls=(closed&&(!bTeam||i===stageNames.length-1))||(!bTeam&&i<currentStage)||(i===currentStage&&stageComplete)?'done':!closed&&i===currentStage?'now':'';
    const planDate=formatHfDate(planByStage[name]);
-   const label=bTeam?'계획 '+planDate:(closed||i<currentStage?'종료':i===currentStage?(planDate!=='미정'?planDate:currentDate):planDate);
+   const label=bTeam?(i===currentStage&&stageComplete?'완료 · ':'')+'계획 '+planDate:(closed||i<currentStage?'종료':i===currentStage?(planDate!=='미정'?planDate:currentDate):planDate);
    return '<div class="hybrid-step '+cls+'"><i></i><b>'+name+'</b><small>'+esc(label)+'</small></div>';
-  }).join('')+'</div><div class="project-schedule-status '+(closed?'closed':'active')+'">'+(closed?'<b>제작 종료</b><span>실납기 '+esc(actualDay)+'</span>':'<b>'+esc(bTeam?productionClass(linked):'진행중')+'</b><span>'+esc(currentState)+' · 기준 '+esc(currentDate)+'</span>')+'</div>';
-  el.innerHTML='<div class="hybrid-project-card"><small>JOB NO. '+esc(p.orderId)+' · PM '+esc(p.pm||'미등록')+'</small><h2>'+esc(p.customer)+' · '+esc(p.model)+'</h2><div class="project-date-grid"><div><small>납기</small><b>'+esc(summaryDue)+'</b></div><div><small>실납기일</small><b>'+esc(summaryActual)+'</b></div></div>'+(closed?'<div class="project-delivery-result '+deliveryPerformance(linked).tone+'">'+esc(deliveryPerformance(linked).label)+'</div>':'')+'<div class="hybrid-state"><span>현재 상태 · '+esc(currentState)+'</span><span>'+esc(closed?'완료':linked.priority===1?'우선 확인':'진행')+'</span></div>'+
+  }).join('')+'</div><div class="project-schedule-status '+(closed?'closed':'active')+'">'+(closed?'<b>제작 종료</b><span>실납기 '+esc(actualDay)+'</span>':'<b>'+esc(bTeam?productionClass(linked):'진행중')+'</b><span>'+esc(currentStatusLabel(linked))+' · 기준 '+esc(currentDate)+'</span>')+'</div>';
+  el.innerHTML='<div class="hybrid-project-card"><small>JOB NO. '+esc(p.orderId)+' · PM '+esc(p.pm||'미등록')+'</small><h2>'+esc(p.customer)+' · '+esc(p.model)+'</h2><div class="project-date-grid"><div><small>납기</small><b>'+esc(summaryDue)+'</b></div><div><small>실납기일</small><b>'+esc(summaryActual)+'</b></div></div>'+(closed?'<div class="project-delivery-result '+deliveryPerformance(linked).tone+'">'+esc(deliveryPerformance(linked).label)+'</div>':'')+'<div class="hybrid-state"><span>현재 상태 · '+esc(currentStatusLabel(linked))+'</span><span>'+esc(closed?'완료':linked.priority===1?'우선 확인':'진행')+'</span></div>'+
  projectCurrentFields(linked)+
  '</div><div class="hybrid-section"><b>전체 제작 일정</b><span>현장 기준</span></div>'+scheduleBlock+'<div class="hybrid-section"><b>최근 라이프사이클</b><span>'+esc(historyState)+'</span></div><div class="lifecycle-preview">'+(shownHistory?lifecyclePreview(shownHistory,4,linked):lifecyclePreview({events:[],changes:[]},4,linked))+'</div><button id="projectLifecycleButton" class="primary">전체 라이프사이클 보기</button><button id="projectHistoryButton" class="secondary">변경 근거 · RAW 이력</button><button id="projectPlanButton" class="secondary">원본 계획일정 확인</button>';
   $('projectLifecycleButton').onclick=()=>projectLifecycle(p.orderId);
@@ -574,6 +582,19 @@ function canSendNote(r,editing=false){
  return true;
 }
 async function saveEditedAndSend(){if(!editingNoteId)return;const id=saveNote();if(id)await sendNote(id);}
+async function readBackSubmittedProject(r,requestId){
+ const d=await appCall({action:'core',orderId:r.orderId});
+ const hits=Array.isArray(d.projects)?d.projects.filter(p=>p.orderId===r.orderId):[];
+ if(!d.ok||d.coreFallback||hits.length!==1)throw Error('project_readback_unconfirmed');
+ const p=hits[0];
+ if(p.contentEvidence?.requestId!==requestId)throw Error('content_readback_unconfirmed');
+ if(r.stateSyncVersion==='natural-v3'&&r.displayState&&p.state!==r.displayState)throw Error('state_readback_unconfirmed');
+ const idx=items.findIndex(x=>x.orderId===r.orderId);
+ if(idx<0||p.projectId!==items[idx].projectId)throw Error('project_mismatch');
+ const previous=items[idx];coreReadGeneration++;
+ items[idx]={...previous,...p,coreVerified:true,cause:p.currentIssue||p.recentEvent||'',sourceLatestUpdate:p.updatedAt||previous.sourceLatestUpdate};
+ projectHistoryCache.delete(r.orderId);coreCacheSave(false);renderCoreScreen();return true;
+}
 async function verifyEventNote(id,receipt){
  const r=notes().find(x=>x.id===id);if(!r)return;
  try{
@@ -583,6 +604,11 @@ async function verifyEventNote(id,receipt){
    const lines=r.text.split(/\r?\n|;/).map(v=>v.trim()).filter(Boolean);
    if(!d.requestId||(r.requestId&&r.requestId!==d.requestId)||!Array.isArray(d.events)||d.events.length!==lines.length||d.events.some((e,i)=>e.status!=='WRITTEN'||e.orderId||e.raw!==lines[i]))throw Error('general_receipt_unconfirmed');
    updateNote(id,{status:'applied',requestId:d.requestId,verifiedAt:new Date().toISOString(),eventVerifiedAt:new Date().toISOString(),ack:'일반 업무이력 저장 확인 · 장비 상태 변경 없음'});return true;
+  }
+  if(r.eventType&&r.orderId){
+   if(d.applied!==true||d.status!=='WRITTEN'||!d.requestId||(Array.isArray(d.events)&&d.events.some(e=>e.status!=='WRITTEN'||e.orderId!==r.orderId)))throw Error('receipt_unconfirmed');
+   await readBackSubmittedProject(r,d.requestId);
+   updateNote(id,{status:'applied',requestId:d.requestId,verifiedAt:new Date().toISOString(),eventVerifiedAt:new Date().toISOString(),ack:'저장 완료 · 해당 장비 서버 반영 확인'});return true;
   }
   // /api/sa2-write returns applied=true only after SAFE WRITE has finished and the
   // normalized event is WRITTEN. On that known-success path, do not run a second
@@ -846,15 +872,7 @@ function deliveryPerformance(x){
  if(diff>0)return {days:diff,label:'납기 대비 '+diff+'일 지연',tone:'late'};
  return {days:0,label:'정시 출고',tone:'ontime'};
 }
-function projectStageLabel(x){
- const state=norm([x.process,x.state,x.nextAction].join(' '));
- if(/출고|납품|포장/.test(state))return '출고';
- if(/검수|점검|테스트|시험/.test(state))return '검수';
- if(/전장|배선|전기|프로그램|프로그래밍/.test(state))return '전장';
- if(/조립|기구|마감|갭세팅|프레임/.test(state))return '조립';
- if(/자재|입고|구매|발주/.test(state))return '자재';
- return '기타';
-}
+function projectStageLabel(x){return HYBRID_FLOW_STAGES[strictCurrentStageIndex(x)]||'기타';}
 function renderHybridProjects(){
  const el=$('hybridProjectList');if(!el)return;
  const q=norm($('hybridProjectSearch')?.value||'');
@@ -874,12 +892,12 @@ function renderHybridProjects(){
    return '<details class="project-group"'+open+'><summary><span>'+esc(title)+'</span><b>'+list.length+'대</b></summary><div class="project-group-body">'+html+'</div></details>';
   }).join('');
  }else{
-  const order=['출고','검수','전장','조립','자재','기타'];
+  const order=['출고','검수','마감조립','프로그램','전장','조립','자재','기타'];
   const groups=new Map(order.map(k=>[k,[]]));
   rows.forEach(x=>groups.get(projectStageLabel(x)).push(x));
   el.innerHTML=order.filter(k=>groups.get(k).length).map(stage=>{
    const list=groups.get(stage).sort((a,b)=>(a.priority||9)-(b.priority||9)||hybridDueKey(a.due).localeCompare(hybridDueKey(b.due)));
-   const html=list.map(x=>'<button class="hybrid-project-row project-active compact-project hf-card '+hfCardTone(x,'active')+'" data-project-order="'+esc(x.orderId)+'"><div class="project-card-top"><div><small class="project-job">'+esc(x.orderId)+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b></div><span class="project-stage-badge">'+esc(stage)+'</span></div><div class="project-compact-line"><span>현재</span><b>'+esc(x.state||'상태 미등록')+'</b><em>납기 '+esc(formatHfDate(x.due))+'</em></div><div class="project-row-next"><span>다음</span>'+esc(displayedNextAction(x))+'</div></button>').join('');
+   const html=list.map(x=>'<button class="hybrid-project-row project-active compact-project hf-card '+hfCardTone(x,'active')+'" data-project-order="'+esc(x.orderId)+'"><div class="project-card-top"><div><small class="project-job">'+esc(x.orderId)+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b></div><span class="project-stage-badge">'+esc(stage)+'</span></div><div class="project-compact-line"><span>현재</span><b>'+esc(currentStatusLabel(x))+'</b><em>납기 '+esc(formatHfDate(x.due))+'</em></div><div class="project-row-next"><span>다음</span>'+esc(displayedNextAction(x))+'</div></button>').join('');
    return '<details class="project-group" open><summary><span>'+esc(stage)+'</span><b>'+list.length+'대</b></summary><div class="project-group-body">'+html+'</div></details>';
   }).join('');
  }
@@ -897,28 +915,28 @@ function naturalProcess(text){
 function naturalStateCandidate(raw,index=0){
  const text=String(raw||'').trim(),n=norm(text);
  if(!text)return null;
- if(/출고완료|납품완료|출고s*완료|납품s*완료/.test(n))return {score:100,index,type:'DELIVERY',state:'출고 완료',status:'CLOSED'};
- if(/재검수s*(?:진행|진행중|중)|재검수중/.test(text))return {score:88,index,type:'INSPECTION',state:'재검수 진행',status:'OPEN'};
- if(/마감조립s*(?:진행|진행중|중)|마감조립중/.test(text))return {score:88,index,type:'PROGRESS',state:'마감조립 진행',status:'OPEN'};
- if(/조립s*(?:진행|진행중|중)|조립진행중|조립중/.test(text))return {score:86,index,type:'PROGRESS',state:'조립 진행',status:'OPEN'};
- if(/전장s*(?:진행|진행중|중)|배선s*(?:진행|진행중|중)|전장중/.test(text))return {score:86,index,type:'PROGRESS',state:'전장 진행',status:'OPEN'};
- if(/프로그램(?:밍)?s*(?:진행|진행중|중)|프로그램중/.test(text))return {score:86,index,type:'PROGRESS',state:'프로그램 진행',status:'OPEN'};
- if(/검수s*(?:진행|진행중|중)|검수진행중|검수중/.test(text))return {score:86,index,type:'INSPECTION',state:'검수 진행',status:'OPEN'};
- if(/(?:구동)?테스트s*(?:진행|진행중|중)|테스트중/.test(text))return {score:84,index,type:'INSPECTION',state:'테스트 진행',status:'OPEN'};
- if(/갭세팅s*(?:진행|진행중|중)|갭세팅중/.test(text))return {score:84,index,type:'PROGRESS',state:'갭세팅 진행',status:'OPEN'};
- if(/장비세팅s*(?:진행|진행중|중)|장비셋팅s*(?:진행|진행중|중)|세팅중|셋팅중/.test(text))return {score:84,index,type:'PROGRESS',state:'장비세팅 진행',status:'OPEN'};
- if(/재조립s*(?:진행|진행중|중)|재조립중/.test(text))return {score:90,index,type:'REWORK',state:'재조립 진행',status:'OPEN'};
- if(/재작업s*(?:진행|진행중|중)|재작업중/.test(text))return {score:90,index,type:'REWORK',state:'재작업 진행',status:'OPEN'};
+ if(/출고완료|납품완료|출고\s*완료|납품\s*완료/.test(n))return {score:100,index,type:'DELIVERY',state:'출고 완료',status:'CLOSED'};
+ if(/재검수\s*(?:진행|진행중|중)|재검수중/.test(text))return {score:88,index,type:'INSPECTION',state:'재검수 진행',status:'OPEN'};
+ if(/마감조립\s*(?:진행|진행중|중)|마감조립중/.test(text))return {score:88,index,type:'PROGRESS',state:'마감조립 진행',status:'OPEN'};
+ if(/조립\s*(?:진행|진행중|중)|조립진행중|조립중/.test(text))return {score:86,index,type:'PROGRESS',state:'조립 진행',status:'OPEN'};
+ if(/전장\s*(?:진행|진행중|중)|배선\s*(?:진행|진행중|중)|전장중/.test(text))return {score:86,index,type:'PROGRESS',state:'전장 진행',status:'OPEN'};
+ if(/프로그램(?:밍)?\s*(?:진행|진행중|중)|프로그램중/.test(text))return {score:86,index,type:'PROGRESS',state:'프로그램 진행',status:'OPEN'};
+ if(/검수\s*(?:진행|진행중|중)|검수진행중|검수중/.test(text))return {score:86,index,type:'INSPECTION',state:'검수 진행',status:'OPEN'};
+ if(/(?:구동)?테스트\s*(?:진행|진행중|중)|테스트중/.test(text))return {score:84,index,type:'INSPECTION',state:'테스트 진행',status:'OPEN'};
+ if(/갭세팅\s*(?:진행|진행중|중)|갭세팅중/.test(text))return {score:84,index,type:'PROGRESS',state:'갭세팅 진행',status:'OPEN'};
+ if(/장비세팅\s*(?:진행|진행중|중)|장비셋팅\s*(?:진행|진행중|중)|세팅중|셋팅중/.test(text))return {score:84,index,type:'PROGRESS',state:'장비세팅 진행',status:'OPEN'};
+ if(/재조립\s*(?:진행|진행중|중)|재조립중/.test(text))return {score:90,index,type:'REWORK',state:'재조립 진행',status:'OPEN'};
+ if(/재작업\s*(?:진행|진행중|중)|재작업중/.test(text))return {score:90,index,type:'REWORK',state:'재작업 진행',status:'OPEN'};
 
- if(/프로그램(?:밍)?s*수정s*(?:대기|보류)/.test(text))return {score:78,index,type:'WAIT',state:'프로그램 수정대기',status:'OPEN'};
- if(/재제작s*(?:요청|대기|진행대기)/.test(text))return {score:74,index,type:'REWORK',state:'재제작 대기',status:'OPEN'};
- if(/재가공s*(?:요청|대기)/.test(text))return {score:74,index,type:'REWORK',state:'재가공 대기',status:'OPEN'};
- if(/출고s*(?:대기|보류)|납품s*(?:대기|보류)/.test(text))return {score:76,index,type:'WAIT',state:'출고 대기',status:'OPEN'};
- if(/검수s*(?:대기|보류)/.test(text))return {score:75,index,type:'WAIT',state:'검수 대기',status:'OPEN'};
- if(/조립s*(?:대기|보류)/.test(text))return {score:75,index,type:'WAIT',state:'조립 대기',status:'OPEN'};
- if(/전장s*(?:대기|보류)/.test(text))return {score:75,index,type:'WAIT',state:'전장 대기',status:'OPEN'};
- if(/입고s*(?:대기|지연)|미입고|입고대기/.test(text)){
-   const compact=text.replace(/s+/g,' ').replace(/^.*?\]\s*/,'').trim();
+ if(/프로그램(?:밍)?\s*수정\s*(?:대기|보류)/.test(text))return {score:78,index,type:'WAIT',state:'프로그램 수정대기',status:'OPEN'};
+ if(/재제작\s*(?:요청|대기|진행대기)/.test(text))return {score:74,index,type:'REWORK',state:'재제작 대기',status:'OPEN'};
+ if(/재가공\s*(?:요청|대기)/.test(text))return {score:74,index,type:'REWORK',state:'재가공 대기',status:'OPEN'};
+ if(/출고\s*(?:대기|보류)|납품\s*(?:대기|보류)/.test(text))return {score:76,index,type:'WAIT',state:'출고 대기',status:'OPEN'};
+ if(/검수\s*(?:대기|보류)/.test(text))return {score:75,index,type:'WAIT',state:'검수 대기',status:'OPEN'};
+ if(/조립\s*(?:대기|보류)/.test(text))return {score:75,index,type:'WAIT',state:'조립 대기',status:'OPEN'};
+ if(/전장\s*(?:대기|보류)/.test(text))return {score:75,index,type:'WAIT',state:'전장 대기',status:'OPEN'};
+ if(/입고\s*(?:대기|지연)|미입고|입고대기/.test(text)){
+   const compact=text.replace(/\s+/g,' ').replace(/^.*?\]\s*/,'').trim();
    const state=compact.length<=42?compact:'자재 입고대기';
    return {score:72,index,type:'WAIT',state,status:'OPEN'};
  }
@@ -927,11 +945,11 @@ function naturalStateCandidate(raw,index=0){
    return {score:68,index,type:'WAIT',state,status:'OPEN'};
  }
 
- if(/재검수s*예정/.test(text))return {score:58,index,type:'INSPECTION',state:'재검수 예정',status:'OPEN'};
- if(/검수s*예정/.test(text))return {score:56,index,type:'INSPECTION',state:'검수 예정',status:'OPEN'};
- if(/(?:구동)?테스트s*예정/.test(text))return {score:55,index,type:'INSPECTION',state:'테스트 예정',status:'OPEN'};
- if(/출고s*예정|납품s*예정/.test(text))return {score:56,index,type:'PROGRESS',state:'출고 예정',status:'OPEN'};
- if(/입고s*예정/.test(text))return {score:48,index,type:'WAIT',state:'자재 입고 예정',status:'OPEN'};
+ if(/재검수\s*예정/.test(text))return {score:58,index,type:'INSPECTION',state:'재검수 예정',status:'OPEN'};
+ if(/검수\s*예정/.test(text))return {score:56,index,type:'INSPECTION',state:'검수 예정',status:'OPEN'};
+ if(/(?:구동)?테스트\s*예정/.test(text))return {score:55,index,type:'INSPECTION',state:'테스트 예정',status:'OPEN'};
+ if(/출고\s*예정|납품\s*예정/.test(text))return {score:56,index,type:'PROGRESS',state:'출고 예정',status:'OPEN'};
+ if(/입고\s*예정/.test(text))return {score:48,index,type:'WAIT',state:'자재 입고 예정',status:'OPEN'};
 
  const process=naturalProcess(text);
  if(/완료/.test(text)&&process){
@@ -945,7 +963,7 @@ function classifyUnifiedEvent(raw){
  const lines=String(raw||'').split(/\r?\n|;/).map(v=>v.trim()).filter(Boolean);
  let best=null,hasIssue=false;
  lines.forEach((line,index)=>{
-  if(/불량|이상|간섭|누락|문제|오류|에러|고장|파손|수정s*필요|납기s*수정|연기/.test(line))hasIssue=true;
+  if(/불량|이상|간섭|누락|문제|오류|에러|고장|파손|수정\s*필요|납기\s*수정|연기/.test(line))hasIssue=true;
   const c=naturalStateCandidate(line,index);
   if(c&&(!best||c.score>best.score||(c.score===best.score&&c.index>best.index)))best=c;
  });
@@ -955,8 +973,10 @@ function classifyUnifiedEvent(raw){
 }
 function unifiedStageFromText(v){
  const t=norm(v);
- if(/출고|납품|포장/.test(t))return 4;
- if(/검수|점검|테스트|시험/.test(t))return 3;
+ if(/출고|납품|포장/.test(t))return 6;
+ if(/검수|점검|테스트|시험/.test(t))return 5;
+ if(/마감조립|마감/.test(t))return 4;
+ if(/프로그램|프로그래밍/.test(t))return 3;
  if(/전장|배선|전기|프로그램|프로그래밍/.test(t))return 2;
  if(/조립|기구|마감|갭세팅|프레임/.test(t))return 1;
  if(/자재|입고|구매|발주/.test(t))return 0;
@@ -966,11 +986,10 @@ function resolveUnifiedImpact(current,classification,bodyText){
  const currentState=String(current?.state||''),currentNext=String(current?.nextAction||'');
  if(!classification.changesState)return {...classification,effectiveState:currentState,effectiveNext:currentNext,label:classification.label||'현재상태 유지'};
  if(classification.status==='CLOSED')return {...classification,effectiveState:classification.state,effectiveNext:'',label:classification.label};
- if(classification.natural)return {...classification,effectiveState:classification.state,effectiveNext:currentNext,label:classification.label};
  const from=unifiedStageFromText(currentState),to=unifiedStageFromText(classification.state);
  const explicitRollback=/재작업|재조립|되돌|회귀|공정\s*복귀|다시\s*(?:조립|전장|프로그램|검수|테스트)/.test(String(bodyText||''));
  if(from>=0&&to>=0&&to<from&&!explicitRollback){
-   const stages=['자재','조립','전장','검수','출고'];
+   const stages=['자재','조립','전장','프로그램','마감조립','검수','출고'];
    const action=String(classification.state||'').replace(/\s*(?:수정대기|대기|보류|지연)$/,'').trim()+
      (/수정대기/.test(String(classification.state||''))?' 수정':'');
    const next=[action,stages[from]].filter(Boolean).join(' 후 ');
@@ -994,46 +1013,15 @@ function previewUnifiedEvent(key,scope=document){
 }
 
 async function syncUnifiedStateBackground(noteId,x,classification,bodyText){
- try{
-   const current=await appCall({action:'issue',issueId:x.issueId});
-   if(current.issueId!==x.issueId||current.orderId!==x.orderId)throw Error('project_mismatch');
-   const impact=resolveUnifiedImpact(current,classification,bodyText);
-   const targetState=impact.effectiveState||current.state;
-   const targetNext=classification.status==='CLOSED'?'':(impact.effectiveNext||current.nextAction);
-   const targetStatus=classification.status==='CLOSED'?'CLOSED':current.status;
-   if(targetState===current.state&&targetNext===current.nextAction&&targetStatus===current.status){
-     updateNote(noteId,{status:'applied',verifiedAt:new Date().toISOString(),issueVerifiedAt:new Date().toISOString(),ack:'Event 기록 완료 · 현재상태 유지'});
-     projectHistoryCache.delete(x.orderId);
-  const nowIso=new Date().toISOString();
-  const localIdx=items.findIndex(v=>String(v.orderId||'')===String(x.orderId||''));
-  if(localIdx>=0){
-    const prev=items[localIdx],state=classification.changesState?(impact.effectiveState||classification.state):prev.state;
-    items[localIdx]={...prev,cause:bodyText,recentEvent:bodyText,recentEventAt:nowIso,state,
-      process:classification.changesState?coreProcessFromState(state,prev.nextAction,prev.process):prev.process,
-      priority:classification.changesState?corePriorityFromState(state,prev.nextAction,prev.issueStatus,prev.priority):prev.priority,
-      sourceLatestUpdate:classification.changesState?nowIso:prev.sourceLatestUpdate,
-      since:classification.changesState?new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'}):prev.since};
-    items=items.map((v,id)=>({...v,id}));if(typeof coreCacheSave==='function')coreCacheSave();
-  }
-     toast('Event 기록 완료 · 현재상태 유지');
-     return;
-   }
-   const requestId=crypto.randomUUID();
-   const applied=await appCall({action:'edit',issueId:x.issueId,orderId:x.orderId,expected:current.revision,state:targetState,nextAction:targetNext,status:targetStatus,reason:(impact.preserveStage?'Event 기록·공정 유지: ':'Event 자동반영: ')+bodyText.slice(0,450),requestId});
-   if(applied.status!=='APPLIED')throw Error('issue_unconfirmed');
-   updateNote(noteId,{status:'applied',verifiedAt:new Date().toISOString(),issueVerifiedAt:new Date().toISOString(),issueRequestId:requestId,ack:impact.preserveStage?'Event 기록 + 현재공정 유지 + 다음행동 반영 완료':'Event 기록 + 현재상태 자동반영 완료'});
-   const idx=items.findIndex(v=>v.issueId===applied.issueId);
-   if(applied.issueStatus==='CLOSED'){if(idx>=0)items.splice(idx,1);}
-   else if(idx>=0){const prev=items[idx];items[idx]={...prev,state:applied.state,nextAction:applied.nextAction,issueStatus:applied.issueStatus,process:coreProcessFromState(applied.state,applied.nextAction,prev.process),priority:corePriorityFromState(applied.state,applied.nextAction,applied.issueStatus,prev.priority),sourceLatestUpdate:new Date().toISOString(),since:new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'})};}
-   items=items.map((v,id)=>({...v,id}));if(typeof coreCacheSave==='function')coreCacheSave();
-   projectHistoryCache.delete(x.orderId);
-   toast(impact.preserveStage?'현재공정 유지 · 다음행동 '+applied.nextAction:'현재상태 자동반영 완료 · '+applied.state);
-   if(screen==='issues')todayIssues();
-   else if(dialog.open&&$('unifiedDialogText'))setTimeout(()=>openProject(x.orderId),0);
- }catch(e){
-   try{updateNote(noteId,{status:'partial',verifiedAt:'',ack:'Event 기록은 완료됐지만 현재상태 자동반영은 확인하지 못했습니다. 자동 재전송하지 않습니다.'});}catch{}
-   toast('Event는 저장됐고 상태 자동반영은 확인이 필요합니다.');
- }
+ const current=await appCall({action:'issue',issueId:x.issueId});
+ if(current.issueId!==x.issueId||current.orderId!==x.orderId)throw Error('project_mismatch');
+ const impact=resolveUnifiedImpact(current,classification,bodyText);
+ const state=impact.effectiveState||current.state,nextAction=classification.status==='CLOSED'?'':(impact.effectiveNext||current.nextAction),status=classification.status==='CLOSED'?'CLOSED':current.status;
+ if(state===current.state&&nextAction===current.nextAction&&status===current.status)return;
+ const requestId=crypto.randomUUID();
+ const applied=await appCall({action:'edit',issueId:x.issueId,orderId:x.orderId,expected:current.revision,state,nextAction,status,reason:'Event 반영: '+bodyText.slice(0,450),requestId});
+ if(applied.status!=='APPLIED')throw Error('issue_unconfirmed');
+ updateNote(noteId,{issueRequestId:requestId});
 }
 
 async function submitUnifiedEvent(key,text,statusEl){
@@ -1044,12 +1032,13 @@ async function submitUnifiedEvent(key,text,statusEl){
  if(!bodyText)return {ok:false,error:'empty'};
  if(navigator.onLine===false)return {ok:false,error:'offline'};
  const classification=classifyUnifiedEvent(bodyText),impact=resolveUnifiedImpact(x,classification,bodyText);
- const id=crypto.randomUUID(),target=(x.orderId?x.orderId+' · ':'')+x.customer+' · '+x.model;
- const note={id,submissionId:id,target,text:bodyText,status:'sending',createdAt:new Date().toISOString(),issueId:x.issueId||'',orderId:x.orderId||'',displayState:classification.state||'',nextAction:x.nextAction||'',issueStatus:x.issueStatus||'',eventOnly:!x.issueId||!classification.changesState,eventType:classification.type,autoClassification:impact.label,stateSyncVersion:classification.changesState?'natural-v3':'',issueContent:bodyText};
+ const id=crypto.randomUUID(),target=[x.orderId,x.customer,x.model].map(v=>String(v||'').replace(/[\r\n;]+/g,' ').replace(/\s+/g,' ').trim()).filter(Boolean).join(' · ');
+ const serverText=bodyText.split(/\r?\n|;/).map(v=>v.trim()).filter(Boolean).map(line=>target+' '+line).join('\n');
+ if(serverText.length>1000)return {ok:false,error:'text_too_long'};
+ const note={id,submissionId:id,target,text:bodyText,status:'sending',createdAt:new Date().toISOString(),issueId:x.issueId||'',orderId:x.orderId||'',displayState:impact.effectiveState||'',nextAction:x.nextAction||'',issueStatus:x.issueStatus||'',eventOnly:!x.issueId||!classification.changesState,eventType:classification.type,autoClassification:impact.label,stateSyncVersion:classification.changesState?'natural-v3':'',issueContent:bodyText};
  try{const list=notes();list.unshift(note);persist(KEY,list);}catch{return {ok:false,error:'local_store'};}
  if(statusEl)statusEl.textContent='Event 기록 중… · '+impact.label;
  try{
-  const serverText=bodyText.split(/\r?\n|;/).map(v=>v.trim()).filter(Boolean).map(line=>target+' '+line).join('\n');
   const d=await api('/api/sa2-write',{op:'safe_write',submissionId:id,text:serverText,targetHint:target,source:'MOBILE|UNIFIED_EVENT',requester:'Emotion'},55000);
   if(!d.applied){
    const state=/REVIEW/i.test(d.status)?'review':/EXCLUDED/i.test(d.status)?'excluded':/DUPLICATE/i.test(d.status)?'duplicate':'received';
@@ -1057,19 +1046,15 @@ async function submitUnifiedEvent(key,text,statusEl){
    return {ok:false,partial:true,classification,eventSaved:false};
   }
   projectHistoryCache.delete(x.orderId);
-  if(!x.issueId){
-   updateNote(id,{status:'saved_unverified',requestId:d.requestId||'',ack:'Project Event 저장 완료 · 서버 현재상태 재조회 중',respondedAt:new Date().toISOString(),eventVerifiedAt:new Date().toISOString(),verifiedAt:''});
-   const verified=await verifyEventNote(id,d);
-   return {ok:verified,partial:!verified,classification,eventSaved:true,stateApplied:verified&&classification.changesState,planOnly:true,requestId:d.requestId||''};
-  }
-  updateNote(id,{status:classification.changesState?'saved_unverified':'applied',requestId:d.requestId||'',ack:classification.changesState?'Project Event 기록 완료 · 자연어 판정 상태를 현재상태 반영':'Project Event 기록 완료',respondedAt:new Date().toISOString(),eventVerifiedAt:new Date().toISOString(),verifiedAt:classification.changesState?'':new Date().toISOString()});
-  if(classification.changesState){
-    if(screen==='home')home();else if(screen==='plan')productionPlan(productionPlanMode,true);else if(screen==='projects')projects(filter,true);else if(screen==='issues')todayIssues();
-  }
-  if(!classification.changesState)return {ok:true,classification,eventSaved:true,stateApplied:false,requestId:d.requestId||''};
-  setTimeout(()=>syncUnifiedStateBackground(id,{...x},classification,bodyText),0);
-  return {ok:true,classification,eventSaved:true,stateApplied:false,statePending:true,requestId:d.requestId||''};
+  updateNote(id,{status:'saved_unverified',requestId:d.requestId||'',ack:'저장 완료 · 해당 장비 반영 확인 중',respondedAt:new Date().toISOString(),verifiedAt:''});
+  if(statusEl)statusEl.textContent='저장 완료 · 해당 장비 반영 확인 중…';
+  if(d.status!=='WRITTEN')return {ok:false,partial:true,classification,eventSaved:true,requestId:d.requestId||''};
+  if(x.issueId&&classification.changesState)await syncUnifiedStateBackground(id,{...x},classification,bodyText);
+  const verified=await verifyEventNote(id,d);
+  return {ok:verified,partial:!verified,classification,eventSaved:true,stateApplied:verified&&classification.changesState,requestId:d.requestId||''};
  }catch(e){
+  const saved=notes().find(r=>r.id===id)?.requestId;
+  if(saved){updateNote(id,{status:'saved_unverified',verifiedAt:'',ack:'이력 저장 완료 · 현재상태 반영 확인 필요. 자동 재전송하지 않습니다.'});return {ok:false,partial:true,eventSaved:true,requestId:saved};}
   const rejected=[400,401,403].includes(e.status);
   try{updateNote(id,{status:rejected?'rejected':'unknown',requestId:e.data?.requestId||'',ack:appError(e),respondedAt:new Date().toISOString()});}catch{}
   return {ok:false,error:rejected?'rejected':'unknown'};
@@ -1095,7 +1080,7 @@ function todayIssues(){
  (activeRows.length?activeRows.map(x=>{const key=todayIssueKey(x),opened=todayIssueOpenId===key,hasIssue=!!x.issueId;return '<section class="today-issue-card hf-card '+hfCardTone(x,hasIssue?'issue':'plan')+' '+(opened?'open':'')+'">'+
  '<div class="today-issue-head"><div class="today-issue-ident"><small>JOB NO.</small><b>'+esc(x.orderId||key)+'</b><h3>'+esc(x.customer)+' · '+esc(x.model)+'</h3></div><span class="today-issue-priority '+(hasIssue?'p'+esc(x.priority||2):'plan')+'">'+(hasIssue?(x.priority===1?'P1':'제작 중'):'제작 중')+'</span></div>'+
  hfDueAlert(x)+
- '<div class="today-issue-summary"><div><small>현재 상태</small><b>'+esc(x.state||'계획')+'</b></div><div><small>다음 행동</small><b>'+esc(displayedNextAction(x))+'</b></div></div>'+
+ '<div class="today-issue-summary"><div><small>현재 상태</small><b>'+esc(currentStatusLabel(x))+'</b></div><div><small>다음 행동</small><b>'+esc(displayedNextAction(x))+'</b></div></div>'+
  (String(x.recentEventAt||'').slice(0,10)===todayKey&&String(x.recentEvent||x.cause||'').trim()?'<div class="today-issue-linked"><small>오늘 이슈/진행</small><p>'+esc(x.recentEvent||x.cause)+'</p></div>':'')+
  (!opened?'<button class="today-issue-open" onclick="toggleTodayIssue(\''+esc(key)+'\')"><span>이 장비에 오늘 이슈 입력</span><span>＋</span></button>':
  '<div class="today-issue-editor"><div class="today-issue-target"><span>입력 대상</span><b>'+esc(x.orderId||key)+' · '+esc(x.customer)+' · '+esc(x.model)+'</b></div>'+
