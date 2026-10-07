@@ -2,9 +2,19 @@ import crypto from 'node:crypto';
 
 const COOKIE='hf_real_session';
 const CACHE_TTL_MS=15000;
+const SNAPSHOT_STALE_MS=120000;
 let statusCache=null;
 let statusCacheAt=0;
 let statusRefreshPending=null;
+function projectKey(x){return String(x.issueId||x.orderId||'');}
+function mergeProjectSnapshot(previous,next){
+ if(!previous||!Array.isArray(previous.currentStatus))return next;
+ const map=new Map(previous.currentStatus.map(x=>[projectKey(x),x]));
+ for(const x of next.currentStatus||[])map.set(projectKey(x),x);
+ const liveKeys=new Set((next.currentStatus||[]).map(projectKey));
+ for(const k of [...map.keys()])if(k&&!liveKeys.has(k))map.delete(k);
+ return {...next,currentStatus:[...map.values()]};
+}
 
 function safeEqual(a,b){
   const ha=crypto.createHash('sha256').update(String(a)).digest();
@@ -106,11 +116,11 @@ export default async function handler(req,res){
     const now=Date.now();
     let data;
     if(!force&&statusCache&&now-statusCacheAt<CACHE_TTL_MS){
-      data=statusCache;
+      data={...statusCache,__snapshot:true,__snapshotAge:now-statusCacheAt};
     }else if(!force&&statusRefreshPending){
       data=await statusRefreshPending;
     }else{
-      statusRefreshPending=readOnce(base,token).then(v=>{statusCache=v;statusCacheAt=Date.now();return v;}).finally(()=>{statusRefreshPending=null;});
+      statusRefreshPending=readOnce(base,token).then(v=>{statusCache=mergeProjectSnapshot(statusCache,v);statusCacheAt=Date.now();return statusCache;}).finally(()=>{statusRefreshPending=null;});
       data=await statusRefreshPending;
     }
     const raw=Array.isArray(data.currentStatus)?data.currentStatus.map(normalize):[];
@@ -131,6 +141,9 @@ export default async function handler(req,res){
       counts:{currentStatus:currentStatus.length},
       diagnostics:{
         singleRead:true,
+        snapshot:data.__snapshot===true,
+        snapshotAgeMs:Number(data.__snapshotAge||0),
+        snapshotStale:Number(data.__snapshotAge||0)>SNAPSHOT_STALE_MS,
         rawItems:raw.length,
         liveItems:currentStatus.length,
         filteredItems:raw.length-currentStatus.length
