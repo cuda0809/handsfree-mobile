@@ -18,9 +18,11 @@ export default async function handler(req,res){
  const signed=JSON.stringify(payload),signature=crypto.createHmac('sha256',process.env.HF_REAL_READ_TOKEN).update(signed).digest('base64url');
  try{return reply(res,200,await upstream({op:'light_app',signed,signature}));}
  catch(e){
+  const diagnostic=/^(not_configured|upstream_invalid_json|upstream_failed|invalid_source_month|forbidden|busy|unsupported_operation)$/.test(e.message)?e.message:e.name==='TimeoutError'||e.name==='AbortError'?'upstream_timeout':'upstream_unavailable';
+  console.warn('HF_APP_READ_FAILED',b.action,diagnostic);
   if(b.action==='core'&&e.message==='unsupported_operation'){
    return reply(res,502,{ok:false,error:'core_not_supported'});
   }
   const known=/^(forbidden|busy|target_missing|ambiguous_record|ambiguous_receipt|stale_record|project_mismatch|invalid_request_id|invalid_reason|invalid_state|invalid_status|invalid_next_action|request_conflict|no_change|formula_cell|edit_gate_closed|pending_verification|schedule_write_failed|unsupported_operation)$/;
- const error=known.test(e.message)?e.message:'app_unavailable';return reply(res,error==='forbidden'?403:/stale|conflict|ambiguous|mismatch/.test(error)?409:502,{ok:false,error,requestId:payload.requestId||''});}
+ const error=known.test(e.message)?e.message:'app_unavailable';return reply(res,error==='forbidden'?403:/stale|conflict|ambiguous|mismatch/.test(error)?409:502,{ok:false,error,reason:diagnostic,requestId:payload.requestId||''});}
 }

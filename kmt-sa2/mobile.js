@@ -1,5 +1,5 @@
 'use strict';
-const BUILD='2026.10.07.SA2.8.3-MOBILE10', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
+const BUILD='2026.10.07.SA2.8.3-MOBILE11', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
 const main=document.getElementById('main'),dialog=document.getElementById('detail');
 let coreSnapshot=false;
 let items=[],live=false,readPending=null,sourceDate='',lastRead='',screen='home',filter='all',returnFocus=null,readMessage='현재 상태를 불러오는 중…',recognition=null,installPrompt=null,readStale=false,lastReadErrorStatus=0,lastCoreAttempt=0;
@@ -79,7 +79,7 @@ async function readApp(body){
   try{return await api('/api/sa2-app',body,55000);}
   catch(e){
    const transient=e.name==='AbortError'||e.name==='TypeError'||e.message==='app_unavailable'||e.message==='busy'||e.status===429||e.status===503||e.status===504;
-   if(attempt||!transient||navigator.onLine===false)throw e;
+   if(attempt||!transient||navigator.onLine===false){e.readAction=body.action;throw e;}
    await new Promise(resolve=>setTimeout(resolve,1500));
   }
  }
@@ -168,8 +168,11 @@ async function refresh(force=true){
    coreCacheSave(true);return true;
   }catch(e){
    ({items,live,sourceDate,lastRead,coreSnapshot}=previous);lastReadErrorStatus=e.status||0;readStale=true;
+   const action=['core','catalog'].includes(e.readAction)?e.readAction:'validation';
+   const reason=/^(upstream_timeout|upstream_invalid_json|upstream_failed|invalid_source_month|upstream_unavailable|not_configured)$/.test(e.data?.reason||'')?e.data.reason:e.name==='AbortError'?'upstream_timeout':e.name==='TypeError'?'network_unavailable':/^(invalid_core|invalid_catalog|ambiguous_issue|partial_core)$/.test(e.message)?e.message:'read_failed';
+   console.warn('HF_CORE_READ_FAILED',action,e.status||0,reason);
    if(e.status===401||e.status===403){items=[];live=false;coreSnapshot=false;screen='home';readMessage='사용자 등록 · 연결이 필요합니다';}
-   else{readMessage=(e.message==='core_not_supported'?'서버 조회 버전 불일치':e.message==='partial_core'?'일부 확인':'갱신 실패')+' · '+(live?'이전 조회값 유지':'현재 상태 확인 불가');}
+   else{const stage=action==='catalog'?'이슈 조회':action==='core'?'장비 조회':'자료 확인';const cause=reason==='upstream_timeout'?'응답 시간 초과':reason==='network_unavailable'?'연결 끊김':reason==='not_configured'?'연결 설정 확인 필요':reason==='upstream_invalid_json'?'원본 서버 응답 오류':reason==='invalid_core'||reason==='invalid_catalog'||reason==='ambiguous_issue'?'자료 일관성 확인 필요':'서버 응답 실패';readMessage=(e.message==='core_not_supported'?'서버 조회 버전 불일치':e.message==='partial_core'?'일부 확인':'갱신 실패 · '+stage+' · '+cause)+' · '+(live?'이전 조회값 유지':'현재 상태 확인 불가');}
    return false;
   }finally{
    readPending=null;banner();
