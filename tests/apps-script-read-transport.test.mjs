@@ -15,6 +15,19 @@ function fixture(responses){
  return {request,calls};
 }
 const corePayload={op:'light_app',signed:JSON.stringify({action:'core'}),token:'fixture'};
+test('all signed read actions recover once while writes never recover',async()=>{
+ for(const action of ['core','catalog','plans','reports','history','receipt','issue','edit']){
+  const f=fixture([{error:Object.assign(Error('reset'),{code:'ECONNRESET'})},{text:'{"ok":true}'}]);
+  const call=readAppsScript('https://script.google.com/macros/s/fixture/exec',{...corePayload,signed:JSON.stringify({action})},1000,f.request);
+  if(action==='edit'){await assert.rejects(call);assert.equal(f.calls.length,1);}
+  else{assert.equal((await call).ok,true);assert.equal(f.calls.length,2);}
+ }
+});
+test('result 404 and network failure share one recovery budget',async()=>{
+ const f=fixture([{status:302,headers:{location:'https://script.googleusercontent.com/macros/echo?first=1'}},{status:404},{error:Object.assign(Error('reset'),{code:'ECONNRESET'})}]);
+ await assert.rejects(readAppsScript('https://script.google.com/macros/s/fixture/exec',corePayload,1000,f.request));
+ assert.equal(f.calls.length,3);
+});
 test('hop diagnostic identifies TLS stall without logging credentials or result URL',async()=>{
  const logs=[],prior=console.info;
  console.info=(...args)=>logs.push(args);
@@ -86,9 +99,9 @@ test('only whitelisted signed light reads select the alternate transport; writes
 
 test('expired result URL is recovered once with a new read nonce and never replays credentials to result host',async()=>{
  const f=fixture([{status:302,headers:{location:'https://script.googleusercontent.com/macros/echo?first=1'}},{status:404,text:'gone'},{status:302,headers:{location:'https://script.googleusercontent.com/macros/echo?second=1'}},{text:'{"ok":true}'}]);
- assert.equal((await readAppsScript('https://script.google.com/macros/s/fixture/exec',{token:'fixture'},1000,f.request)).ok,true);
+ assert.equal((await readAppsScript('https://script.google.com/macros/s/fixture/exec',corePayload,1000,f.request)).ok,true);
  assert.deepEqual(f.calls.map(c=>c.method),['POST','GET','POST','GET']);assert.notEqual(f.calls[0].url,f.calls[2].url);
  for(const c of f.calls.filter(c=>c.method==='GET'))assert.equal(c.body,undefined);
  const bad=fixture([{status:302,headers:{location:'https://script.googleusercontent.com/macros/echo?first=1'}},{status:404},{status:302,headers:{location:'https://script.googleusercontent.com/macros/echo?second=1'}},{status:404}]);
- await assert.rejects(readAppsScript('https://script.google.com/macros/s/fixture/exec',{},1000,bad.request),e=>e.upstreamStatus===404&&e.upstreamPhase==='result');assert.equal(bad.calls.length,4);
+ await assert.rejects(readAppsScript('https://script.google.com/macros/s/fixture/exec',corePayload,1000,bad.request),e=>e.upstreamStatus===404&&e.upstreamPhase==='result');assert.equal(bad.calls.length,4);
 });
