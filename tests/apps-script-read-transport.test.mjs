@@ -15,6 +15,19 @@ function fixture(responses){
  return {request,calls};
 }
 const corePayload={op:'light_app',signed:JSON.stringify({action:'core'}),token:'fixture'};
+test('hop diagnostic identifies TLS stall without logging credentials or result URL',async()=>{
+ const logs=[],prior=console.info;
+ console.info=(...args)=>logs.push(args);
+ const request=(url,options,callback)=>{
+  const req=new EventEmitter();req.destroy=e=>req.emit('error',e);
+  req.end=()=>queueMicrotask(()=>{const socket=new EventEmitter();socket.connecting=true;req.emit('socket',socket);socket.emit('lookup');socket.emit('connect');req.emit('error',Object.assign(Error('PRIVATE_TOKEN_RESULT_URL'),{code:'ECONNRESET'}));});
+  return req;
+ };
+ try{await assert.rejects(readAppsScript('https://script.google.com/macros/s/fixture/exec',{token:'PRIVATE_TOKEN'},100,request),e=>e.upstreamStage==='tls'&&e.upstreamPhase==='execution');}
+ finally{console.info=prior;}
+ assert.equal(logs.length,1);assert.equal(logs[0][4],'tls');assert.equal(logs[0][7],'failed');
+ assert.doesNotMatch(JSON.stringify(logs),/PRIVATE|https:|token|signature/);
+});
 test('signed core read recovers a reset once with a new nonce and never retries rejection',async()=>{
  const f=fixture([{error:Object.assign(Error('reset'),{code:'ECONNRESET'})},{text:'{"ok":true,"projects":[]}'}]);
  assert.equal((await readAppsScript('https://script.google.com/macros/s/fixture/exec',corePayload,1000,f.request)).ok,true);
