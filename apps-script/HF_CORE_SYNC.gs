@@ -38,6 +38,11 @@ function hfCoreSourceWatch(){
 }
 
 function hfCoreSync_(mode){
+  var lock=LockService.getScriptLock();if(!lock.tryLock(5000))throw Error('core_sync_busy');
+  try{return hfCoreBuildSync_(mode);}finally{lock.releaseLock();}
+}
+
+function hfCoreBuildSync_(mode){
   var started=new Date(),syncId='CORE-'+Utilities.formatDate(started,HF_CORE_SYNC.TZ,'yyyyMMdd-HHmmss')+'-'+Utilities.getUuid().slice(0,6);
   var target=SpreadsheetApp.openById(HF_CORE_SYNC.TARGET_ID),weekly=SpreadsheetApp.openById(HF_CORE_SYNC.WEEKLY_ID);
   try{
@@ -58,8 +63,8 @@ function hfCoreSync_(mode){
       var prev=issueMap[job];if(!prev||String(r[9]||'')>=String(prev[9]||''))issueMap[job]=r;
     });
 
-    var existing=hfCoreExistingIds_(target),base={},ordered=[];
-    prod.forEach(function(r){var job=String(r[3]||'').trim();if(!hfCoreValidJob_(job)||base[job])return;base[job]={kind:'PROD',row:r};ordered.push(job);});
+    var existingRows=hfCoreRows_(target,HF_CORE_SYNC.CORE,2,40),existing=hfCoreExistingIds_(target),base={},ordered=[];
+    prod.forEach(function(r){var job=String(r[3]||'').trim();if(!hfCoreValidJob_(job))return;if(base[job])throw Error('duplicate_source_job');base[job]={kind:'PROD',row:r};ordered.push(job);});
     pm.forEach(function(r){var job=String(r[0]||'').trim();if(!hfCoreValidJob_(job)||base[job])return;base[job]={kind:'PM',row:r};ordered.push(job);});
     rnd.forEach(function(r){var job=String(r[1]||'').trim();if(!hfCoreValidJob_(job)||base[job])return;base[job]={kind:'RND',row:r};ordered.push(job);});
 
@@ -93,8 +98,11 @@ function hfCoreSync_(mode){
       ]);
     });
 
+    // Preserve existing operational facts and source-absent equipment. Never
+    // clear the live table before a replacement write has succeeded.
+    out=hfCorePreserveSnapshot_(existingRows,out);
     var core=target.getSheetByName(HF_CORE_SYNC.CORE);if(!core)throw Error('missing_core_sheet');
-    if(core.getLastRow()>1)core.getRange(2,1,core.getLastRow()-1,40).clearContent();
+    if(JSON.stringify(hfCoreRows_(target,HF_CORE_SYNC.CORE,2,40))!==JSON.stringify(existingRows))throw Error('core_changed_during_sync');
     if(out.length){if(core.getMaxRows()<out.length+1)core.insertRowsAfter(core.getMaxRows(),out.length+1-core.getMaxRows());core.getRange(2,1,out.length,40).setValues(out);}
     hfCoreMarkSources_(target,nowText,'SUCCESS');
     hfCoreLog_(target,[syncId,started.toISOString(),new Date().toISOString(),mode,'MULTI_SOURCE',String(prod.length),String(out.length),String(out.length),String(conflicts),'SUCCESS','','AppsScript']);
@@ -104,6 +112,27 @@ function hfCoreSync_(mode){
     try{hfCoreMarkSources_(target,Utilities.formatDate(new Date(),HF_CORE_SYNC.TZ,'yyyy-MM-dd HH:mm:ss'),'ERROR');hfCoreLog_(target,[syncId,started.toISOString(),new Date().toISOString(),mode,'MULTI_SOURCE','','','','','ERROR',String(err&&err.message||err),'AppsScript']);}catch(_){}
     throw err;
   }
+}
+
+function hfCorePreserveSnapshot_(before,candidate){
+  var prior={},seen={},ids={};
+  before.forEach(function(r){var job=String(r[1]||'').trim();if(!job)return;if(prior[job])throw Error('duplicate_existing_job');prior[job]=r;});
+  var rows=candidate.map(function(row){
+    var r=row.slice(),job=String(r[1]||'').trim(),old=prior[job];
+    if(!job||seen[job])throw Error('duplicate_candidate_job');seen[job]=true;
+    if(old){
+      r[0]=old[0];
+      // Source date changes require review; retain user-confirmed due/shipping
+      // dates and flag disagreement instead of silently replacing them.
+      [6,37].forEach(function(i){if(String(old[i]||'').trim()){if(String(r[i]||'').trim()&&String(r[i])!==String(old[i]))r[38]=String(r[38]||'')+'·REVIEW_DATE_CONFLICT';r[i]=old[i];}});
+      [27,28,29,30,31].forEach(function(i){if(!String(r[i]||'').trim()&&String(old[i]||'').trim())r[i]=old[i];});
+      if(/^(출고완료|납품완료)$/.test(String(r[27]||'')))r[28]='';
+    }
+    return r;
+  });
+  before.forEach(function(r){var job=String(r[1]||'').trim();if(job&&!seen[job]){rows.push(r.slice());seen[job]=true;}});
+  rows.forEach(function(r){var id=String(r[0]||'');if(!id||ids[id])throw Error('duplicate_or_missing_project_id');ids[id]=true;});
+  return rows;
 }
 
 function hfCoreRows_(ss,name,startRow,cols){var sh=ss.getSheetByName(name);if(!sh)return[];var last=sh.getLastRow();if(last<startRow)return[];return sh.getRange(startRow,1,last-startRow+1,Math.min(cols,sh.getMaxColumns())).getDisplayValues();}
