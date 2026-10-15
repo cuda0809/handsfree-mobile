@@ -77,7 +77,9 @@ function hfCoreBuildSync_(mode){
       var qty=String(b[6]||''),due=String(b[8]||pmRow&&pmRow[4]||''),pmName=String(pr&&pr[6]||b[2]||''),design=String(pr&&pr[7]||''),buyer=String(p&&p[5]||pr&&pr[8]||''),production=String(pr&&pr[9]||''),quality=String(pr&&pr[10]||'');
       var scheduleState=String(s&&s[9]||''),hfState=String(i&&i[16]||''),currentState=hfState||scheduleState||String(rndRow&&rndRow[4]||'');
       var nextAction=String(i&&i[18]||''),currentIssue=String(i&&(i[10]||i[15])||pmRow&&pmRow[5]||rndRow&&rndRow[7]||'');
-      var shipment=String(s&&s[10]||''),completed=!!shipment||/출고\s*완료|납품\s*완료/.test(hfState+' '+scheduleState);
+      var shipment=String(s&&s[10]||''),completed=hfCoreShipmentCompleted_(hfState,scheduleState);
+      // A date, a planned shipment or a parts shipment is not equipment completion.
+      if(!completed)shipment='';
       var currentStage=completed?'출고':hfCoreStage_(i&&i[6],currentState,nextAction,e);
       if(completed){currentState='출고완료';nextAction='';}
       var qualityState=String(q&&q[11]||'')||(String(q&&q[9]||'').trim()?'검수완료':'');
@@ -125,7 +127,12 @@ function hfCorePreserveSnapshot_(before,candidate){
       // Source date changes require review; retain user-confirmed due/shipping
       // dates and flag disagreement instead of silently replacing them.
       [6,37].forEach(function(i){if(String(old[i]||'').trim()){if(String(r[i]||'').trim()&&String(r[i])!==String(old[i]))r[38]=String(r[38]||'')+'·REVIEW_DATE_CONFLICT';r[i]=old[i];}});
-      [27,28,29,30,31].forEach(function(i){if(!String(r[i]||'').trim()&&String(old[i]||'').trim())r[i]=old[i];});
+      // The importer has no comparable event timestamp. Keep the current snapshot
+      // as a unit rather than mixing a stale schedule state with a newer action.
+      if(String(old[27]||'').trim()){
+        if(String(r[27]||'').trim()&&hfCoreNorm_(r[27])!==hfCoreNorm_(old[27]))r[38]=String(r[38]||'')+'·REVIEW_STATE_CONFLICT';
+        [26,27,28,29,30,31].forEach(function(i){r[i]=old[i];});
+      }else [28,29,30,31].forEach(function(i){if(!String(r[i]||'').trim()&&String(old[i]||'').trim())r[i]=old[i];});
       if(/^(출고완료|납품완료)$/.test(String(r[27]||'')))r[28]='';
     }
     return r;
@@ -139,6 +146,12 @@ function hfCoreRows_(ss,name,startRow,cols){var sh=ss.getSheetByName(name);if(!s
 function hfCoreValidJob_(v){return /^[A-Z]{0,4}-?\d{6}[A-Z]?-?\d{3}(?:-\d+|-REPARE)?$/i.test(String(v||'').trim())||/^LAB-\d+/i.test(String(v||'').trim())||/^PT-\d+/i.test(String(v||'').trim());}
 function hfCoreMap_(rows,index){var out={};rows.forEach(function(r){var k=String(r[index]||'').trim();if(k&&hfCoreValidJob_(k))out[k]=r;});return out;}
 function hfCoreNorm_(v){return String(v||'').toLowerCase().replace(/[\s\-_/().·]/g,'');}
+function hfCoreShipmentCompleted_(state,schedule){
+  return [state,schedule].some(function(v){
+    var t=String(v||'').trim();
+    return !/예정|대기|보관|자재|부품|일부|미완료|취소/.test(t)&&/^(장비\s*)?(출고|납품)\s*완료(?:\s*\([^)]*\))?$/.test(t);
+  });
+}
 function hfCorePurchasePct_(r){if(!r)return'';var total=Number(String(r[19]||'').replace(/[^\d.-]/g,'')),got=Number(String(r[20]||'').replace(/[^\d.-]/g,''));return isFinite(total)&&total>0&&isFinite(got)?Math.round(got/total*1000)/10+'%':'';}
 function hfCoreDesignState_(r){if(!r||!r.length)return'';if(String(r[12]||'').indexOf('완료')>=0||String(r[13]||'').trim())return'완료';if(String(r[10]||'').trim()||String(r[11]||'').trim())return'진행';return'대기';}
 function hfCoreStage_(issueProcess,state,next,e){var t=hfCoreNorm_([state,next,issueProcess].join(' '));if(/출고|납품|포장/.test(t))return'출고';if(/검수|점검|테스트|시험/.test(t))return'검수';if(/프로그램|프로그래밍/.test(t))return'프로그램';if(/전장|배선|전기/.test(t))return'전장';if(/조립|갭|세팅|기구/.test(t))return'조립';if(/설계/.test(t))return'설계';if(/자재|입고|구매/.test(t))return'자재';if(e&&String(e[20]||'').indexOf('완료')>=0)return'검수';return String(issueProcess||'');}

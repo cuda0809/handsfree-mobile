@@ -20,3 +20,17 @@ test('explicit closed state clears next action and shared lock always releases',
  c.hfCoreBuildSync_=()=>{throw Error('fixture failure');};assert.throws(()=>c.hfCoreSync_('TEST'),/fixture failure/);assert.equal(release,1);
  allow=false;assert.throws(()=>c.hfCoreSync_('TEST'),/core_sync_busy/);assert.equal(release,1);
 });
+test('a conflicting schedule cannot reopen or regress a current operational snapshot',()=>{
+ const prior=row('P1','J1',{26:'전장',27:'전장 완료',28:'갭 작업',29:'후속작업',31:'2026-10-07'});
+ const incoming=row('NEW','J1',{26:'조립',27:'조립진행',28:'전장',31:'2026-10-01'});
+ const result=c.hfCorePreserveSnapshot_([prior],[incoming])[0];
+ for(const i of [26,27,28,29,30,31])assert.equal(result[i],prior[i]);
+ assert.match(result[38],/REVIEW_STATE_CONFLICT/);
+ const closed=row('P2','J2',{27:'출고완료',28:'오래된 행동'});
+ const kept=c.hfCorePreserveSnapshot_([closed],[row('X','J2',{27:'조립진행'})])[0];
+ assert.equal(kept[27],'출고완료');assert.equal(kept[28],'');
+});
+test('only explicit equipment shipment completion closes a source row',()=>{
+ for(const text of ['2026-10-07','출고예정','출고대기','완료 (출고대기)','일부 자재 출고완료','부품 납품완료','출고완료 예정'])assert.equal(c.hfCoreShipmentCompleted_('',text),false,text);
+ for(const text of ['출고완료','납품 완료','장비 출고 완료'])assert.equal(c.hfCoreShipmentCompleted_(text,''),true,text);
+});
