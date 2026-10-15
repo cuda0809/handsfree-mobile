@@ -61,6 +61,7 @@ test('multiline saved progress and issue render once per distinct line',()=>{
 test('durable acknowledgement releases editor while failed readback remains pending',async()=>{
  let notes=[],task,writes=0;
  const c=vm.createContext({navigator:{onLine:true},crypto:{randomUUID:()=> 'stable-request-id'},KEY:'notes',todayIssueTarget:()=>({orderId:'JOB'}),classifyUnifiedEvent:()=>({type:'NOTE',changesState:false}),resolveUnifiedImpact:()=>({label:'메모'}),notes:()=>notes,persist:(k,v)=>notes=v,updateNote:(id,p)=>Object.assign(notes.find(n=>n.id===id),p),projectHistoryCache:new Map(),api:async()=>{writes++;return {applied:true,status:'WRITTEN',requestId:'saved-request'};},setTimeout:f=>task=f,verifyEventNote:async()=>{throw Error('readback timeout');}});
+ vm.runInContext(flow.slice(flow.indexOf('function unresolvedSameInput('),flow.indexOf('function previewUnifiedEvent(')),c);
  vm.runInContext(flow.slice(flow.indexOf('async function submitUnifiedEvent('),flow.indexOf('let todayIssueOpenId=')),c);
  const result=await c.submitUnifiedEvent('JOB','원문 보존');
  assert.equal(result.statePending,true);assert.equal(notes[0].status,'saved_unverified');
