@@ -9,8 +9,7 @@ function issuePlanProgress(x){
  return '<div class="issue-plan-progress" aria-label="공정 진행도">'+stages.map(name=>{
   const field=x[fields[name]],same=name===current;
   const done=same?completed(x.state):completed(field)&&(!processKey(field)||processKey(field)===name);
-  const status=same?(done?'여기까지 완료':/예정/.test(x.state||'')?'예정':/대기/.test(x.state||'')?'작업 대기':'진행 중'):done?'완료':'';
-  return '<div class="issue-plan-stage '+(same?'now ':done?'done ':'future ')+(same&&done?'done':'')+'"'+(same?' aria-current="step"':'')+'><b>'+esc(name)+'</b>'+(status?'<span>'+esc(status)+'</span>':'')+'</div>';
+  return '<div class="issue-plan-stage '+(same?'now ':done?'done ':'future ')+(same&&done?'done':'')+'"'+(same?' aria-current="step"':'')+'><b>'+esc(name)+'</b>'+'</div>';
  }).join('')+'</div>'+(!current?'<small class="note">현재 공정 확인 필요</small>':'');
 }
 const issueDecisionDrafts=new Map();
@@ -24,3 +23,4 @@ function issueContextPreview(key,scope=main){
  const select=panel.querySelector('select');if(select){select.value=chosen;select.onchange=()=>issueDecisionDrafts.set(String(key),{text,state:select.value});}
 }
 previewUnifiedEvent=issueContextPreview;
+
