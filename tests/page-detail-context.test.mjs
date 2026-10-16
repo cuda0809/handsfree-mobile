@@ -9,7 +9,8 @@ const row={orderId:'FIXTURE',customer:'고객',model:'장비',state:'프로그�
 test('today detail contains context only, no input or full project lifecycle',()=>{
  const before=JSON.stringify(row),html=c.pageDetailHtml(row,'today');
  for(const text of ['현재 상태','현재 이슈','오늘 계획','다음 행동','최근 입력','부품 대기'])assert.ok(html.includes(text));
- assert.doesNotMatch(html,/textarea|<input|onclick|전체 라이프사이클|전체 제작 일정/);
+ assert.doesNotMatch(html,/textarea|<input|전체 라이프사이클|전체 제작 일정/);
+ assert.match(html,/openEquipmentPhotos\('FIXTURE',false\)/,'photo history opens separately without embedding an editor');
  assert.equal(JSON.stringify(row),before);
 });
 test('plan detail keeps schedule separate from issues and uses existing automatic finishing',()=>{

@@ -560,7 +560,7 @@ function projectDetailRow(orderId,fallback={}){
  };
 }
 function pageDetailHtml(x,purpose){
- const identity='<div class="job-number"><small>JOB NO.</small><b>'+esc(x.orderId)+'</b></div>';
+ const identity='<div class="job-number"><small>JOB NO.</small><b>'+esc(x.orderId)+'</b></div><button class="secondary" onclick="openEquipmentPhotos(\''+esc(x.orderId)+'\',false)">사진·메모 이력</button>';
  if(purpose==='today'){
   const stages=planStagesOnDay(x,HfProductionRules.today());
   return heading('오늘 현황',x.customer,x.model)+identity+
@@ -1104,7 +1104,8 @@ function naturalStateCandidate(raw,index=0){
  if(/완성품/.test(text))return {score:35,index,type:'PROGRESS',state:'제작 완료',status:'OPEN'};
  return null;
 }
-function classifyUnifiedEvent(raw){
+function classifyUnifiedEvent(raw,current){
+ if(typeof HfIssueContext!=='undefined')return HfIssueContext.resolve(raw,current||{});
  const lines=String(raw||'').split(/\r?\n|;/).map(v=>v.trim()).filter(Boolean);
  let best=null,hasIssue=false;
  lines.forEach((line,index)=>{
@@ -1155,7 +1156,7 @@ function saveTodayDraft(key,text){
  persist('hf-today-issue-drafts-v1',drafts);
 }
 function unresolvedSameInput(orderId,text,general=false){
- return notes().find(r=>(general?r.eventType==='GENERAL':r.orderId===orderId)&&r.text===text&&['sending','unknown','received','saved_unverified','partial','review'].includes(r.status));
+ return notes().find(r=>(general?r.eventType==='GENERAL':r.orderId===orderId)&&(r.originalText||r.text)===text&&['sending','unknown','received','saved_unverified','partial','review'].includes(r.status));
 }
 function previewUnifiedEvent(key,scope=document){
  const field=scope.querySelector('[data-unified-text="'+key+'"]'),status=scope.querySelector('[data-unified-preview="'+key+'"]');
@@ -1170,7 +1171,7 @@ function previewUnifiedEvent(key,scope=document){
 async function syncUnifiedStateBackground(noteId,x,classification,bodyText){
  const current=await appCall({action:'issue',issueId:x.issueId});
  if(current.issueId!==x.issueId||current.orderId!==x.orderId)throw Error('project_mismatch');
- const impact=resolveUnifiedImpact(current,classification,bodyText);
+ const impact=classification.explicitDecision?{effectiveState:classification.state||current.state,effectiveNext:current.nextAction}:resolveUnifiedImpact(current,classification,bodyText);
  const state=impact.effectiveState||current.state,nextAction=classification.status==='CLOSED'?'':(impact.effectiveNext||current.nextAction),status=classification.status==='CLOSED'?'CLOSED':current.status;
  if(state===current.state&&nextAction===current.nextAction&&status===current.status)return;
  const requestId=crypto.randomUUID();
@@ -1183,15 +1184,18 @@ async function submitUnifiedEvent(key,text,statusEl){
  const x=todayIssueTarget(key);
  if(!x)return {ok:false,error:'missing_issue'};
  if(/-\*$/.test(String(x.orderId||'')))return {ok:false,error:'grouped_target'};
- const bodyText=String(text||'').trim();
+ let bodyText=String(text||'').trim();
+ const originalText=bodyText;
  if(!bodyText)return {ok:false,error:'empty'};
  if(unresolvedSameInput(x.orderId,bodyText))return {ok:false,partial:true,eventSaved:false};
  if(navigator.onLine===false)return {ok:false,error:'offline'};
- const classification=classifyUnifiedEvent(bodyText),impact=resolveUnifiedImpact(x,classification,bodyText);
+ const context=classifyUnifiedEvent(bodyText,x);
+ if(context.needsDecision){const choice=typeof issueDecision==='function'?issueDecision(key,bodyText):'';if(!choice){if(statusEl)statusEl.textContent='반영할 공정을 먼저 선택하세요. 원문은 보존됩니다.';return {ok:false,error:'decision_required'};}bodyText+='\n[공정 확인] '+choice;}
+ const classification=classifyUnifiedEvent(bodyText,x),impact=classification.explicitDecision?{...classification,effectiveState:classification.state||x.state,effectiveNext:x.nextAction,label:classification.label}:resolveUnifiedImpact(x,classification,bodyText);
  const id=crypto.randomUUID(),target=[x.orderId,x.customer,x.model].map(v=>String(v||'').replace(/[\r\n;]+/g,' ').replace(/\s+/g,' ').trim()).filter(Boolean).join(' · ');
  const serverText=bodyText.split(/\r?\n|;/).map(v=>v.trim()).filter(Boolean).map(line=>target+' '+line).join('\n');
  if(serverText.length>1000)return {ok:false,error:'text_too_long'};
- const note={id,submissionId:id,target,text:bodyText,status:'sending',createdAt:new Date().toISOString(),issueId:x.issueId||'',orderId:x.orderId||'',displayState:impact.effectiveState||'',nextAction:x.nextAction||'',issueStatus:x.issueStatus||'',eventOnly:!x.issueId||!classification.changesState,eventType:classification.type,autoClassification:impact.label,stateSyncVersion:classification.changesState?'natural-v3':'',issueContent:bodyText};
+ const note={id,submissionId:id,target,text:bodyText,originalText,status:'sending',createdAt:new Date().toISOString(),issueId:x.issueId||'',orderId:x.orderId||'',displayState:impact.effectiveState||'',nextAction:x.nextAction||'',issueStatus:x.issueStatus||'',eventOnly:!x.issueId||!classification.changesState,eventType:classification.type,autoClassification:impact.label,stateSyncVersion:classification.changesState?'natural-v3':'',issueContent:bodyText};
  try{const list=notes();list.unshift(note);persist(KEY,list);}catch{return {ok:false,error:'local_store'};}
  if(statusEl)statusEl.textContent='Event 기록 중… · '+impact.label;
  try{
@@ -1241,14 +1245,15 @@ function todayIssues(){
  (activeRows.length?activeRows.map(x=>{const key=todayIssueKey(x),opened=todayIssueOpenId===key,hasIssue=!!x.issueId;return '<section class="today-issue-card hf-card '+hfCardTone(x,hasIssue?'issue':'plan')+' '+(opened?'open':'')+'">'+
  '<div class="today-issue-head"><div class="today-issue-ident"><small>JOB NO.</small><b>'+esc(x.orderId||key)+'</b><h3>'+esc(x.customer)+' · '+esc(x.model)+'</h3><small>담당 PM: '+esc(x.pm||'PM 미등록')+'</small></div><span class="today-issue-priority '+(hasIssue?'p'+esc(x.priority||2):'plan')+'">'+(hasIssue?(x.priority===1?'P1':'제작 중'):'제작 중')+'</span></div>'+
  hfDueAlert(x)+priorityReasonHtml(x)+
- '<div class="today-issue-summary"><div><small>현재 상태</small><b>'+esc(currentStatusLabel(x))+'</b></div><div><small>다음 행동</small><b>'+esc(displayedNextAction(x))+'</b></div></div>'+
+ (typeof issuePlanProgress==='function'?issuePlanProgress(x):'<p class="note">생산계획 공정 조회 준비 중</p>')+
  (String(x.recentEventAt||'').slice(0,10)===todayKey&&String(x.recentEvent||x.cause||'').trim()?'<div class="today-issue-linked"><small>오늘 이슈/진행</small><p>'+esc(x.recentEvent||x.cause)+'</p></div>':'')+
+ '<div class="issue-photo-actions"><button class="secondary" onclick="openEquipmentPhotos(\''+esc(x.orderId)+'\',true)">📷 사진·메모</button><button class="secondary" onclick="openEquipmentPhotos(\''+esc(x.orderId)+'\',false)">사진 이력</button></div>'+
  (!opened?'<button class="today-issue-open" onclick="toggleTodayIssue(\''+esc(key)+'\')"><span>이 장비에 오늘 이슈 입력</span><span>＋</span></button>':
  '<div class="today-issue-editor"><div class="today-issue-target"><span>입력 대상</span><b>'+esc(x.orderId||key)+' · '+esc(x.customer)+' · '+esc(x.model)+'</b></div>'+
  (x.cause?'<p class="today-issue-cause">기존 사유 · '+esc(x.cause)+'</p>':'')+
  (!hasIssue?'<p class="note">현재 별도 OPEN 이슈가 없는 생산계획 장비입니다. 입력 내용은 JOB NO. 기준 Event로 기록합니다.</p>':'')+
  '<label class="today-issue-label">오늘 이슈 / 진행·사유<textarea data-unified-text="'+esc(key)+'" maxlength="800" placeholder="예: 마감조립 진행 / 부품 미입고로 조립 대기 / 센서값 이상 확인" oninput="saveTodayDraft(\''+esc(key)+'\',this.value);previewUnifiedEvent(\''+esc(key)+'\',main)">'+esc(todayDraft(key))+'</textarea></label>'+
- '<p class="note today-issue-preview" data-unified-preview="'+esc(key)+'">내용을 입력하면 상태 반영 여부를 미리 보여줍니다.</p>'+
+ '<div class="note today-issue-preview" data-unified-preview="'+esc(key)+'">내용을 입력하면 상태 반영 여부를 미리 보여줍니다.</div>'+
  '<div class="today-issue-actions"><button class="chip" data-today-voice="'+esc(key)+'">🎙 음성</button><button class="primary" data-today-save="'+esc(key)+'">'+(hasIssue?'기록 및 자동 반영':'Event 기록')+'</button></div>'+
  '<button class="today-issue-close" onclick="toggleTodayIssue(\''+esc(key)+'\')">입력창 닫기</button><p class="note" data-today-status="'+esc(key)+'"></p></div>')+
  '</section>';}).join(''):'<div class="empty">현재 진행 중인 생산계획 장비가 없습니다.</div>')+
@@ -1328,10 +1333,10 @@ async function saveTodayIssue(key){
 }
 function openUnifiedEvent(issueId){
  const x=items.find(v=>v.issueId===issueId);if(!x)return toast('최신 상태를 다시 불러오세요.');
- open(heading('TODAY ISSUE',x.customer,x.model)+'<p class="note">'+esc(x.orderId)+' · 현재 '+esc(currentStatusLabel(x))+'</p><label>진행·이슈·사유<textarea id="unifiedDialogText" maxlength="800" placeholder="예: 마감조립 진행 / 부품 미입고로 조립 대기 / 센서값 이상 확인"></textarea></label><p id="unifiedDialogPreview" class="note">내용을 입력하면 상태 반영 여부를 미리 보여줍니다.</p><button id="unifiedDialogSave" class="primary">기록 및 자동 반영</button><button class="secondary" onclick="todayIssues();dialog.close()">오늘 이슈 전체 보기</button>');
+ open(heading('TODAY ISSUE',x.customer,x.model)+'<p class="note">'+esc(x.orderId)+' · 현재 '+esc(currentStatusLabel(x))+'</p><label>진행·이슈·사유<textarea data-unified-text="'+esc(issueId)+'" id="unifiedDialogText" maxlength="800" placeholder="예: 마감조립 진행 / 부품 미입고로 조립 대기 / 센서값 이상 확인"></textarea></label><div data-unified-preview="'+esc(issueId)+'" id="unifiedDialogPreview" class="note">내용을 입력하면 상태 반영 여부를 미리 보여줍니다.</div><button id="unifiedDialogSave" class="primary">기록 및 자동 반영</button><button class="secondary" onclick="todayIssues();dialog.close()">오늘 이슈 전체 보기</button>');
  const field=$('unifiedDialogText'),preview=$('unifiedDialogPreview'),button=$('unifiedDialogSave');
  field.value=todayDraft(issueId);
- field.oninput=()=>{saveTodayDraft(issueId,field.value);const v=field.value.trim();preview.textContent=v?'자동 판정 · '+resolveUnifiedImpact(x,classifyUnifiedEvent(v),v).label:'내용을 입력하면 상태 반영 여부를 미리 보여줍니다.';};
+ field.oninput=()=>{saveTodayDraft(issueId,field.value);previewUnifiedEvent(issueId,dialog);};
  button.onclick=async()=>{
   const text=field.value.trim();if(!text){preview.textContent='내용을 입력하세요.';return;}
   try{saveTodayDraft(issueId,field.value);}catch{preview.textContent='초안을 기기에 보관하지 못해 전송하지 않았습니다.';return;}

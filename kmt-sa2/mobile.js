@@ -1,6 +1,6 @@
 let coreReadGeneration=0;
 'use strict';
-const BUILD='2026.10.16.SA2.8.3-MOBILE19', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
+const BUILD='2026.10.16.SA2.8.3-MOBILE20-RC1', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
 const main=document.getElementById('main'),dialog=document.getElementById('detail');
 let coreSnapshot=false,teamSnapshotComplete=false;
 let items=[],live=false,readPending=null,sourceDate='',lastRead='',screen='home',filter='all',returnFocus=null,readMessage='현재 상태를 불러오는 중…',recognition=null,installPrompt=null,readStale=false,lastReadErrorStatus=0,lastCoreAttempt=0;
@@ -22,7 +22,7 @@ const APP_ASSET_HASH_KEY='hf-ui-assets-hash-v3';
 let assetCheckPending=null;
 async function liveAssetHash(){
  try{
-  const stamp=Date.now(),paths=['./app-flow.js','./hybrid05.css','./mobile.js','./index.html','./live-refresh.js'];
+  const stamp=Date.now(),paths=['./app-flow.js','./hybrid05.css','./mobile.js','./index.html','./live-refresh.js','./issue-context.js','./issue-workspace.js','./equipment-photos.js'];
   const parts=await Promise.all(paths.map(async path=>{
    const r=await fetch(path+'?watch='+stamp,{cache:'no-store',credentials:'same-origin'});
    if(!r.ok)throw Error('asset_fetch_failed');

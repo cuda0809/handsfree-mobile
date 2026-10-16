@@ -18,7 +18,7 @@ function hfAppCore_(ss){
 // Confirmed, precisely linked field events are operational evidence, not local drafts.
 // This read projection preserves Core/RAW, manual Next_Action, and shipping history.
 function hfAppCurrentEvidence_(projects,events,today){
- var byJob={},latest={},content={},issueContent={};projects.forEach(function(p){byJob[p.orderId]=p;});
+ var byJob={},latest={},content={},issueContent={},stageRequests={};projects.forEach(function(p){byJob[p.orderId]=p;});
  events.forEach(function(e){
   if(e[17]!=='WRITTEN'||e[2]!=='FIELD_INPUT'||!e[20]||e[15]!==e[20])return;
   var p=byJob[e[20]],date=hfAppDeliveryDay_(e[6]);if(!p||['A','B'].indexOf(p.team)<0||!date||String(e[1]||'').slice(0,10)>today||date==='2026-09-14')return;
@@ -28,19 +28,21 @@ function hfAppCurrentEvidence_(projects,events,today){
   [p.orderId,p.customer,p.model].forEach(function(v){if(v)text=text.split(String(v)).join(' ');});
   text=text.replace(/^[·\s]+/,'').replace(/\s+/g,' ').trim();
   var request=String(e[22]||e[0]||'').replace(/-E\d+$/,''),stamp=String(e[1]||''),c=content[p.orderId];
-  if(text&&(!c||stamp>c.stamp&&c.requestId!==request)){c=content[p.orderId]={requestId:request,stamp:stamp,date:date,lines:[],ids:[]};}
+  if(text&&(!c||stamp>c.stamp&&c.requestId!==request)){c=content[p.orderId]={requestId:request,stamp:stamp,date:date,lines:[],ids:[],stageLines:[],stageDate:'',stageId:''};}
   if(text&&c&&c.requestId===request){c.lines.push(text);c.ids.push(e[0]);if(date>c.date)c.date=date;if(stamp>c.stamp)c.stamp=stamp;}
   if(/대기|지연|불량|문제|고장|수정|불가|미입고|입고|반출|누락|이상|간섭/.test(text)){
    var issue=issueContent[p.orderId];
    if(!issue||stamp>issue.stamp&&issue.requestId!==request)issue=issueContent[p.orderId]={requestId:request,stamp:stamp,lines:[]};
    if(issue.requestId===request){if(issue.lines.indexOf(text)<0)issue.lines.push(text);if(stamp>issue.stamp)issue.stamp=stamp;}
   }
-  if(e[7]!=='일일작업'||date>today)return;
-  var candidates=text.split(/\r?\n|;|\/(?=\s*[가-힣])/).map(function(part){return part.trim().match(/^(?:조립\s*가능\s*파트\s*)?(조립|마감\s*조립|전장|배선|프로그램|검수|(?:리크|누설|구동)?\s*테스트)\s*(완료|진행(?:\s*중)?|중)(?:\s+(?:20\d{2}[-/.])?\d{1,2}[-/.]\d{1,2})?\s*$/);}).filter(Boolean);
-  if(candidates.length!==1)return;
-  var match=candidates[0],process=/테스트/.test(match[1])?'테스트':match[1],status=match[2]==='완료'?'완료':'진행';
-  var stamp=String(e[1]||''),prior=latest[p.orderId];
-  if(!prior||date>prior.date||date===prior.date&&stamp>prior.stamp)latest[p.orderId]={date:date,stamp:stamp,state:process+' '+status,process:/전장|배선/.test(process)?'전장':process==='테스트'?'검수':process,id:e[0],raw:text};
+  if(date>today||['일일작업','검수','불량발생','지연사유','일정변경'].indexOf(e[7])<0)return;
+  var key=p.orderId+'|'+request,g=stageRequests[key]||(stageRequests[key]={job:p.orderId,lines:[],date:date,stamp:stamp,ids:[]});
+  g.lines.push(text);g.ids.push(e[0]);if(date>g.date)g.date=date;if(stamp>g.stamp)g.stamp=stamp;
+ });
+ Object.keys(stageRequests).forEach(function(key){
+  var g=stageRequests[key],p=byJob[g.job];if(typeof HfIssueContext==='undefined')return;
+  var d=HfIssueContext.resolve(g.lines.join('\n'),p),prior=latest[g.job],evidence=g.lines.findIndex(function(line){return d.evidenceText&&line.indexOf(d.evidenceText)>=0;});
+  if(d.changesState&&!d.needsDecision&&(!prior||g.date>prior.date||g.date===prior.date&&g.stamp>prior.stamp))latest[g.job]={date:g.date,stamp:g.stamp,state:d.state,process:/테스트/.test(d.state)?'검수':d.state.split(' ')[0],id:g.ids[evidence>=0?evidence:d.explicitDecision?g.ids.length-1:0],raw:g.lines.join('\n'),explicitDecision:d.explicitDecision,rework:/재작업|재조립|다시|되돌|복귀/.test(g.lines.join('\n'))};
  });
  var projected=projects.map(function(p){
   var e=latest[p.orderId];if(!e||p.actualDelivery||/출고\s*완료|납품\s*완료|출고\s*대기/.test(p.state||''))return p;
@@ -49,7 +51,7 @@ function hfAppCurrentEvidence_(projects,events,today){
   var generic=p.state==='생산팀 조립자재 수령중'&&/입고|반출/.test(String(p.recentEvent||''));
   if(currentDay>e.date||!generic&&eventDay>e.date)return p;
   function stage(v){return /출고|납품/.test(v)?6:/검수|테스트|시험/.test(v)?5:/마감\s*조립/.test(v)?4:/프로그램/.test(v)?3:/전장|배선/.test(v)?2:/조립/.test(v)?1:0;}
-  if(stage(p.state||'')>stage(e.state))return p;
+  if(stage(p.state||'')>stage(e.state)&&!e.explicitDecision&&!e.rework)return p;
   // A newer explicit Core state remains authoritative (including same-day edits).
   if(!generic&&String(p.recentEventAt||'')>e.stamp)return p;
   var out={};Object.keys(p).forEach(function(k){out[k]=p[k];});

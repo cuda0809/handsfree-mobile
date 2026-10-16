@@ -5,6 +5,7 @@ import vm from 'node:vm';
 const server=fs.readFileSync('apps-script/HF_LIGHT_APP.gs','utf8');
 const flow=fs.readFileSync('kmt-sa2/app-flow.js','utf8');
 const ctx=vm.createContext({norm:v=>String(v||'').replace(/\s/g,'')});
+vm.runInContext(fs.readFileSync('kmt-sa2/issue-context.js','utf8'),ctx);
 vm.runInContext(server.slice(server.indexOf('function hfAppCurrentEvidence_'),server.indexOf('function hfAppDeliveryEvidence_')),ctx);
 vm.runInContext(flow.slice(flow.indexOf('function currentStatusLabel('),flow.indexOf('function projectCurrentFields(')),ctx);
 vm.runInContext(flow.slice(flow.indexOf('const HYBRID_FLOW_STAGES='),flow.indexOf('const PLAN_OVERVIEW_KEY=')),ctx);

@@ -15,6 +15,13 @@ function fixture(responses){
  return {request,calls};
 }
 const corePayload={op:'light_app',signed:JSON.stringify({action:'core'}),token:'fixture'};
+test('photo reads recover once; photo saves never retry network failures',async()=>{
+ for(const action of ['media-list','media-get','media-receipt','media-save']){
+  const f=fixture([{error:Object.assign(Error('reset'),{code:'ECONNRESET'})},{text:'{"ok":true}'}]);
+  const call=readAppsScript('https://script.google.com/macros/s/fixture/exec',{op:'light_media',signed:JSON.stringify({action})},1000,f.request);
+  if(action==='media-save'){await assert.rejects(call);assert.equal(f.calls.length,1);}else{assert.equal((await call).ok,true);assert.equal(f.calls.length,2);}
+ }
+});
 test('all signed read actions recover once while writes never recover',async()=>{
  for(const action of ['core','catalog','plans','reports','history','receipt','issue','edit']){
   const f=fixture([{error:Object.assign(Error('reset'),{code:'ECONNRESET'})},{text:'{"ok":true}'}]);

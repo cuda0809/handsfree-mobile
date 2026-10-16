@@ -32,6 +32,9 @@ function doPost(e) {
     if (!expected || supplied !== expected) {
       return hfMobileJson_({ok:false, schema:'HF_REAL_READ_V2', error:'unauthorized'});
     }
+    if (String(body.op || '') === 'light_media') {
+      return hfMobileJson_(hfLightMediaDispatch_(body));
+    }
     if (String(body.op || '') !== 'safe_write') {
       return hfMobileJson_({ok:false, schema:'HF_REAL_READ_V2', error:'unsupported_operation'});
     }

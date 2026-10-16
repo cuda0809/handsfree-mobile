@@ -6,6 +6,7 @@ import {createRequire} from 'node:module';
 const rules=createRequire(import.meta.url)('../kmt-sa2/production-rules.js');
 const source=fs.readFileSync('apps-script/HF_LIGHT_APP.gs','utf8');
 const ctx=vm.createContext({});
+vm.runInContext(fs.readFileSync('kmt-sa2/issue-context.js','utf8'),ctx);
 vm.runInContext(source.slice(source.indexOf('function hfAppCurrentEvidence_'),source.indexOf('// READ projection only:')),ctx);
 vm.runInContext(source.slice(source.indexOf('function hfAppDeliveryDay_'),source.indexOf('function hfAppDeliveryEvidence_')),ctx);
 const job='260727A-060-02',today='2026-10-07';
