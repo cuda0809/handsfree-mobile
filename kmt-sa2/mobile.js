@@ -22,7 +22,7 @@ const APP_ASSET_HASH_KEY='hf-ui-assets-hash-v2';
 let assetCheckPending=null;
 async function liveAssetHash(){
  try{
-  const stamp=Date.now(),paths=['./app-flow.js','./hybrid05.css','./mobile.js','./index.html'];
+  const stamp=Date.now(),paths=['./app-flow.js','./hybrid05.css','./mobile.js','./index.html','./live-refresh.js'];
   const parts=await Promise.all(paths.map(async path=>{
    const r=await fetch(path+'?watch='+stamp,{cache:'no-store',credentials:'same-origin'});
    if(!r.ok)throw Error('asset_fetch_failed');
