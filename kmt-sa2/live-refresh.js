@@ -13,12 +13,12 @@ function liveRefreshControls(){
  if(!button){button=document.createElement('button');button.id='hfRefreshNow';button.className='chip';button.onclick=()=>refreshLiveData(true);}
  if(button.parentElement!==host)host.appendChild(button);
  button.disabled=!!liveRefreshPending||!!readPending;
- button.textContent=button.disabled?'갱신 중…':liveRenderDeferred?'새 자료 반영':'↻ 지금 갱신';
+ button.textContent=button.disabled?'갱신 중…':'↻ 지금 갱신';
  button.setAttribute('aria-label','현재 화면 데이터 갱신');
  let status=$('hfRefreshStatus');
  if(!status){status=document.createElement('small');status.id='hfRefreshStatus';status.className='note';}
  if(status.parentElement!==host)host.appendChild(status);
- status.textContent=liveRenderDeferred?'새 자료 도착 · 입력을 마치면 반영':readStale?'최신 확인 필요':lastRead?'자동 갱신 · 마지막 확인 '+lastRead:'자동 갱신 대기';
+ status.textContent=(liveRenderDeferred?'입력 보존 중 · ':'자동 갱신 · ')+(readStale?'최신 확인 필요':lastRead?'마지막 확인 '+lastRead:'대기');
 }
 banner=function(){liveBannerBase();liveRefreshControls();};
 renderCoreScreen=function(){
@@ -42,7 +42,7 @@ async function refreshLiveData(manual=false){
   const core=await refresh(true);
   let plans=true;
   if(core&&typeof syncPlanOverview==='function'&&(manual||Date.now()-lastPlanAttempt>=120000))plans=!!await syncPlanOverview(true);
-  if(typeof reconcileEventReceipts==='function')await reconcileEventReceipts();
+  if(typeof reconcileEventReceipts==='function')Promise.resolve(reconcileEventReceipts()).catch(()=>{});
   return core===true&&plans;
  })().finally(()=>{liveRefreshPending=null;flushLiveRender();liveRefreshControls();});
  liveRefreshControls();return liveRefreshPending;
