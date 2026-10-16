@@ -41,7 +41,7 @@ async function openEquipmentPhotos(orderId,capture=false){
    if(!await confirmStored(result))throw Error('media_pending');
   }catch(e){if([400,401,403].includes(e.status)||['invalid_metadata','invalid_photo','project_mismatch','media_not_ready','forbidden'].includes(e.data?.error)){draft.status='draft';await photoDraftStore.run('readwrite',orderId,{...draft});}status.textContent=photoError(e)+(draft.status==='unknown'?' 저장 결과 확인을 눌러주세요.':' 입력은 보존되어 있습니다.');}finally{busy=false;lock();}}
   save.onclick=()=>savePhoto(false);resume.onclick=()=>savePhoto(true);
-  receipt.onclick=async()=>{if(busy)return;busy=true;lock();try{if(!await confirmStored(await photoCall({action:'media-receipt',orderId,requestId:draft.requestId})))status.textContent='저장이 아직 확인되지 않았습니다. 입력은 보존되며 자동 재전송하지 않습니다.';}catch(e){status.textContent=photoError(e);}finally{busy=false;lock();}};
+  receipt.onclick=async()=>{if(busy)return;busy=true;lock();try{if(!await confirmStored(await photoCall({action:'media-receipt',orderId,requestId:draft.requestId}))){if(draft.data){draft.status='unknown';await photoDraftStore.run('readwrite',orderId,{...draft});status.textContent='저장 완료 기록이 없습니다. 아래 ‘같은 기록 저장 이어하기’를 눌러 저장을 진행하세요. 사진·메모는 보존되어 있습니다.';}else status.textContent='저장할 사진이 선택되어 있지 않습니다. 촬영 또는 갤러리·파일 선택으로 사진을 선택한 뒤 저장하세요.';}}catch(e){status.textContent=photoError(e);}finally{busy=false;lock();}};
   lock();if(draft.status==='unknown')status.textContent='미확인 저장이 있습니다. 저장 결과 확인을 눌러주세요.';
  }
  $('photoCompose').onclick=renderDraft;
