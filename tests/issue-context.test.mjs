@@ -19,3 +19,13 @@ test('explicit completion-to-progress correction uses the corrected state, not t
  assert.equal(resolve('프레임조립 완료를 조립 진행으로 수정',{state:'1차 조립 진행 중'}).state,'조립 진행');
  assert.equal(resolve('프로그램 완료를 전장 진행으로 정정',{state:'프로그램 완료'}).state,'전장 진행');
 });
+
+test('seven stages keep test and inspection distinct and advance only from actual work',()=>{
+ assert.equal(resolve('테스트 진행',{state:'마감조립 완료'}).state,'테스트 진행');
+ assert.equal(resolve('검수 진행',{state:'테스트 완료'}).state,'검수 진행');
+ assert.equal(resolve('전장 완료',{state:'전장 진행'}).nextStage,'프로그램');
+ assert.equal(resolve('마감 완료',{state:'프로그램 완료'}).state,'마감조립 완료');
+ const ambiguous=resolve('작업 완료',{state:'전장 진행'});
+ assert.equal(ambiguous.needsDecision,true);assert.ok(ambiguous.candidates.includes('전장 완료'));
+ assert.equal(resolve('다음 주 테스트 예정',{state:'마감조립 완료'}).changesState,false);
+});

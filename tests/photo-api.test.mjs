@@ -12,6 +12,7 @@ test('photo API enforces method, origin, session and bounded signed metadata bef
   assert.equal((await call(base,{headers:{host:'fixture.test',origin:'https://evil.test',cookie}})).code,403);
   assert.equal((await call(base,{headers:{host:'fixture.test',origin:'https://fixture.test'}})).code,401);
   for(const patch of [{mime:'image/png'},{data:'invalid'},{memo:'x'.repeat(1001)},{requestId:'short'},{resume:'yes'}])assert.equal((await call({...base,...patch})).code,400);
+  assert.equal((await call({...base,memo:''})).code,503);
   const valid=await call(base);assert.equal(valid.code,503);assert.equal(valid.body.error,'not_configured');
  }finally{for(const k of Object.keys(process.env))if(!(k in before))delete process.env[k];Object.assign(process.env,before);}
 });

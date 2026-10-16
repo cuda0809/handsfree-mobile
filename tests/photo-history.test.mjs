@@ -38,14 +38,25 @@ test('closed safety gate records classification but writes no photos or equipmen
  const f=fixture();f.setGate('CLOSED');assert.throws(()=>f.c.hfMediaSave_(f.ss,f.b,f.body,f.target),/safe_write_not_ready/);assert.equal(f.files.size,0);assert.equal(f.tables.get('HF_MEDIA_저장대기').data[1][5],'PHOTO_NOTE');assert.equal(f.tables.has('HF_MEDIA_사진이력'),false);
 });
 test('tampered image hash and missing metadata fail before queue creation',()=>{
- for(const patch of [{hash:'a'.repeat(64)},{memo:''},{issueId:'wrong'}]){const f=fixture();assert.throws(()=>f.c.hfMediaSave_(f.ss,{...f.b,...patch},f.body,f.target),/invalid_photo|invalid_metadata/);assert.equal(f.tables.size,0);}
+ for(const patch of [{hash:'a'.repeat(64)},{memo:null},{issueId:'wrong'}]){const f=fixture();assert.throws(()=>f.c.hfMediaSave_(f.ss,{...f.b,...patch},f.body,f.target),/invalid_photo|invalid_metadata/);assert.equal(f.tables.size,0);}
 });
 test('today issue photo entry points remain separate from text issues and use actual plan processes',()=>{
  const flow=fs.readFileSync('kmt-sa2/app-flow.js','utf8'),today=flow.slice(flow.indexOf('function todayIssues(){'),flow.indexOf('function generalIssueForm(){'));
  assert.doesNotMatch(today,/today-issue-summary/);assert.match(today,/issuePlanProgress\(x\)/);assert.match(today,/openEquipmentPhotos/);
  const c=vm.createContext({esc:v=>String(v),HfIssueContext:{stage:v=>v==='전장'?2:v==='조립'?1:-1},planReadStale:false});vm.runInContext(fs.readFileSync('kmt-sa2/issue-workspace.js','utf8').split('const issueDecisionDrafts=')[0],c);
- const html=c.issuePlanProgress({state:'전장',planTimeline:[{process:'조립',date:'2026-10-01'},{process:'전장',date:'2026-10-02'}]});assert.match(html,/조립/);assert.match(html,/전장/);assert.doesNotMatch(html,/프로그램|출고|완료/);
+ const html=c.issuePlanProgress({state:'전장',planTimeline:[{process:'조립',date:'2026-10-01'},{process:'전장',date:'2026-10-02'}]});assert.match(html,/조립/);assert.match(html,/전장/);assert.doesNotMatch(html,/2026-|<span>완료/);for(const name of ['조립','전장','프로그램','마감조립','테스트','검수','출고'])assert.match(html,new RegExp('<b>'+name+'</b>'));
  const testing=c.issuePlanProgress({state:'테스트 진행',planTimeline:[{process:'테스트',date:'2026-10-01'},{process:'검수',date:'2026-10-02'}]});
  assert.match(testing,/<b>테스트<\/b><span>진행 중<\/span>/);assert.match(testing,/<b>검수<\/b>/);assert.doesNotMatch(testing,/2026-|<b>검수<\/b><span>진행/);
  const corrected=c.issuePlanProgress({state:'조립 진행',assemblyState:'조립 완료',planTimeline:[{process:'조립',date:'2026-10-08'}]});assert.match(corrected,/<b>조립<\/b><span>진행 중<\/span>/);
+});
+
+test('photo permission ignores same-email settings rows but rejects reader and duplicate role grants',()=>{
+ const c=vm.createContext({SpreadsheetApp:{openById:()=>({getSheetByName:()=>({getLastRow:()=>4,getRange:()=>({getDisplayValues:()=>c.permissionRows})})})},HF_SPREADSHEET_ID:'fixture',hfLsActor_:()=>({action:'media-save',actor:{email:'writer@example.test'}}),LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock(){}})}});
+ vm.runInContext(backend,c);c.hfMediaTarget_=()=>({});c.hfMediaSave_=()=>({ok:true,status:'STORED'});
+ c.permissionRows=[['user','writer@example.test','Writer / OPEN'],['setting','writer@example.test','OPEN']];
+ assert.equal(c.hfLightMediaDispatch_({}).status,'STORED');
+ c.permissionRows=[['user','writer@example.test','Reader / OPEN'],['setting','writer@example.test','OPEN']];
+ assert.throws(()=>c.hfLightMediaDispatch_({}),/forbidden/);
+ c.permissionRows=[['user','writer@example.test','Writer / OPEN'],['user','writer@example.test','Writer / OPEN']];
+ assert.throws(()=>c.hfLightMediaDispatch_({}),/forbidden/);
 });

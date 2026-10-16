@@ -36,7 +36,7 @@ function hfMediaFile_(folder,id,name,mime,bytes){
 function hfMediaView_(r){return {requestId:r[0],projectId:r[1],orderId:r[2],issueId:r[3],issueTitle:r[4],at:r[5],takenAt:r[6],actor:r[8],memo:r[9],mime:r[12],status:r[15]};}
 function hfMediaSave_(ss,b,body,target,isolatedRoot){
  if(isolatedRoot&&ss.getId()===HF_SPREADSHEET_ID)throw Error('production_test_forbidden');
- if(!/^[a-zA-Z0-9-]{16,80}$/.test(b.requestId||'')||!/^PHI-[a-zA-Z0-9-]{16,70}$/.test(b.issueId||'')||!b.issueTitle||b.issueTitle.length>80||!b.memo||b.memo.length>1000||b.mime!=='image/jpeg'||!(/^[a-f0-9]{64}$/).test(b.hash||''))throw Error('invalid_metadata');
+ if(!/^[a-zA-Z0-9-]{16,80}$/.test(b.requestId||'')||!/^PHI-[a-zA-Z0-9-]{16,70}$/.test(b.issueId||'')||!b.issueTitle||b.issueTitle.length>80||typeof b.memo!=='string'||b.memo.length>1000||b.mime!=='image/jpeg'||!(/^[a-f0-9]{64}$/).test(b.hash||''))throw Error('invalid_metadata');
  if(typeof body.data!=='string'||body.data.length>1400000)throw Error('invalid_photo');
  var bytes=Utilities.base64Decode(body.data),hash=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,bytes).map(function(x){return ('0'+(x&255).toString(16)).slice(-2);}).join('');
  if(bytes.length<4||bytes.length>1000000||(bytes[0]&255)!==255||(bytes[1]&255)!==216||(bytes[bytes.length-2]&255)!==255||(bytes[bytes.length-1]&255)!==217||hash!==b.hash)throw Error('invalid_photo');
@@ -69,7 +69,7 @@ function hfMediaSave_(ss,b,body,target,isolatedRoot){
 }
 function hfLightMediaDispatch_(body){
  var ss=SpreadsheetApp.openById(HF_SPREADSHEET_ID),b=hfLsActor_(body,ss),target=hfMediaTarget_(ss,b.orderId);
- var permitted=ss.getSheetByName('HF_SYS_권한관리').getRange(1,1,ss.getSheetByName('HF_SYS_권한관리').getLastRow(),3).getDisplayValues().filter(function(r){return r[1].toLowerCase()===b.actor.email;});
+ var permitted=ss.getSheetByName('HF_SYS_권한관리').getRange(1,1,ss.getSheetByName('HF_SYS_권한관리').getLastRow(),3).getDisplayValues().filter(function(r){return r[1].toLowerCase()===b.actor.email&&/^(Owner|Writer\b|Reader\b)/i.test(r[2]);});
  if(b.action==='media-save'&&(permitted.length!==1||!/^(Owner|Writer\b)/i.test(permitted[0][2])))throw Error('forbidden');
  if(b.action==='media-save'){var lock=LockService.getScriptLock();if(!lock.tryLock(8000))throw Error('busy');try{return hfMediaSave_(ss,b,body,target);}finally{lock.releaseLock();}}
  var rows=hfMediaRows_(hfMediaTable_(ss,HF_MEDIA.index,HF_MEDIA.headers,false),16).filter(function(r){return r[1]===target.id&&r[15]==='STORED';});

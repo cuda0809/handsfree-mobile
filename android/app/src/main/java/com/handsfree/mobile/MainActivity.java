@@ -94,10 +94,8 @@ public class MainActivity extends Activity {
                 camera.putExtra(MediaStore.EXTRA_OUTPUT, cameraOutput);
                 camera.setClipData(ClipData.newRawUri("equipment photo", cameraOutput));
                 camera.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-                Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*");
-                Intent chooser = Intent.createChooser(picker, "사진 촬영 또는 선택");
-                chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{camera});
-                try { startActivityForResult(chooser, PHOTO_PICK_REQUEST); }
+                Intent picker = Build.VERSION.SDK_INT >= 33 ? new Intent(MediaStore.ACTION_PICK_IMAGES).setType("image/*") : new Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*");
+                try { startActivityForResult(params.isCaptureEnabled() ? camera : picker, PHOTO_PICK_REQUEST); }
                 catch (android.content.ActivityNotFoundException e) { pendingPhoto.onReceiveValue(null); pendingPhoto = null; cameraOutput = null; }
                 return true;
             }
