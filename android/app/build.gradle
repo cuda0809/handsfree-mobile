@@ -40,6 +40,13 @@ android {
             versionNameSuffix '-preview'
             manifestPlaceholders = [appLabel: '핸즈프리 REAL Preview']
         }
+        camera {
+            initWith debug
+            applicationIdSuffix '.camera'
+            versionNameSuffix '-camera'
+            manifestPlaceholders = [appLabel: '핸즈프리 REAL 카메라']
+            matchingFallbacks = ['debug']
+        }
         release {
             minifyEnabled false
             if (hasReleaseSigning) {
