@@ -46,6 +46,6 @@ test('today issue photo entry points remain separate from text issues and use ac
  const c=vm.createContext({esc:v=>String(v),HfIssueContext:{stage:v=>v==='전장'?2:v==='조립'?1:-1},planReadStale:false});vm.runInContext(fs.readFileSync('kmt-sa2/issue-workspace.js','utf8').split('const issueDecisionDrafts=')[0],c);
  const html=c.issuePlanProgress({state:'전장',planTimeline:[{process:'조립',date:'2026-10-01'},{process:'전장',date:'2026-10-02'}]});assert.match(html,/조립/);assert.match(html,/전장/);assert.doesNotMatch(html,/프로그램|출고|완료/);
  const testing=c.issuePlanProgress({state:'테스트 진행',planTimeline:[{process:'테스트',date:'2026-10-01'},{process:'검수',date:'2026-10-02'}]});
- assert.match(testing,/<b>테스트<\/b><span>진행<\/span>/);assert.match(testing,/<b>검수<\/b><span>예정<\/span>/);
- const corrected=c.issuePlanProgress({state:'조립 진행',assemblyState:'조립 완료',planTimeline:[{process:'조립',date:'2026-10-08'}]});assert.match(corrected,/<b>조립<\/b><span>진행<\/span>/);
+ assert.match(testing,/<b>테스트<\/b><span>진행 중<\/span>/);assert.match(testing,/<b>검수<\/b>/);assert.doesNotMatch(testing,/2026-|<b>검수<\/b><span>진행/);
+ const corrected=c.issuePlanProgress({state:'조립 진행',assemblyState:'조립 완료',planTimeline:[{process:'조립',date:'2026-10-08'}]});assert.match(corrected,/<b>조립<\/b><span>진행 중<\/span>/);
 });
