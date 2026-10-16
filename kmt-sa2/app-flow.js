@@ -34,7 +34,7 @@ function formatHfDate(v){
 function isCompletedOperational(x){
  return productionClass(x)==='출고완료';
 }
-function currentProductionRows(){const today=HfProductionRules.today();return operationalRows(true).filter(x=>String(x.team||'').trim()==='B'&&!isCarryoverStock(x)&&HfProductionRules.manufacturingNow(x,today));}
+function currentProductionRows(){const today=HfProductionRules.today();return operationalRows(true).filter(x=>teamMatches(x)&&!isCarryoverStock(x)&&HfProductionRules.manufacturingNow(x,today));}
 function displayedNextAction(x){
  if(isCarryoverStock(x))return '고객 배정 시 제작·출고 계획 확인';
  const manual=String(x.nextAction||'').trim();
@@ -74,7 +74,7 @@ function operationalRows(includeCompleted=true){
   if(confirmed||map.has(orderId))continue;
   map.set(orderId,{orderId,...p,state:'계획',priority:2});
  }
- const rows=[...map.values()].filter(x=>String(x.team||'').trim()==='B').map(x=>{
+ const rows=[...map.values()].filter(x=>teamMatches(x)).map(x=>{
   const local=x.coreVerified?null:localInputs.get(String(x.orderId||''));
   const naturalState=local?.stateSyncVersion==='natural-v3'?String(local.displayState||'').trim():'';
   const localIssue=String(local?.text||'').trim();
@@ -214,7 +214,7 @@ function projectCurrentFields(x){
  const completed=isCompletedOperational(x);
  const issue=String(x.currentIssue||'').trim(),event=String(x.recentEvent||'').trim();
  const deliveryEvidence=(x.actualDeliveryEvidence||[]).map(e=>'<p>'+esc(e.date)+' · '+esc(e.source)+' · '+esc(e.sourceRef)+'</p>').join('');
- return (String(x.team||'').trim()==='B'?'<div class="project-linked-issue"><small>생산계획 분류</small><p>'+esc(productionClass(x))+'</p></div>':'')+(x.actualDeliveryReview?'<p class="alert">'+esc(x.actualDeliveryReview)+'</p>':'')+(deliveryEvidence?'<div class="project-linked-issue"><small>실출고일 근거</small>'+deliveryEvidence+'</div>':'')+(issue?'<div class="project-linked-issue"><small>'+esc(completed?'과거 이슈 기록':'현재 이슈')+'</small><p>'+esc(issue)+'</p></div>':'')+
+ return (teamMatches(x)?'<div class="project-linked-issue"><small>생산계획 분류</small><p>'+esc(productionClass(x))+'</p></div>':'')+(x.actualDeliveryReview?'<p class="alert">'+esc(x.actualDeliveryReview)+'</p>':'')+(deliveryEvidence?'<div class="project-linked-issue"><small>실출고일 근거</small>'+deliveryEvidence+'</div>':'')+(issue?'<div class="project-linked-issue"><small>'+esc(completed?'과거 이슈 기록':'현재 이슈')+'</small><p>'+esc(issue)+'</p></div>':'')+
  (event&&event!==issue?'<div class="project-linked-issue"><small>'+esc(completed?'과거 진행 기록':'최근 진행 기록')+'</small><p>'+esc(event)+'</p></div>':'')+
  '<div class="project-linked-issue"><small>다음 행동</small><p>'+esc(displayedNextAction(x))+'</p></div>';
 }
@@ -318,7 +318,7 @@ async function syncProjectMeta(force=false){
   try{
    // Metadata comes from the same verified snapshot, not another competing Core read.
    if(!coreSnapshot&&!await refresh(false))return cached||null;
-   const metadataRows=items.filter(x=>String(x.team||'').trim()==='B').map(x=>({...x}));
+   const metadataRows=items.filter(isABTeam).map(x=>({...x}));
    appProjects=metadataRows;
    appIssues=metadataRows.filter(x=>x.issueId);
    if(!readStale)persist(PROJECT_META_KEY,{cachedAt:new Date().toISOString(),source:'core',projects:metadataRows});
@@ -343,12 +343,12 @@ function showStockInventory(){
 }
 async function loadAppReport(mode){const title=mode==='support'?'타부서 지원':'생산 실적';open(heading('생산 · 지원 집계',title)+'<div id="appReportResult">원본 집계를 불러오는 중…</div>');const el=$('appReportResult');try{const d=await appCall({action:'reports'});if(mode==='production'){const core=await appCall({action:'core'});if(!Array.isArray(core.projects))throw Error('invalid_core');d.projects=core.projects;}if(!el.isConnected)return;appReport={mode,data:d};renderAppReport();}catch(e){appFailure(el,e);}}
 function productionReportMonths(data){
- const old=(data.monthly||[]).slice(1).filter(r=>r[0]&&r[1]);
+ const old=selectedTeam==='B'?(data.monthly||[]).slice(1).filter(r=>r[0]&&r[1]):[];
  if(!Array.isArray(data.projects))return old;
  const today=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'}),year=today.slice(0,4),counts=new Map(),seen=new Set();
  for(const p of data.projects){
   const date=HfProductionRules.day(p.actualDelivery),job=String(p.orderId||'');
-  if(p.team!=='B'||!date||date>today||!date.startsWith(year)||/REPARE|REPAIR|수리|^PT-/i.test(job+' '+String(p.model||''))||seen.has(job))continue;
+  if(!teamMatches(p)||!date||date>today||!date.startsWith(year)||/REPARE|REPAIR|수리|^PT-/i.test(job+' '+String(p.model||''))||seen.has(job))continue;
   seen.add(job);const qty=appQuantity(p.qty);if(qty<=0)throw Error('invalid_report');
   const month=Number(date.slice(5,7));counts.set(month,(counts.get(month)||0)+qty);
  }
@@ -360,21 +360,21 @@ function supportReportDay(r){
 function renderAppReport(){
  const el=$('appReportResult');if(!el||!appReport)return;const {mode,data}=appReport;
  try{
-  const support=mode==='support',monthly=productionReportMonths(data),annual=(data.annual||[]).slice(1).filter(r=>r[0]&&r[1]),supportRows=(data.support||[]).slice(1).filter(r=>supportReportDay(r));
+  const support=mode==='support',monthly=productionReportMonths(data),annual=selectedTeam==='B'?(data.annual||[]).slice(1).filter(r=>r[0]&&r[1]):[],supportRows=(data.support||[]).slice(1).filter(r=>supportReportDay(r));
   const years=[...new Set((support?supportRows.map(r=>supportReportDay(r).slice(0,4)):monthly.map(r=>String(r[0])).concat(data.projects?[String(new Date().getFullYear())]:[])).filter(Boolean))].sort().reverse();
   const year=$('reportYear')?.value||years[0]||String(new Date().getFullYear());
   let body='';
   if(support){
    const selected=supportRows.filter(r=>supportReportDay(r).startsWith(year)&&r[11]==='Y'&&r[8]==='확정'),monthPeople=new Map(),allPeople=new Set();
    selected.forEach(r=>{const month=Number(supportReportDay(r).slice(5,7)),names=String(r[5]||'').split(/[,·/]+/).map(v=>v.trim()).filter(Boolean);if(!monthPeople.has(month))monthPeople.set(month,{people:new Set(),cases:0});const group=monthPeople.get(month);group.cases++;names.forEach(name=>{group.people.add(name);allPeople.add(name);});});
-   body='<div class="action-box"><small>'+esc(year)+'년 타부서 지원</small><strong>'+allPeople.size+'명</strong><span>확정 '+selected.length+'건</span></div><h3>월별 지원 인원</h3><div class="month-list">'+Array.from({length:12},(_,i)=>i+1).map(m=>{const v=monthPeople.get(m);return '<div><b>'+m+'월</b><span>'+(v?v.people.size:0)+'명</span><small>'+(v?v.cases:0)+'건</small></div>';}).join('')+'</div><p class="note">월 인원은 참여자 이름의 중복을 제거한 인원수입니다. 연간 인원도 같은 사람의 중복을 제거합니다. 원본에서 확정되고 운영현황 표시가 Y인 기록만 포함합니다. 일자 미확정 주간 기록은 해당 월에 한 번만 집계합니다.</p><h3>지원 이력</h3>'+selected.slice().sort((a,b)=>supportReportDay(b).localeCompare(supportReportDay(a))).map(r=>'<div class="action-box"><b>'+esc(r[2]||r[9]||r[1])+' · '+esc(r[5]||'참여자 미등록')+'</b><p>'+esc(r[4])+'</p><small>'+esc(r[0]?appDay(r[0]):String(r[10]).split(' · ').slice(0,3).join(' · '))+'</small></div>').join('');
+   body='<div class="action-box"><small>'+esc(year)+'년 타부서 지원</small><strong>'+allPeople.size+'명</strong><span>확정 '+selected.length+'건</span></div><h3>월별 지원 인원</h3><div class="month-list">'+Array.from({length:12},(_,i)=>i+1).map(m=>{const v=monthPeople.get(m);return '<div><b>'+m+'월</b><span>'+(v?v.people.size:0)+'명</span><small>'+(v?v.cases:0)+'건</small></div>';}).join('')+'</div><p class="note">월 인원은 참여자 이름의 중복을 제거한 인원수입니다. 연간 인원도 같은 사람의 중복을 제거합니다. 팀 미분류 공통 지원 이력입니다. 팀 선택과 별도로 표시합니다. 원본에서 확정되고 운영현황 표시가 Y인 기록만 포함합니다. 일자 미확정 주간 기록은 해당 월에 한 번만 집계합니다.</p><h3>지원 이력</h3>'+selected.slice().sort((a,b)=>supportReportDay(b).localeCompare(supportReportDay(a))).map(r=>'<div class="action-box"><b>'+esc(r[2]||r[9]||r[1])+' · '+esc(r[5]||'참여자 미등록')+'</b><p>'+esc(r[4])+'</p><small>'+esc(r[0]?appDay(r[0]):String(r[10]).split(' · ').slice(0,3).join(' · '))+'</small></div>').join('');
   }else{
    const selected=monthly.filter(r=>String(r[0])===year),byMonth=new Map();selected.forEach(r=>byMonth.set(Number(r[1]),(byMonth.get(Number(r[1]))||0)+appQuantity(r[3])));
    const currentYear=String(new Date().getFullYear()),lastDataMonth=Math.max(0,...byMonth.keys()),lastMonth=year===currentYear?Math.max(new Date().getMonth()+1,lastDataMonth):Math.max(12,lastDataMonth);let cumulative=0;
    const monthRows=Array.from({length:lastMonth},(_,i)=>i+1).map(m=>{const qty=byMonth.get(m)||0;cumulative+=qty;return '<tr><td>'+m+'월</td><td>'+qty+'대</td><td><b>'+cumulative+'대</b></td></tr>';}).join('');
    const annualTotals=new Map();annual.forEach(r=>{const y=String(r[0]);annualTotals.set(y,(annualTotals.get(y)||0)+appQuantity(r[2]));});
    const past=[...annualTotals].filter(([y])=>y<year).sort((a,b)=>b[0].localeCompare(a[0]));
-   body='<div class="action-box"><small>'+esc(year)+'년 실제 납품 누적</small><strong>'+cumulative+'대</strong><span>'+lastMonth+'월까지</span></div><h3>월별 · 연간 누적</h3><table class="report-table"><thead><tr><th>월</th><th>월 생산</th><th>연간 누적</th></tr></thead><tbody>'+monthRows+'</tbody></table><h3>과거 연도 합계</h3>'+(past.length?'<div class="year-totals">'+past.map(([y,v])=>'<div><b>'+esc(y)+'년</b><strong>'+v+'대</strong></div>').join('')+'</div>':'<p>과거 연도 집계 기록이 없습니다.</p>')+'<p class="note">올해: 운영DB 실납기일 기준 · 과거: 원본 납품 집계표 · B팀 · 수리/PT 제외. 계획 진행률은 실적으로 계산하지 않습니다.</p>';
+   body='<div class="action-box"><small>'+esc(year)+'년 실제 납품 누적</small><strong>'+cumulative+'대</strong><span>'+lastMonth+'월까지</span></div><h3>월별 · 연간 누적</h3><table class="report-table"><thead><tr><th>월</th><th>월 생산</th><th>연간 누적</th></tr></thead><tbody>'+monthRows+'</tbody></table><h3>과거 연도 합계</h3>'+(past.length?'<div class="year-totals">'+past.map(([y,v])=>'<div><b>'+esc(y)+'년</b><strong>'+v+'대</strong></div>').join('')+'</div>':'<p>과거 연도 집계 기록이 없습니다.</p>')+'<p class="note">올해: 운영DB 실납기일 기준 · 과거: 원본 납품 집계표(B팀 과거 집계만 확인됨) · '+esc(selectedTeamLabel())+' · 수리/PT 제외. 계획 진행률은 실적으로 계산하지 않습니다.</p>';
   }
   el.innerHTML='<div class="report-controls"><label>기준 연도<select id="reportYear" onchange="renderAppReport()">'+years.map(y=>'<option '+(y===year?'selected':'')+'>'+esc(y)+'</option>').join('')+'</select></label></div>'+body;
  }catch(e){appFailure(el,e);}
@@ -383,7 +383,7 @@ const appWorkBase=work;
 work=function(f='all',query=''){appWorkBase(f,query);main.insertAdjacentHTML('afterbegin','<button class="secondary" onclick="allProjects()">전체 프로젝트 · 계획 · 이력</button>');};
 async function getAppProjects(){
  if(!await refresh(false))throw Error('core_unverified');
- appProjects=items.filter(x=>String(x.team||'').trim()==='B').map(x=>({...x}));
+ appProjects=items.filter(x=>teamMatches(x)).map(x=>({...x}));
  appIssues=appProjects.filter(x=>x.issueId);return appProjects;
 }
 async function allProjects(prefix='',purpose='detail'){
@@ -441,7 +441,7 @@ function lifecyclePreview(history,limit=4,item=null){
  return shown.length?shown.map(r=>'<div class="lifecycle-row '+esc(r.kind)+'"><time>'+esc(lifecycleDisplayAt(r.at))+'</time><div><span class="lifecycle-type">'+esc(r.type)+'</span><b>'+esc(r.text)+'</b>'+(r.change?'<p class="lifecycle-change">'+esc(r.change)+'</p>':'')+'<small>'+esc(r.actor)+'</small></div></div>').join(''):'<p class="empty">연결된 라이프사이클 기록이 없습니다.</p>';
 }
 async function projectLifecycle(orderId){
- if(!operationalRows(true).some(x=>x.orderId===orderId))return toast('B팀 장비의 최신 조회가 필요합니다.');
+ if(!operationalRows(true).some(x=>x.orderId===orderId))return toast('선택한 팀 장비의 최신 조회가 필요합니다.');
  const cached=projectHistoryCache.get(orderId)||lifecycleCacheGet(orderId)?.history||null;
  open(heading('LIFECYCLE','전체 라이프사이클',orderId)+'<div id="lifecycleResult"></div>');
  const el=$('lifecycleResult');
@@ -514,7 +514,7 @@ function applyLatestHistoryState(orderId,history){
  return true;
 }
 async function openProjectPlan(orderId,fallback={}){
- if(!operationalRows(true).some(x=>x.orderId===orderId))return toast('B팀 장비의 최신 조회가 필요합니다.');
+ if(!operationalRows(true).some(x=>x.orderId===orderId))return toast('선택한 팀 장비의 최신 조회가 필요합니다.');
  open(heading('계획일정',fallback.customer||orderId,fallback.model||'')+'<div id="projectDirectPlan">원본 계획을 불러오는 중…</div>');
  const el=$('projectDirectPlan');
  try{
@@ -583,7 +583,7 @@ function pageDetailHtml(x,purpose){
   '<p class="note">토·일 제외 · 마감조립은 프로그램 후 검수 전 1~2일 자동 계획입니다. 테스트와의 중첩은 일정 충돌로 보지 않습니다. 계획은 완료 실적이 아닙니다.</p>';
 }
 function openPageDetail(orderId,purpose,sourceSnapshot){
- if(!operationalRows(true).some(x=>x.orderId===orderId))return toast('B팀 장비의 최신 조회가 필요합니다.');
+ if(!operationalRows(true).some(x=>x.orderId===orderId))return toast('선택한 팀 장비의 최신 조회가 필요합니다.');
  const x=projectDetailRow(orderId,sourceSnapshot||{});
  open(pageDetailHtml(x,purpose)+(readStale?'<p class="alert">최신 조회 미확인 · 최근 확인 자료입니다.</p>':'')+
   (purpose==='plan'?'<button id="contextScheduleEdit" class="primary">일정 확인 · 수정</button>':'')+
@@ -592,7 +592,7 @@ function openPageDetail(orderId,purpose,sourceSnapshot){
  if(purpose==='plan')$('contextScheduleEdit').onclick=()=>scheduleReport(x);
 }
 async function openProject(orderId,purpose='detail',sourceSnapshot=null){
- if(!operationalRows(true).some(x=>x.orderId===orderId))return toast('B팀 장비의 최신 조회가 필요합니다.');
+ if(!operationalRows(true).some(x=>x.orderId===orderId))return toast('선택한 팀 장비의 최신 조회가 필요합니다.');
  if(sourceSnapshot?.orderId)rememberProjectDetail(sourceSnapshot);
  const entrySnapshot=sourceSnapshot?.orderId===orderId?{...sourceSnapshot}:{...(PROJECT_DETAIL_SNAPSHOT.get(String(orderId))||{})};
  let p=projectDetailRow(orderId,sourceSnapshot||appProjects.find(x=>x.orderId===orderId)||items.find(x=>x.orderId===orderId)||{});
@@ -619,7 +619,7 @@ async function openProject(orderId,purpose='detail',sourceSnapshot=null){
   const closed=isCompletedOperational(linked);
   const currentStage=closed?stageNames.length-1:strictCurrentStageIndex({state:currentState,process:linked.process||''});
   const actualDay=formatHfDate(linked.actualDelivery||p.actualDelivery);
-  const bTeam=String(linked.team||'').trim()==='B';
+  const bTeam=isABTeam(linked);
   const currentDate=closed&&actualDay!=='미정'?actualDay:(appDay(linked.since)||appDay(linked.sourceLatestUpdate)||(bTeam?'미등록':new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'})));
   const savedPlanStages=projectPlanStageMap(linked.planTimeline||[]);
   const planByStage={자재:'',조립:linked.planAssembly||'',전장:linked.planElectrical||'',프로그램:linked.planProgram||'',마감조립:linked.planFinishing||savedPlanStages.get('마감조립')?.start||'',검수:linked.planInspection||'',출고:linked.planDelivery||''};
@@ -899,7 +899,7 @@ async function syncPlanOverview(force=false){
   const [d,confirmed]=await Promise.all([appCall({action:'plans'}),coreReady]);
   if(!confirmed)throw Error('core_unverified');
   if(!Array.isArray(d.records)||!d.generatedAt)throw Error('invalid_plans');
-  const allowed=new Set(items.filter(x=>String(x.team||'').trim()==='B').map(x=>x.orderId));
+  const allowed=new Set(items.filter(isABTeam).map(x=>x.orderId));
   const grouped=new Map();
   for(const r of d.records){
    if(!allowed.has(r?.orderId))continue;
@@ -908,7 +908,7 @@ async function syncPlanOverview(force=false){
    grouped.get(r.orderId).push(r);
   }
   const byOrder={};
-  for(const [orderId,records] of grouped)byOrder[orderId]=summarizePlanRecords(records,items.some(x=>x.orderId===orderId&&String(x.team||'').trim()==='B'));
+  for(const [orderId,records] of grouped)byOrder[orderId]=summarizePlanRecords(records,items.some(x=>x.orderId===orderId&&isABTeam(x)));
   planReadStale=false;
   const cacheChanged=JSON.stringify(byOrder)!==JSON.stringify(cached?.byOrder||{});
   persist(PLAN_OVERVIEW_KEY,{completePlan:true,cachedAt:new Date().toISOString(),byOrder,candidateCount:grouped.size});
@@ -951,7 +951,7 @@ function productionPlan(mode='plan',skipMeta=false){
   const deliveryTabs='<div class="plan-switch"><button class="'+(deliveryView==='active'?'active':'')+'" onclick="deliveryView=\'active\';productionPlan(\'delivery\',true)">진행 · 출고대기 · '+count(selected)+'</button><button class="'+(deliveryView==='completed'?'active':'')+'" onclick="deliveryView=\'completed\';productionPlan(\'delivery\',true)">출고완료 · '+count(completed)+'</button></div>';
   main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">PRODUCTION CONTROL</div><h1>계획</h1></div></div>'+tabs+
   (readStale||planReadStale?'<div class="alert">최신 조회 미확인 · 이전 정상값 표시</div>':'')+'<p class="hybrid-desc">납기는 고객 약속일입니다. 실납기일은 확인된 실제 출고일이며, 입력한 날짜나 출고 예정일로 대신하지 않습니다.</p>'+deliveryTabs+'<input id="deliverySearch" class="hybrid-search" placeholder="전체 연도 고객 · 장비 · JOB NO. 검색" value="'+esc(deliverySearch)+'" oninput="deliverySearch=this.value;productionPlan(\'delivery\',true);const e=document.getElementById(\'deliverySearch\');e.focus();e.setSelectionRange(e.value.length,e.value.length)"><div id="deliveryList" class="hybrid-promise-list">'+
-  (deliveryRows.length?(deliveryView==='completed'?completedYearHtml(deliveryRows,deliverySearch,rows=>rows.map(x=>{const due=formatHfDate(x.due),actual=formatHfDate(x.actualDelivery);return '<button class="hybrid-promise-row delivery-v2 hf-card '+hfCardTone(x,deliveryView==='completed'?'completed':'active')+'" data-delivery-order="'+esc(x.orderId)+'"><div class="delivery-dates"><div><small>납기</small><strong>'+esc(due)+'</strong></div><div><small>실납기일</small><strong>'+esc(actual)+'</strong></div></div>'+(String(x.team||'').trim()==='B'?'<p>출고 계획 · '+esc(formatHfDate(x.planDelivery))+' (실적 아님)</p>':'')+(x.actualDeliveryReview?'<p class="alert">'+esc(x.actualDeliveryReview)+'</p>':'')+(x.actualDeliveryEvidence?.length?'<p>출고완료 근거 · '+esc([...new Set(x.actualDeliveryEvidence.map(e=>e.source))].join(' · '))+'</p>':'')+hfDueAlert(x)+'<div class="delivery-main"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><small class="delivery-job">JOB NO. '+esc(x.orderId||'미등록')+'</small><p><span>현재</span>'+esc(currentStatusLabel(x))+'</p><p><span>다음</span>'+esc(displayedNextAction(x))+'</p></div>'+hybridStageFlow(x)+'</button>';}).join('')):deliveryRows.map(x=>{const due=formatHfDate(x.due),actual=formatHfDate(x.actualDelivery);return '<button class="hybrid-promise-row delivery-v2 hf-card '+hfCardTone(x,deliveryView==='completed'?'completed':'active')+'" data-delivery-order="'+esc(x.orderId)+'"><div class="delivery-dates"><div><small>납기</small><strong>'+esc(due)+'</strong></div><div><small>실납기일</small><strong>'+esc(actual)+'</strong></div></div>'+(String(x.team||'').trim()==='B'?'<p>출고 계획 · '+esc(formatHfDate(x.planDelivery))+' (실적 아님)</p>':'')+(x.actualDeliveryReview?'<p class="alert">'+esc(x.actualDeliveryReview)+'</p>':'')+(x.actualDeliveryEvidence?.length?'<p>출고완료 근거 · '+esc([...new Set(x.actualDeliveryEvidence.map(e=>e.source))].join(' · '))+'</p>':'')+hfDueAlert(x)+'<div class="delivery-main"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><small class="delivery-job">JOB NO. '+esc(x.orderId||'미등록')+'</small><p><span>현재</span>'+esc(currentStatusLabel(x))+'</p><p><span>다음</span>'+esc(displayedNextAction(x))+'</p></div>'+hybridStageFlow(x)+'</button>';}).join('')):'<p class="empty">'+(readStale||planReadStale?'최신 목록을 확인하지 못했습니다.':'해당하는 장비가 없습니다.')+'</p>')+
+  (deliveryRows.length?(deliveryView==='completed'?completedYearHtml(deliveryRows,deliverySearch,rows=>rows.map(x=>{const due=formatHfDate(x.due),actual=formatHfDate(x.actualDelivery);return '<button class="hybrid-promise-row delivery-v2 hf-card '+hfCardTone(x,deliveryView==='completed'?'completed':'active')+'" data-delivery-order="'+esc(x.orderId)+'"><div class="delivery-dates"><div><small>납기</small><strong>'+esc(due)+'</strong></div><div><small>실납기일</small><strong>'+esc(actual)+'</strong></div></div>'+(teamMatches(x)?'<p>출고 계획 · '+esc(formatHfDate(x.planDelivery))+' (실적 아님)</p>':'')+(x.actualDeliveryReview?'<p class="alert">'+esc(x.actualDeliveryReview)+'</p>':'')+(x.actualDeliveryEvidence?.length?'<p>출고완료 근거 · '+esc([...new Set(x.actualDeliveryEvidence.map(e=>e.source))].join(' · '))+'</p>':'')+hfDueAlert(x)+'<div class="delivery-main"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><small class="delivery-job">JOB NO. '+esc(x.orderId||'미등록')+'</small><p><span>현재</span>'+esc(currentStatusLabel(x))+'</p><p><span>다음</span>'+esc(displayedNextAction(x))+'</p></div>'+hybridStageFlow(x)+'</button>';}).join('')):deliveryRows.map(x=>{const due=formatHfDate(x.due),actual=formatHfDate(x.actualDelivery);return '<button class="hybrid-promise-row delivery-v2 hf-card '+hfCardTone(x,deliveryView==='completed'?'completed':'active')+'" data-delivery-order="'+esc(x.orderId)+'"><div class="delivery-dates"><div><small>납기</small><strong>'+esc(due)+'</strong></div><div><small>실납기일</small><strong>'+esc(actual)+'</strong></div></div>'+(teamMatches(x)?'<p>출고 계획 · '+esc(formatHfDate(x.planDelivery))+' (실적 아님)</p>':'')+(x.actualDeliveryReview?'<p class="alert">'+esc(x.actualDeliveryReview)+'</p>':'')+(x.actualDeliveryEvidence?.length?'<p>출고완료 근거 · '+esc([...new Set(x.actualDeliveryEvidence.map(e=>e.source))].join(' · '))+'</p>':'')+hfDueAlert(x)+'<div class="delivery-main"><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><small class="delivery-job">JOB NO. '+esc(x.orderId||'미등록')+'</small><p><span>현재</span>'+esc(currentStatusLabel(x))+'</p><p><span>다음</span>'+esc(displayedNextAction(x))+'</p></div>'+hybridStageFlow(x)+'</button>';}).join('')):'<p class="empty">'+(readStale||planReadStale?'최신 목록을 확인하지 못했습니다.':'해당하는 장비가 없습니다.')+'</p>')+
   '</div>';
   const el=$('deliveryList');el?.querySelectorAll('[data-delivery-order]').forEach(b=>b.onclick=()=>openProject(b.dataset.deliveryOrder,'plan'));
   return;
@@ -969,7 +969,7 @@ function productionPlan(mode='plan',skipMeta=false){
  (selected.length?selected.map(x=>{
    const planned=allStages.some(s=>formatHfDate(planValue(x,s))!=='미정');
    const review=planReviewReasons(x);
-   return '<button class="production-plan-card hf-card '+hfCardTone(x,'plan')+'" data-plan-review="'+(review.length?'true':'false')+'" data-plan-order="'+esc(x.orderId)+'"><div class="production-plan-head"><div><small>JOB NO. '+esc(x.orderId||'미등록')+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b></div><span class="'+(planned?'set':'unset')+'">'+(String(x.team||'').trim()==='B'?productionClass(x):(planned?'일정 있음':'제작일정 미정'))+'</span></div>'+hfDueAlert(x)+(review.length?'<div class="plan-review-notice"><b>일정 확인 필요</b><p>'+esc(review.join(' / '))+'</p></div>':'')+
+   return '<button class="production-plan-card hf-card '+hfCardTone(x,'plan')+'" data-plan-review="'+(review.length?'true':'false')+'" data-plan-order="'+esc(x.orderId)+'"><div class="production-plan-head"><div><small>JOB NO. '+esc(x.orderId||'미등록')+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b></div><span class="'+(planned?'set':'unset')+'">'+(teamMatches(x)?productionClass(x):(planned?'일정 있음':'제작일정 미정'))+'</span></div>'+hfDueAlert(x)+(review.length?'<div class="plan-review-notice"><b>일정 확인 필요</b><p>'+esc(review.join(' / '))+'</p></div>':'')+
    '<div class="production-plan-meta"><div><small>납기</small><b>'+esc(formatHfDate(x.due))+'</b></div><div><small>현재</small><b>'+esc(currentStatusLabel(x))+'</b></div></div>'+
    '<div class="production-plan-stages">'+allStages.map(name=>'<div><small>'+name+'</small><b>'+esc(name==='마감조립'?finishingPlan(x).label:formatHfDate(planValue(x,name)))+'</b></div>').join('')+'</div>'+
    '<p class="production-plan-next"><span>다음 행동</span>'+esc(displayedNextAction(x))+'</p></button>';
@@ -1235,7 +1235,7 @@ function todayIssues(){
  const todayKey=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
  const todayLocal=visibleNotes().filter(r=>{try{return new Date(r.createdAt).toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'})===todayKey&&(r.eventType||r.eventOnly);}catch{return false;}});
  main.innerHTML='<div class="hybrid-page-head"><div><div class="hybrid-eyebrow">TODAY ISSUES</div><h1>오늘 이슈</h1></div></div>'+
- '<p class="hybrid-desc">B팀에서 실제 제작 중인 장비만 표시합니다. 타팀·작업 예정·자재 대기만 하는 장비·출고대기·완료 장비는 제외합니다.</p>'+
+ '<p class="hybrid-desc">'+esc(selectedTeamLabel())+'에서 실제 제작 중인 장비만 표시합니다. 작업 예정·자재 대기만 하는 장비·출고대기·완료 장비는 제외합니다.</p>'+
  (readStale||planReadStale?'<p class="alert">최신 조회 미확인 · 이전 목록은 참고용입니다.</p>':'')+
  '<div class="today-issue-list">'+
  (activeRows.length?activeRows.map(x=>{const key=todayIssueKey(x),opened=todayIssueOpenId===key,hasIssue=!!x.issueId;return '<section class="today-issue-card hf-card '+hfCardTone(x,hasIssue?'issue':'plan')+' '+(opened?'open':'')+'">'+

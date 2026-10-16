@@ -13,6 +13,10 @@ test('explicit dated completion projects shipment day, not received date; preser
   const e=event(raw),before=JSON.stringify([project,e]);const p=run(project,[e]);assert.equal(p.actualDelivery,'2026-10-01');assert.equal(p.state,project.state);assert.equal(p.nextAction,project.nextAction);assert.equal(p.actualDeliveryEvidence[0].source,'Event');assert.equal(JSON.stringify([project,e]),before);
  }
 });
+test('A-team explicit shipment evidence is projected without changing team or original fields',()=>{
+ const p={...project,team:'A'},e=event('출고완료 10/1'),before=JSON.stringify([p,e]);
+ const out=run(p,[e]);assert.equal(out.actualDelivery,'2026-10-01');assert.equal(out.team,'A');assert.equal(JSON.stringify([p,e]),before);
+});
 test('plans, unresolved targets, partial shipment, failed events and undated messages cannot create actual dates',()=>{
  for(const raw of ['출고완료','10/1 출고완료 예정','10/1 출고완료 아님','10/1 출고대기','10/1 외주 출고완료','10/1 부분 출고완료','10/1 출고완료 취소','10/1 재출고 완료','2026-02-30 출고완료','10/8 출고완료','260727A-060-02 출고완료 10/1','260727A-060-* 출고완료 10/1'])assert.equal(run(project,[event(raw)]).actualDelivery,'',raw);
  for(const patch of [{17:'EXCLUDED'},{17:'REVIEW'},{14:'검토'},{6:'2026-09-14'}])assert.equal(run(project,[event('출고완료 10/1',patch)]).actualDelivery,'');
@@ -24,7 +28,7 @@ test('conflicts and current shipping-wait require review; existing dates stay au
  const p=run(project,[event('출고완료 10/1'),event('출고완료 10/2')]);assert.equal(p.actualDelivery,'');assert.match(p.actualDeliveryReview,/충돌/);
  const wait=run({...project,state:'출고대기'},[event('출고완료 10/1')]);assert.equal(wait.actualDelivery,'');assert.match(wait.actualDeliveryReview,/충돌/);
  const canceled=run(project,[event('출고완료 10/1'),event('출고완료 취소')]);assert.equal(canceled.actualDelivery,'');assert.match(canceled.actualDeliveryReview,/취소/);
- assert.equal(run({...project,team:'A'},[event('출고완료 10/1')]).actualDelivery,'');
+ assert.equal(run({...project,team:'C'},[event('출고완료 10/1')]).actualDelivery,'');
  assert.equal(run(project,[event('출고완료 10/1',{7:'기타',15:'',20:''})]).actualDelivery,'','general journal cannot imply equipment shipment');
 });
 test('confirmed journal business date is accepted only with exact job; auto-stamped event mirrors are excluded',()=>{

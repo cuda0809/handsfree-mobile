@@ -31,7 +31,7 @@
   const months=[...new Set(list.map(r=>r.sourceMonth).filter(Boolean))].sort(),month=months.at(-1)||'';
   const current=list.filter(r=>!month||r.sourceMonth===month);
   // Explicit source-verified monthly snapshots supersede collection rows, not history.
-  const snapshots=current.filter(r=>String(r.recordId||'').startsWith('BVERIFIED|'));
+  const snapshots=current.filter(r=>/^[AB]VERIFIED\|/.test(String(r.recordId||'')));
   const revision=snapshots.map(r=>String(r.recordId).split('|')[1]).sort().at(-1);
   const verified=snapshots.filter(r=>String(r.recordId).split('|')[1]===revision);
   if(verified.some(r=>typeof r.status!=='string'||!r.sourceRef))throw Error('plan_provenance_not_supported');
@@ -56,7 +56,7 @@
   // intermediate stage is complete and follow-up fabrication remains.
   const evidence=x.productionEvidence;
   if(x.planSourceVerified===true&&evidence?.status==='진행 중'&&
-   String(evidence.recordId||'').startsWith('BVERIFIED|')&&
+   /^[AB]VERIFIED\|/.test(String(evidence.recordId||''))&&
    evidence.sourceMonth===today.slice(0,7)&&day(evidence.date)&&day(evidence.date)<=today&&
    /실제 진행 근거\s*:\s*\S/.test(String(evidence.sourceRef||''))&&
    !/제작\s*(?:완료|종료)|작업\s*(?:중단|취소)/.test(String(x.state||'')))return true;

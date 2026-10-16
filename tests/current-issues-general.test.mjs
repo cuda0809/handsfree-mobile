@@ -1,3 +1,4 @@
+import {scopeContext} from './team-scope-context.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -11,7 +12,7 @@ test('current issue filter uses evidence, not job year; storage and history cann
  {orderId:'26-FUTURE',state:'조립 예정',planTimeline:[{date:'2026-10-12',process:'조립'}]},
  {orderId:'26-UNKNOWN',state:'상태 확인'}, {orderId:'26-WORK',state:'조립 진행'}];
  rows.forEach(x=>x.team='B');rows.push({orderId:'260319A-020',team:'A',state:'조립 진행'},{orderId:'260319A-021',team:'A',state:'납품 전 마무리 작업 중'});
- const c=vm.createContext({HfProductionRules:rules,operationalRows:()=>rows,productionClass:x=>rules.classify(x,'2026-10-06')});
+ const c=scopeContext({HfProductionRules:rules,operationalRows:()=>rows,productionClass:x=>rules.classify(x,'2026-10-06')});
  vm.runInContext(src.slice(src.indexOf('function isCarryoverStock('),src.indexOf('function priorityReasonHtml(')),c);
  vm.runInContext(src.slice(src.indexOf('function isCompletedOperational('),src.indexOf('function latestUnifiedInputByOrder(')),c);
  assert.deepEqual(Array.from(c.currentProductionRows(),x=>x.orderId),['25-REAL-WORK','26-WORK']);
@@ -25,7 +26,7 @@ test('current issue filter uses evidence, not job year; storage and history cann
 });
 const engine=fs.readFileSync('apps-script/HF_REAL_SAFE_WRITE_V08.gs','utf8');
 test('general issue normalization never resolves equipment; excluded date and closed gate preserved',()=>{
- const c=vm.createContext({Date,HF_SW:{TZ:'Asia/Seoul'},Utilities:{formatDate:d=>d.toISOString().slice(0,10)},
+ const c=scopeContext({Date,HF_SW:{TZ:'Asia/Seoul'},Utilities:{formatDate:d=>d.toISOString().slice(0,10)},
  parseDate_:raw=>new Date(raw.includes('9/14')?'2026-09-14T00:00:00Z':'2026-10-06T00:00:00Z'),
  safety_:()=> '2026-09-14',extractPeople_:()=>['테스트인원'],resolveProject_(){throw Error('must not resolve project');}});
  vm.runInContext(engine.slice(engine.indexOf('function normalEvent_('),engine.indexOf('function workType_(')),c);
@@ -40,7 +41,7 @@ test('general issue normalization never resolves equipment; excluded date and cl
 });
 test('general receipt requires every exact raw event, no project linkage; no equipment state write',async()=>{
  let note={id:'g1',eventType:'GENERAL',text:'인원지원',requestId:'req1'},updates=[];
- const c=vm.createContext({notes:()=>[note],receiptState:()=> 'saved_unverified',updateNote:(id,p)=>{updates.push(p);Object.assign(note,p);},Date});
+ const c=scopeContext({notes:()=>[note],receiptState:()=> 'saved_unverified',updateNote:(id,p)=>{updates.push(p);Object.assign(note,p);},Date});
  vm.runInContext(src.slice(src.indexOf('async function verifyEventNote('),src.indexOf('async function syncProgressIssue(')),c);
  const good={requestId:'req1',events:[{status:'WRITTEN',orderId:'',raw:'인원지원'}]};
  assert.equal(await c.verifyEventNote('g1',good),true);assert.equal(note.status,'applied');
@@ -51,7 +52,7 @@ test('general receipt requires every exact raw event, no project linkage; no equ
 });
 test('isolated Queue -> normalization -> safety gate -> journal readback across 36 general examples',()=>{
  let gate=true,statuses=[],written=[];
- const c=vm.createContext({Date,HF_SW:{TZ:'Asia/Seoul',SHEET:{FIELD:'field',WORK:'work'},ID:{FIELD:1,WORK:2}},Utilities:{formatDate:d=>d.toISOString().slice(0,10)},
+ const c=scopeContext({Date,HF_SW:{TZ:'Asia/Seoul',SHEET:{FIELD:'field',WORK:'work'},ID:{FIELD:1,WORK:2}},Utilities:{formatDate:d=>d.toISOString().slice(0,10)},
  parseDate_:raw=>new Date(raw.includes('9/14')?'2026-09-14T00:00:00Z':'2026-10-06T00:00:00Z'),safety_:()=> '2026-09-14',extractPeople_:()=>[],
  getSheet_:()=>({}),fieldOpen_:()=>gate,appendNorm_:(ss,e)=>{statuses.push({e});return statuses.length-1;},setNormStatus_:(ss,n,s)=>statuses[n].status=s,
  setInputStatus_(){},writeWork_:(ss,e)=>{written.push({...e});return {ok:true,row:8+written.length};},dt_:()=> 'now'});
@@ -67,7 +68,7 @@ test('isolated Queue -> normalization -> safety gate -> journal readback across 
  assert.equal(queue.filter(([col,v])=>col===6&&v==='DONE').length,36);
 });
 test('unallocated finished stock is separate from waiting shipment and active fabrication',()=>{
- const c=vm.createContext({productionClass:x=>rules.classify(x,'2026-10-07')});
+ const c=scopeContext({productionClass:x=>rules.classify(x,'2026-10-07')});
  vm.runInContext(src.slice(src.indexOf('function isCompletedOperational('),src.indexOf('function latestUnifiedInputByOrder(')),c);
  vm.runInContext(src.slice(src.indexOf('function isCarryoverStock('),src.indexOf('function priorityReasonHtml(')),c);
  const stock={orderId:'251215A-144-04',customer:'재고',state:'출고대기'};

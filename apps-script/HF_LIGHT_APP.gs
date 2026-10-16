@@ -21,7 +21,7 @@ function hfAppCurrentEvidence_(projects,events,today){
  var byJob={},latest={},content={},issueContent={};projects.forEach(function(p){byJob[p.orderId]=p;});
  events.forEach(function(e){
   if(e[17]!=='WRITTEN'||e[2]!=='FIELD_INPUT'||!e[20]||e[15]!==e[20])return;
-  var p=byJob[e[20]],date=hfAppDeliveryDay_(e[6]);if(!p||p.team!=='B'||!date||String(e[1]||'').slice(0,10)>today||date==='2026-09-14')return;
+  var p=byJob[e[20]],date=hfAppDeliveryDay_(e[6]);if(!p||['A','B'].indexOf(p.team)<0||!date||String(e[1]||'').slice(0,10)>today||date==='2026-09-14')return;
   var raw=String(e[3]||''),jobs=raw.match(/(?:[A-Z]{2,4}-)?\d{6}[A-Z]-\d{3}(?:-\d+)?/g)||[];
   if(!jobs.length||jobs.some(function(j){return j!==p.orderId;}))return;
   var text=String(e[10]||'').replace(/^[·\s]+/,'').replace(/^\[(?:NOTE|PROGRESS|WAIT|ISSUE)\]\s*/,'').trim();
@@ -76,7 +76,7 @@ function hfAppDeliveryEvidence_(projects,events,journal,today){
   if(!/(?:출고|납품).*(?:취소|철회|아님|오류)|(?:취소|철회).*(?:출고|납품)/.test(String(raw||'')))return;
   var jobs=String(raw||'').match(/(?:[A-Z]{2,4}-)?\d{6}[A-Z]-\d{3}(?:-\d+)?/g)||[];jobs=jobs.filter(function(j,i,a){return a.indexOf(j)===i;});
   var p=byId[linked]||(jobs.length===1?byId[jobs[0]]:null);
-  if(p&&p.team==='B'&&jobs.length<=1&&(!jobs.length||jobs[0]===p.orderId))blocked[p.orderId]=true;
+  if(p&&['A','B'].indexOf(p.team)>=0&&jobs.length<=1&&(!jobs.length||jobs[0]===p.orderId))blocked[p.orderId]=true;
  }
  function inspect(raw,linked,businessDay,source,sourceRef,manual){
   raw=String(raw||'');
@@ -84,7 +84,7 @@ function hfAppDeliveryEvidence_(projects,events,journal,today){
   var jobs=raw.match(/(?:[A-Z]{2,4}-)?\d{6}[A-Z]-\d{3}(?:-\d+)?/g)||[];
   jobs=jobs.filter(function(j,i,a){return a.indexOf(j)===i;});
   var p=byId[linked]||(jobs.length===1?byId[jobs[0]]:null);
-  if(!p||p.team!=='B'||jobs.length>1||(jobs.length===1&&jobs[0]!==p.orderId))return;
+  if(!p||['A','B'].indexOf(p.team)<0||jobs.length>1||(jobs.length===1&&jobs[0]!==p.orderId))return;
   if(Number(p.qty)>1&&!/전량|전체/.test(raw))return;
   var business=hfAppDeliveryDay_(businessDay),clean=raw.replace(/(?:[A-Z]{2,4}-)?\d{6}[A-Z]-\d{3}(?:-\d+)?/g,'').replace(/(20\d{2})년\s*/g,'$1-').replace(/(\d{1,2})월\s*(\d{1,2})일/g,'$1-$2'),dates=[],re=/(?:^|[^\d])(?:(20\d{2}|\d{2})[-/.]\s*)?(\d{1,2})[-/.]\s*(\d{1,2})(?!\d)/g,match;
   while((match=re.exec(clean))){var year=match[1]||(business?business.slice(0,4):'');if(!year)return;var date=hfAppDeliveryDay_(year+'-'+match[2]+'-'+match[3]);if(!date)return;dates.push(date);}
@@ -96,7 +96,7 @@ function hfAppDeliveryEvidence_(projects,events,journal,today){
  events.forEach(function(r,i){if(r[7]==='일반이슈'||((r[7]==='타팀지원'||r[7]==='기타')&&!r[20]&&!r[15])||r[17]!=='WRITTEN'||r[14]!=='확정'||String(r[6]||'').slice(0,10)==='2026-09-14')return;cancellation(r[3],r[20]||r[15]);inspect(r[3],r[20]||r[15],r[6],'Event','HF_DATA_입력정규화!'+(i+2)+' · '+r[0],false);});
  journal.forEach(function(r,i){if(r[8]!=='확정'||r[7]==='현장입력'||String(r[0]||'').slice(0,10)==='2026-09-14')return;var raw=String(r[4]||'')+' '+String(r[6]||'')+(r[1]==='출고완료'?' 출고완료':'');cancellation(raw,'');inspect(raw,'',r[0],'일지','업무이력!'+(i+8),true);});
  return projects.map(function(p){
-  if(p.team!=='B')return p;
+  if(['A','B'].indexOf(p.team)<0)return p;
   var evidence=candidates[p.orderId]||[],dates=evidence.map(function(e){return e.date;}).filter(function(d,i,a){return a.indexOf(d)===i;}),current=hfAppDeliveryDay_(p.actualDelivery),review='';
   if(dates.length>1||(current&&dates.some(function(d){return d!==current;})))review='실출고일 기록 충돌 · 원본 확인 필요';
   if(!current&&dates.length===1&&/출고\s*대기|보관\s*중/.test(String(p.state||'')+' '+String(p.deliveryState||'')))review='출고완료 기록과 현재 대기 상태 충돌 · 확인 필요';

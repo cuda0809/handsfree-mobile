@@ -16,9 +16,13 @@ test('confirmed exact job event projects completion across devices without chang
  const e=event(),p={...base,nextAction:'개선품 확인'},before=JSON.stringify([p,e]);
  const out=run(p,[e]);assert.equal(out.state,'전장 완료');assert.equal(out.process,'전장');assert.equal(out.since,'2026-10-06');assert.equal(out.nextAction,'개선품 확인');assert.equal(out.stateEvidence.entryId,'REQ-E01');assert.equal(JSON.stringify([p,e]),before);
 });
+test('A-team confirmed field event uses the same state and manual-action preservation rules',()=>{
+ const p={...base,team:'A',nextAction:'후속 작업 확인'},e=event(),before=JSON.stringify([p,e]);
+ const out=run(p,[e]);assert.equal(out.state,'전장 완료');assert.equal(out.nextAction,p.nextAction);assert.equal(JSON.stringify([p,e]),before);
+});
 test('draft, failed, general, other equipment, future and older evidence cannot replace current state',()=>{
  for(const patch of [{17:'REVIEW'},{2:'GENERAL_EVENT'},{7:'기타'},{15:'OTHER'},{20:'OTHER'},{6:'2026-10-08'},{6:'2026-09-14'},{10:'전장 완료 예정'},{10:'전장 완료 아님'},{10:'전장 완료 여부 확인'},{3:job+' 260727A-060-03 전장 완료'}])assert.equal(run(base,[event(patch)]).state,base.state);
- for(const patch of [{team:'A'},{since:'2026-10-07'},{state:'검수 진행'},{recentEventAt:'2026-10-07 09:00:00 KST'},{actualDelivery:'2026-10-01'},{state:'출고완료'},{state:'출고대기'}])assert.equal(run({...base,...patch},[event()]).state,({...base,...patch}).state);
+ for(const patch of [{team:'C'},{since:'2026-10-07'},{state:'검수 진행'},{recentEventAt:'2026-10-07 09:00:00 KST'},{actualDelivery:'2026-10-01'},{state:'출고완료'},{state:'출고대기'}])assert.equal(run({...base,...patch},[event()]).state,({...base,...patch}).state);
  assert.equal(run({...base,updatedAt:'2026-10-08'},[event()]).state,'전장 완료','a later collection does not roll confirmed business state back');
 });
 test('latest business date wins; late entry of older events does not roll progress back',()=>{

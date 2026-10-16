@@ -1,3 +1,4 @@
+import {scopeContext} from './team-scope-context.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -7,7 +8,7 @@ const code=source.slice(source.indexOf('async function syncPlanOverview('),sourc
 test('manual latest refresh retries both Core and plans, and partial success stays unconfirmed',async()=>{
  const manual=source.slice(source.indexOf('async function refreshAllCurrent('),source.indexOf('async function syncPlanOverview('));
  for(const planResult of [null,{byOrder:{}}]){
-  const calls=[];const c=vm.createContext({Promise,refresh:async force=>{calls.push(['core',force]);return true;},syncPlanOverview:async force=>{calls.push(['plans',force]);return planResult;}});
+  const calls=[];const c=scopeContext({Promise,refresh:async force=>{calls.push(['core',force]);return true;},syncPlanOverview:async force=>{calls.push(['plans',force]);return planResult;}});
   vm.runInContext(manual,c);assert.equal(await c.refreshAllCurrent(),!!planResult);assert.deepEqual(calls,[['core',true],['plans',true]]);
  }
  assert.match(source,/onclick="refreshAllCurrent\(\)">최신 상태 다시 확인/);
@@ -18,7 +19,7 @@ function harness(response){
   planOverviewCache:()=>prior,applyPlanOverview:()=>true,summarizePlanRecords:r=>({planTimeline:r}),
   persist:(k,v)=>{ctx.saved=v;},home:()=>ctx.rendered++,toast(){},
   appCall:async b=>{ctx.calls.push(b);if(response instanceof Error)throw response;return response;}};
- vm.createContext(ctx);return {ctx,run:()=>vm.runInContext(code+';syncPlanOverview(true)',ctx)};
+ scopeContext(ctx);return {ctx,run:()=>vm.runInContext(code+';syncPlanOverview(true)',ctx)};
 }
 test('all project plans refresh in one authenticated request and removed rows disappear',async()=>{
  const h=harness({generatedAt:'now',records:[{orderId:'NEW',date:'2026-10-06',process:'전장'}]});await h.run();

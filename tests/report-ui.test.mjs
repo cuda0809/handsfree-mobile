@@ -1,4 +1,5 @@
 import vm from 'node:vm';
+import {scopeContext} from './team-scope-context.mjs';
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -12,7 +13,7 @@ const data={ok:true,
  monthly:[['연도','월','장비명','대수'],['2026','8','Mixer','2'],['2026','9','Mill','3'],['2025','12','Tank','4']],
  support:[['일자','구분','고객/현장','모델','업무내용','참여자','원문','등록경로','확정여부','지원분류','분류기준','운영현황표시'],['2026-08-02','타팀지원','A','','조립','김, 이','','','확정','PT지원','','Y'],['2026-09-03','타팀지원','B','','설치','이, 박','','','확정','A/S지원','','Y'],['2026-09-04','타팀지원','C','','검토','최','','','미확정','A/S지원','','Y']]
 };
-const context=vm.createContext({HfProductionRules,personalConnected:true,login(){throw Error('unexpected_login');},api:async()=>data,open(){result.isConnected=true;},heading:()=>'',esc:String,scheduleErrors:{},$:id=>id==='appReportResult'?result:null});
+const context=scopeContext({screen:'home',HfProductionRules,personalConnected:true,login(){throw Error('unexpected_login');},api:async()=>data,readApp:async()=>data,open(){result.isConnected=true;},heading:()=>'',esc:String,scheduleErrors:{},$:id=>id==='appReportResult'?result:null});
 vm.runInContext(src.slice(0,src.indexOf('const appWorkBase=')),context);
 
 await context.productionReport();
@@ -22,6 +23,12 @@ assert.match(result.innerHTML,/9월<\/td><td>3대<\/td><td><b>5대/);
 assert.match(result.innerHTML,/과거 연도 합계/);
 assert.match(result.innerHTML,/2025년<\/b><strong>6대/);
 assert.doesNotMatch(result.innerHTML,/id="reportMonth"/);
+vm.runInContext("selectedTeam='ALL'",context);await context.productionReport();
+assert.match(result.innerHTML,/<strong>14대<\/strong>/);
+assert.doesNotMatch(result.innerHTML,/2025년<\/b><strong>6대/);
+vm.runInContext("selectedTeam='A'",context);await context.productionReport();
+assert.match(result.innerHTML,/<strong>9대<\/strong>/);
+vm.runInContext("selectedTeam='B'",context);
 
 await context.supportReport();
 assert.match(result.innerHTML,/2026년 타부서 지원/);

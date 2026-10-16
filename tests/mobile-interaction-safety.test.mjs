@@ -28,7 +28,8 @@ test('late detail-close event never steals a following navigation click or scrol
 test('status refresh leaves navigation touch targets attached in their current position',()=>{
  const source=fs.readFileSync('kmt-sa2/mobile.js','utf8');let moves=0;
  const span={},demo={innerHTML:'',querySelector:()=>span,after:()=>moves++},status={previousElementSibling:demo,replaceChildren(){}},nav={previousElementSibling:status};
- const c=vm.createContext({document:{querySelector:s=>s==='.demo'?demo:s==='.bottom'?nav:status},BUILD:'test',live:true,readMessage:'fresh',esc:s=>s});
+ const teamBar={innerHTML:''};nav.previousElementSibling=teamBar;
+ const c=vm.createContext({$:()=>teamBar,selectedTeam:'B',document:{querySelector:s=>s==='.demo'?demo:s==='.bottom'?nav:status},BUILD:'test',live:true,readMessage:'fresh',esc:s=>s});
  vm.runInContext(source.slice(source.indexOf('function banner('),source.indexOf('async function refresh(')),c);
  for(let i=0;i<30;i++)c.banner();assert.equal(moves,0);
 });

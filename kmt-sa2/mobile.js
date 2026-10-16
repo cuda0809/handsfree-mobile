@@ -1,8 +1,8 @@
 let coreReadGeneration=0;
 'use strict';
-const BUILD='2026.10.15.SA2.8.3-MOBILE17', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
+const BUILD='2026.10.16.SA2.8.3-MOBILE18', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
 const main=document.getElementById('main'),dialog=document.getElementById('detail');
-let coreSnapshot=false;
+let coreSnapshot=false,teamSnapshotComplete=false;
 let items=[],live=false,readPending=null,sourceDate='',lastRead='',screen='home',filter='all',returnFocus=null,readMessage='현재 상태를 불러오는 중…',recognition=null,installPrompt=null,readStale=false,lastReadErrorStatus=0,lastCoreAttempt=0;
 const $=id=>document.getElementById(id);
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -57,20 +57,32 @@ window.addEventListener('focus',()=>setTimeout(checkForLiveUpdate,300));
 function coreCacheRead(){const v=readStore(CORE_CACHE_KEY,null);return v&&Array.isArray(v.items)?v:null;}
 function itemIdentity(x){return String(x.projectId||x.issueId||x.orderId||'');}
 function isBTeam(x){return String(x?.team||'').trim()==='B';}
+let selectedTeam=['A','B','ALL'].includes(readStore('hf-selected-team-v1','B'))?readStore('hf-selected-team-v1','B'):'B';
+function isABTeam(x){return ['A','B'].includes(String(x?.team||'').trim());}
+function teamMatches(x){return selectedTeam==='ALL'?isABTeam(x):String(x?.team||'').trim()===selectedTeam;}
+function selectedTeamLabel(){return selectedTeam==='ALL'?'전체 A·B팀':selectedTeam+'팀';}
+function selectTeam(value){
+ if(!['A','B','ALL'].includes(value)||value===selectedTeam)return;
+ if(value!=='B'&&!teamSnapshotComplete){toast('A·B팀 전체 최신값을 먼저 조회합니다. 조회 후 다시 선택하세요.');refresh(true);return;}
+ if(dialog.open||document.querySelector('button[data-today-save]:disabled,#generalIssueSave:disabled'))return toast('상세·입력을 마친 뒤 팀을 선택하세요.');
+ stopVoice();
+ try{persist('hf-selected-team-v1',value);}catch{return toast('팀 선택을 저장하지 못했습니다.');}
+ selectedTeam=value;banner();renderCoreScreen();
+}
 function itemById(id){return typeof id==='object'?id:items.find(x=>x.id===String(id));}
 function coreCacheSave(verified=false){
  if(!verified)return;
- try{persist(CORE_CACHE_KEY,{completeCore:true,cachedAt:new Date().toISOString(),sourceDate,items:items.map(({id,...x})=>x)});}catch{}
+ try{persist(CORE_CACHE_KEY,{completeCore:true,teamScope:'AB',cachedAt:new Date().toISOString(),sourceDate,items:items.map(({id,...x})=>x)});}catch{}
 }
 function coreCacheRestore(){
- const c=coreCacheRead();if(!c)return false;coreSnapshot=c.completeCore===true;
- items=c.items.filter(isBTeam).map(x=>({...x,priority:corePriorityFromState(x.state,x.nextAction,x.issueStatus,x.priority),id:itemIdentity(x)}));sourceDate=String(c.sourceDate||'');lastRead=c.cachedAt?new Date(c.cachedAt).toLocaleString('ko-KR'):'';
+ const c=coreCacheRead();if(!c)return false;teamSnapshotComplete=c.teamScope==='AB';if(selectedTeam!=='B'&&!teamSnapshotComplete)return false;coreSnapshot=c.completeCore===true;
+ items=c.items.filter(isABTeam).map(x=>({...x,priority:corePriorityFromState(x.state,x.nextAction,x.issueStatus,x.priority),id:itemIdentity(x)}));sourceDate=String(c.sourceDate||'');lastRead=c.cachedAt?new Date(c.cachedAt).toLocaleString('ko-KR'):'';
  live=true;readStale=true;readMessage='이전 조회값 · 최신 동기화 대기';
  return true;
 }
 coreCacheRestore();
 function notes(){const a=readStore(KEY,[]);return Array.isArray(a)?a:[];}
-function visibleNotes(){return notes().filter(r=>!r.orderId||items.some(x=>x.orderId===r.orderId&&isBTeam(x)));}
+function visibleNotes(){return notes().filter(r=>!r.orderId||items.some(x=>x.orderId===r.orderId&&teamMatches(x)));}
 function updateNote(id,patch){const a=notes(),r=a.find(r=>r.id===id);if(!r)throw Error('missing_note');Object.assign(r,patch);persist(KEY,a);return r;}
 async function api(path,body,timeout=25000){const c=new AbortController(),timer=setTimeout(()=>c.abort(),timeout);try{const r=await fetch(path,{credentials:'same-origin',cache:'no-store',signal:c.signal,...(body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});let d;try{d=await r.json();}catch{const e=Error(!r.ok&&[429,502,503,504].includes(r.status)?'app_unavailable':'invalid_response');e.status=r.status;throw e;}if(!r.ok||d.ok!==true){const e=Error(d.error||'request_failed');e.status=r.status;e.data=d;throw e;}return d;}finally{clearTimeout(timer);}}
 async function readApp(body){
@@ -129,7 +141,7 @@ async function refreshCachedCore(){
   if(priorActive&&active&&prior.issueId!==v.issueId)throw Error('ambiguous_issue');
   if(!prior||active&&!priorActive)byOrder.set(v.orderId,v);
  }
- const next=d.projects.filter(isBTeam).map(p=>{
+ const next=d.projects.filter(isABTeam).map(p=>{
   const issue=byOrder.get(p.orderId),status=String(issue?.status||'');
   return {...p,issueId:String(issue?.issueId||''),issueStatus:status,
    cause:p.currentIssue||p.recentEvent||'',
@@ -154,7 +166,10 @@ function banner(){
  if(span)status.replaceChildren(span);
  // Do not detach/reinsert touch targets on each status refresh or Home render.
  if(status.previousElementSibling!==demo)demo.after(status);
- if(nav&&nav.previousElementSibling!==status)status.after(nav);
+ if(nav&&nav.previousElementSibling!==status&&nav.previousElementSibling!==$('hfTeamSelector'))status.after(nav);
+ let teamBar=$('hfTeamSelector');if(!teamBar){teamBar=document.createElement('div');teamBar.id='hfTeamSelector';teamBar.className='tabs';teamBar.style.cssText='margin:8px 24px 14px;flex-wrap:wrap;align-items:center';status.after(teamBar);}
+ teamBar.innerHTML=[['ALL','전체'],['A','A팀'],['B','B팀']].map(([v,label])=>'<button class="chip '+(v===selectedTeam?'active':'')+'" aria-pressed="'+(v===selectedTeam)+'" onclick="selectTeam(\''+v+'\')">'+label+'</button>').join('');
+ if(selectedTeam!=='B')teamBar.innerHTML+='<small class="note">A팀 일부 일정 메모 확인 필요</small>';
 }
 async function refresh(force=true){
  if(readPending)return readPending;
@@ -162,18 +177,18 @@ async function refresh(force=true){
  lastCoreAttempt=Date.now();readStale=true;
  readMessage=live?'이전 조회값 표시 · 전체 최신값 확인 중…':'현재 상태를 불러오는 중…';banner();
  readPending=(async()=>{
-  const previous={items,live,sourceDate,lastRead,coreSnapshot},readGeneration=coreReadGeneration;
+  const previous={items,live,sourceDate,lastRead,coreSnapshot,teamSnapshotComplete},readGeneration=coreReadGeneration;
   try{
    const full=await refreshCachedCore();
    if(readGeneration!==coreReadGeneration)return false;
-   items=full.items;coreSnapshot=true;live=true;sourceDate=full.sourceDate;
+   items=full.items;coreSnapshot=true;teamSnapshotComplete=true;live=true;sourceDate=full.sourceDate;
    renderCoreScreen(); // A failed application must not advance freshness or the cache.
    readStale=false;lastReadErrorStatus=0;lastRead=new Date().toLocaleString('ko-KR');
-   readMessage='CORE · '+items.length+'건 · 전체 최신 상태 확인 · '+(sourceDate||'원천 기준시각 미등록');
+   readMessage='CORE A·B · '+items.length+'건 · 전체 최신 상태 확인 · '+(sourceDate||'원천 기준시각 미등록');
    coreCacheSave(true);return true;
   }catch(e){
    if(readGeneration!==coreReadGeneration)return false;
-   ({items,live,sourceDate,lastRead,coreSnapshot}=previous);lastReadErrorStatus=e.status||0;readStale=true;
+   ({items,live,sourceDate,lastRead,coreSnapshot,teamSnapshotComplete}=previous);lastReadErrorStatus=e.status||0;readStale=true;
    const action=['core','catalog'].includes(e.readAction)?e.readAction:'validation';
    const reason=/^(upstream_timeout|upstream_invalid_json|upstream_failed|invalid_source_month|upstream_unavailable|not_configured|ENOTFOUND|EAI_AGAIN|ECONNRESET|ETIMEDOUT|UND_ERR_CONNECT_TIMEOUT|UND_ERR_HEADERS_TIMEOUT|UND_ERR_SOCKET)$/.test(e.data?.reason||'')?e.data.reason:e.name==='AbortError'?'upstream_timeout':e.name==='TypeError'?'network_unavailable':/^(invalid_core|invalid_catalog|ambiguous_issue|partial_core)$/.test(e.message)?e.message:'read_failed';
    console.warn('HF_CORE_READ_FAILED',action,e.status||0,reason);
@@ -202,7 +217,7 @@ ${top?`<section class="hybrid-decision"><div class="hybrid-decision-top"><span>�
 <div class="hybrid-section"><b>생산 · 지원 집계</b><span>실제 집계</span></div>${reports()}
 <p class="source">${live?`Core 기준 · 조회 ${esc(lastRead)}`:esc(readMessage)}</p>`;banner();}
 function work(f='all',query=''){active('work');filter=f;main.innerHTML=`<h1>업무 <span>한눈에</span></h1><p class="lead">현재 관리 이슈를 검색합니다.</p><div class="search"><input id="search" aria-label="고객 또는 장비 검색" value="${esc(query)}" placeholder="고객명 · 장비명 · 상태" oninput="renderList()"></div><div class="tabs">${[['all','전체'],['waiting','대기·보류'],['urgent','우선순위 1']].map(([v,t])=>`<button class="chip ${f===v?'active':''}" onclick="work('${v}')">${t}</button>`).join('')}</div><div id="list"></div>`;renderList();}
-function renderList(){const q=norm($('search').value),a=items.filter(x=>(filter!=='waiting'||/대기|보류|지연/.test(x.state))&&(filter!=='urgent'||x.priority===1)&&norm([x.customer,x.model,x.state,x.cause,x.orderId].join(' ')).includes(q));$('list').innerHTML=a.length?a.map(card).join(''):`<div class="empty">${live?'일치하는 업무가 없습니다.':esc(readMessage)}</div>`;}
+function renderList(){const q=norm($('search').value),a=items.filter(x=>teamMatches(x)&&(filter!=='waiting'||/대기|보류|지연/.test(x.state))&&(filter!=='urgent'||x.priority===1)&&norm([x.customer,x.model,x.state,x.cause,x.orderId].join(' ')).includes(q));$('list').innerHTML=a.length?a.map(card).join(''):`<div class="empty">${live?'일치하는 업무가 없습니다.':esc(readMessage)}</div>`;}
 function openItem(id){const x=itemById(id);if(!x)return toast('최신 상태를 다시 불러오세요.');open(heading(x.process,x.customer,x.model)+`<div class="job-number"><small>JOB NO.</small><b>${esc(x.orderId||'미등록')}</b></div><h4>납기</h4><p>${esc(typeof formatHfDate==='function'?formatHfDate(x.due):(x.due||'미정'))}</p><h4>최근 진행내용</h4><div class="action-box">${esc(x.state||'미등록')}</div><h4>진행 시작 · 지속</h4><p>${esc(x.since||'미등록')} · ${Number.isFinite(x.days)?x.days+'일째':'기간 미확인'}</p><h4>기존 원인 / 이슈</h4><p>${esc(x.cause||'미등록')}</p><h4>다음 행동</h4><p>${esc(x.nextAction||'미등록')}</p><p class="note">${esc(x.issueId)} · ${esc(x.issueStatus)} · 원본 최신 ${esc(x.sourceLatestUpdate||sourceDate)}</p><button class="primary" onclick="openUnifiedEvent('${esc(x.issueId)}')">오늘 이슈 입력</button><button class="secondary" onclick="scheduleReport(${esc(JSON.stringify(id))})">계획일정 확인</button>`);}
 function unavailable(title,description){open(heading('연결 상태',title,'실제 데이터 연결이 필요합니다')+`<div class="alert">${esc(description)}</div><p>값을 0 또는 완료로 대신 표시하지 않습니다.</p><button class="secondary" onclick="dialog.close()">닫기</button>`);}
 function productionReport(mode){unavailable(mode==='month'?'월간생산량':'연간생산량','현재 조회 서비스에 생산 완료일·완료 수량이 없어 실적을 집계할 수 없습니다.');}
