@@ -15,7 +15,6 @@
         <provider android:name=".EquipmentPhotoProvider"
             android:authorities="${applicationId}.photos"
             android:exported="false" android:grantUriPermissions="true" />
-        <provider android:name=".ImprovementPdfProvider" android:authorities="${applicationId}.documents" android:exported="false" android:grantUriPermissions="true" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

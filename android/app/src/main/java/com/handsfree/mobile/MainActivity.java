@@ -155,6 +155,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (improvementPdf.result(this,requestCode,resultCode,data)) return;
         if (requestCode != PHOTO_PICK_REQUEST || pendingPhoto == null) return;
         Uri selected = resultCode == RESULT_OK ? (data != null && data.getData() != null ? data.getData() : cameraOutput) : null;
         if (selected != null && !"content".equals(selected.getScheme())) selected = null;
