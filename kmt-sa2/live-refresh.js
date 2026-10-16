@@ -47,7 +47,8 @@ async function refreshLiveData(manual=false){
  })().finally(()=>{liveRefreshPending=null;flushLiveRender();liveRefreshControls();});
  liveRefreshControls();return liveRefreshPending;
 }
-setInterval(()=>refreshLiveData(false),30000);
+// Check every10s but issue a data read only after30s, including after manual refresh.
+setInterval(()=>refreshLiveData(false),10000);
 // Existing resume handling may already start a Core request; refresh() joins it.
 window.addEventListener('focus',()=>refreshLiveData(false));
 document.addEventListener('visibilitychange',()=>refreshLiveData(false));

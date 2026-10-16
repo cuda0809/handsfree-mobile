@@ -12,7 +12,7 @@ function fixture(){
  return {c,doc,events,timers,elements,get reads(){return reads;},get plans(){return plans;},get renders(){return renders;},get scroll(){return scroll;}};
 }
 test('running visible app polls at30s and manual button reads data without page reload',async()=>{
- const f=fixture();assert.equal(f.timers[0].ms,30000);
+ const f=fixture();assert.equal(f.timers[0].ms,10000);
  await f.timers[0].f();assert.equal(f.reads,1);assert.equal(f.plans,1);
  await f.elements.get('hfRefreshNow').onclick();assert.equal(f.reads,2);
  assert.doesNotMatch(source,/location\.|fetch\(|sa2-write|submitUnifiedEvent/);

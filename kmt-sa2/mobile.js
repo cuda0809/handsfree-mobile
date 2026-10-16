@@ -18,7 +18,7 @@ dialog.addEventListener('close',()=>{if(dialog.open)return;stopVoice();const tar
 function toast(text){clearTimeout(toast.timer);$('toast').hidden=true;let target=$('toast');if(dialog.open){target=$('dialogStatus');if(!target){target=document.createElement('p');target.id='dialogStatus';target.className='alert';target.setAttribute('role','status');$('sheetBody').appendChild(target);}}target.textContent=text;target.hidden=false;if(dialog.open)target.scrollIntoView({block:'nearest'});toast.timer=setTimeout(()=>target.hidden=true,4500);}
 function readStore(key,fallback){try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback;}catch{return fallback;}}
 function persist(key,value){localStorage.setItem(key,JSON.stringify(value));if(localStorage.getItem(key)!==JSON.stringify(value))throw Error('storage_failed');}
-const APP_ASSET_HASH_KEY='hf-ui-assets-hash-v2';
+const APP_ASSET_HASH_KEY='hf-ui-assets-hash-v3';
 let assetCheckPending=null;
 async function liveAssetHash(){
  try{
