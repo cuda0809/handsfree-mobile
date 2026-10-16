@@ -276,7 +276,7 @@ function renderUnifiedHome(){
  '<div class="hybrid-section"><b>현장 이슈</b><span>'+(currentAvailable?issueActive.length+'대'+(!currentConfirmed?' · 최근 확인':''):'확인 불가')+'</span></div>'+
  '<div class="hf-card-list">'+(currentAvailable?(issueCards||'<div class="empty">'+(currentConfirmed?'현재 진행 이슈가 없습니다.':'최근 자료에 표시할 이슈가 없습니다. 최신 확인 중입니다.')+'</div>'):'<div class="empty">최신 이슈를 확인하지 못했습니다.</div>')+'</div>'))+
  '<button class="hybrid-quick hf-quick-card" onclick="todayIssues()"><span>🎙 오늘 이슈 입력</span><span>＋</span></button>'+
- reports()+'<section><button class="secondary" onclick="openImprovement()">스마트 개선제안</button></section><p class="source">통합 운영 · 계획 + 현재상태 · 조회 '+esc(lastRead||'확인 전')+'</p>';
+ reports()+'<p class="source">통합 운영 · 계획 + 현재상태 · 조회 '+esc(lastRead||'확인 전')+'</p>';
  main.querySelectorAll('[data-home-order]').forEach(b=>b.onclick=()=>{const x=operationalRows(true).find(v=>v.orderId===b.dataset.homeOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.homeOrder,'today',x);});
  banner();
 }
@@ -1248,6 +1248,7 @@ function todayIssues(){
  (typeof issuePlanProgress==='function'?issuePlanProgress(x):'<p class="note">생산계획 공정 조회 준비 중</p>')+
  (String(x.recentEventAt||'').slice(0,10)===todayKey&&String(x.recentEvent||x.cause||'').trim()?'<div class="today-issue-linked"><small>오늘 이슈/진행</small><p>'+esc(x.recentEvent||x.cause)+'</p></div>':'')+
  '<div class="issue-photo-actions"><button class="secondary" onclick="openEquipmentPhotos(\''+esc(x.orderId)+'\',true)">📷 사진·메모</button><button class="secondary" onclick="openEquipmentPhotos(\''+esc(x.orderId)+'\',false)">사진 이력</button></div>'+
+ '<button class="secondary" onclick="openImprovement(\''+esc(x.orderId)+'\')">개선제안</button>'+
  (!opened?'<button class="today-issue-open" onclick="toggleTodayIssue(\''+esc(key)+'\')"><span>이 장비에 오늘 이슈 입력</span><span>＋</span></button>':
  '<div class="today-issue-editor"><div class="today-issue-target"><span>입력 대상</span><b>'+esc(x.orderId||key)+' · '+esc(x.customer)+' · '+esc(x.model)+'</b></div>'+
  (x.cause?'<p class="today-issue-cause">기존 사유 · '+esc(x.cause)+'</p>':'')+
