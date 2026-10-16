@@ -31,3 +31,11 @@ test('A source snapshot provides planned next action without inventing actual fa
  assert.equal(rules.classify(x,'2026-10-16'),'작업 예정');assert.equal(rules.manufacturingNow(x,'2026-10-16'),false);
  assert.equal(rules.nextAction(x,'2026-10-16'),'조립 · 2026-10-20');
 });
+test('home current-work and project manufacturing buckets agree in every team scope',()=>{
+ const c=harness();c.items.push({orderId:'A-wait',team:'A',state:'납품 전 마무리 작업 중'});
+ for(const [start,end] of [['function projectBucket(','function latestUnifiedInputByOrder('],['function projectViewBucket(','function projectReviewReason('],['function homeStatRows(','function homeStatHtml(']])vm.runInContext(flow.slice(flow.indexOf(start),flow.indexOf(end)),c);
+ for(const scope of ['A','B','ALL']){vm.runInContext(`selectedTeam='${scope}'`,c);const rows=c.operationalRows();
+  assert.deepEqual(Array.from(c.homeStatRows(rows,'current').map(x=>x.orderId)),Array.from(rows.filter(x=>c.projectViewBucket(x)==='active').map(x=>x.orderId)));
+  assert.ok(!c.homeStatRows(rows,'current').some(x=>x.orderId==='A-wait'));
+ }
+});

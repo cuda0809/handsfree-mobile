@@ -222,7 +222,7 @@ let homeStatMode='',homeStatSearch='';
 function homeStat(mode){homeStatMode=mode;homeStatSearch='';home();}
 function homeStatRows(rows,mode,query=''){
  const activeRows=rows.filter(x=>!isCompletedOperational(x)&&!isCarryoverStock(x));
- return mode==='completed'?rows.filter(x=>isCompletedOperational(x)&&(query||HfProductionRules.jobYear(x.orderId)===HfProductionRules.today().slice(0,4))):mode==='urgent'?activeRows.filter(x=>x.priority===1):activeRows.filter(x=>productionClass(x)==='진행 중');
+ return mode==='completed'?rows.filter(x=>isCompletedOperational(x)&&(query||HfProductionRules.jobYear(x.orderId)===HfProductionRules.today().slice(0,4))):mode==='urgent'?activeRows.filter(x=>x.priority===1):activeRows.filter(x=>projectViewBucket(x)==='active');
 }
 function homeStatHtml(rows){
  const q=norm(homeStatSearch),selected=homeStatRows(rows,homeStatMode,q).filter(x=>!q||norm([x.orderId,x.customer,x.model,x.pm,x.state].join(' ')).includes(q));
