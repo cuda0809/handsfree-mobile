@@ -184,7 +184,7 @@ async function refresh(force=true){
    items=full.items;coreSnapshot=true;teamSnapshotComplete=true;live=true;sourceDate=full.sourceDate;
    renderCoreScreen(); // A failed application must not advance freshness or the cache.
    readStale=false;lastReadErrorStatus=0;lastRead=new Date().toLocaleString('ko-KR');
-   readMessage='CORE A·B · '+items.length+'건 · 전체 최신 상태 확인 · '+(sourceDate||'원천 기준시각 미등록');
+   readMessage='CORE A·B · '+items.length+'건 · 운영DB 조회 확인 · 최근 행 갱신 '+(sourceDate||'미등록');
    coreCacheSave(true);return true;
   }catch(e){
    if(readGeneration!==coreReadGeneration)return false;

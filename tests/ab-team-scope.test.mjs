@@ -39,3 +39,16 @@ test('home current-work and project manufacturing buckets agree in every team sc
   assert.ok(!c.homeStatRows(rows,'current').some(x=>x.orderId==='A-wait'));
  }
 });
+test('A weekly actual-work evidence expires with its source period and does not override subsequent Core work',()=>{
+ const r={recordId:'AVERIFIED|20261016|A1|META',date:'2026-10-12',process:'',sourceMonth:'2026-10',status:'진행 중',sourceRef:'생산A팀!U937 · 원본 기준기간 2026-10-12~2026-10-16(착수일 아님) · 실제 진행 근거: 조립 및 테스트진행'};
+ const x={team:'A',state:'생산팀 조립자재 수령중',...rules.resolve([r])};
+ assert.equal(rules.manufacturingNow(x,'2026-10-16'),true);assert.equal(rules.manufacturingNow(x,'2026-10-17'),false);
+ assert.equal(rules.classify(x,'2026-10-17'),'확인 필요');assert.equal(rules.manufacturingNow({...x,state:'전장 진행 중'},'2026-10-17'),true);
+});
+test('a confirmed stock shipment does not turn the old stock deadline into customer delay performance',()=>{
+ const c=harness();c.formatHfDate=rules.day;
+ vm.runInContext(flow.slice(flow.indexOf('function ymdTime('),flow.indexOf('function projectStageLabel(')),c);
+ const stock=c.deliveryPerformance({due:'2026-03-09',actualDelivery:'2026-10-07',confidence:'STOCK_ALLOCATED_SHIP·DUE_REVIEW'});
+ assert.equal(stock.days,null);assert.match(stock.label,/계약 납기 확인 필요/);
+ assert.equal(c.deliveryPerformance({due:'2026-09-03',actualDelivery:'2026-08-30'}).days,-4);
+});

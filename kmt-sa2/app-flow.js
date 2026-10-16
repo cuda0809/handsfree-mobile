@@ -208,6 +208,8 @@ function currentStatusLabel(x){
  const recent=String(x.recentEvent||'').trim();
  if(/조립|전장|프로그램|검수|테스트|연결|설치|세팅|셋팅|입고|반출|수정|대기|지연/.test(recent))add(recent);
  add(x.currentIssue);
+ const reported=String(x.productionEvidence?.sourceRef||'').match(/(?:실제 진행|확인 필요) 근거:\s*(.+)$/);
+ if(x.team==='A'&&reported&&HfProductionRules.evidenceCurrent(x.productionEvidence,HfProductionRules.today()))add('주간 보고: '+reported[1]);
  return parts.join(' · ');
 }
 function projectCurrentFields(x){
@@ -1014,6 +1016,7 @@ function ymdTime(v){
  const [y,m,d]=s.split('-').map(Number);return Date.UTC(y,m-1,d);
 }
 function deliveryPerformance(x){
+ if(String(x?.confidence||'').includes('STOCK_ALLOCATED_SHIP'))return {days:null,label:'재고 출고 · 계약 납기 확인 필요',tone:'unknown'};
  const due=ymdTime(x?.due),actual=ymdTime(x?.actualDelivery);
  if(!Number.isFinite(due)||!Number.isFinite(actual))return {days:null,label:'비교 미정',tone:'unknown'};
  const diff=Math.round((actual-due)/86400000);

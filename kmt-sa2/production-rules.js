@@ -14,12 +14,17 @@
   const parsed=new Date(d+'T00:00:00Z');
   return Number.isFinite(parsed.getTime())&&parsed.toISOString().slice(0,10)===d?d:'';
  }
+ function evidenceCurrent(e,today){
+  if(!e)return false;
+  const period=String(e.sourceRef||'').match(/원본 기준기간 (20\d{2}-\d{2}-\d{2})~(20\d{2}-\d{2}-\d{2})/);
+  return !period||today>=period[1]&&today<=period[2];
+ }
  function classify(x,today){
   const state=String(x.state||''),delivery=String(x.deliveryState||'');
   const actual=day(x.actualDelivery),complete=[state,delivery].some(s=>/출고\s*완료|납품\s*완료/.test(s)&&!/예정|계획|취소|미완료|아님|철회/.test(s));
   if((actual&&actual<=today)||complete)return '출고완료';
   if(/출고\s*대기|납품\s*대기|보관\s*중/.test(state+' '+delivery))return '출고대기';
-  if(x.productionEvidence&&['진행 중','작업 예정','출고대기','확인 필요'].includes(x.productionEvidence.status))return x.productionEvidence.status;
+  if(evidenceCurrent(x.productionEvidence,today)&&['진행 중','작업 예정','출고대기','확인 필요'].includes(x.productionEvidence.status))return x.productionEvidence.status;
   // Only explicit current work is evidence; a calendar entry or a due date is not.
   if(/(?:조립|전장|프로그램|검수|테스트|시험|작업|마무리).*(?:진행|작업\s*중)/.test(state)&&!/예정|진행\s*예정/.test(state))return '진행 중';
   const dates=(x.planTimeline||[]).filter(r=>!/출고|납품/.test(r.process||'')).map(r=>day(r.date)).filter(Boolean);
@@ -50,12 +55,12 @@
  }
  function manufacturingNow(x,today){
   const c=classify(x,today);
-  if(c==='출고완료'||c==='출고대기'||x.productionEvidence?.status==='확인 필요')return false;
+  if(c==='출고완료'||c==='출고대기'||evidenceCurrent(x.productionEvidence,today)&&x.productionEvidence.status==='확인 필요')return false;
   // Source-verified actual work is separate from calendar-only stages.
   // It remains fabrication when Core shows materials receipt or an
   // intermediate stage is complete and follow-up fabrication remains.
   const evidence=x.productionEvidence;
-  if(x.planSourceVerified===true&&evidence?.status==='진행 중'&&
+  if(x.planSourceVerified===true&&evidenceCurrent(evidence,today)&&evidence?.status==='진행 중'&&
    /^[AB]VERIFIED\|/.test(String(evidence.recordId||''))&&
    evidence.sourceMonth===today.slice(0,7)&&day(evidence.date)&&day(evidence.date)<=today&&
    /실제 진행 근거\s*:\s*\S/.test(String(evidence.sourceRef||''))&&
@@ -90,6 +95,6 @@
   for(const x of rows){const year=jobYear(x.orderId)||'연도 미확인';if(!groups.has(year))groups.set(year,[]);groups.get(year).push(x);}
   return [...groups].sort(([a],[b])=>a===currentYear?-1:b===currentYear?1:b.localeCompare(a)).map(([year,items])=>({year,items,open:!!query||year===currentYear}));
  }
- const rules={day,today,classify,resolve,manufacturingNow,nextAction,jobYear,completedGroups};root.HfProductionRules=rules;
+ const rules={day,today,classify,resolve,manufacturingNow,nextAction,jobYear,completedGroups,evidenceCurrent};root.HfProductionRules=rules;
  if(typeof module==='object'&&module.exports)module.exports=rules;
 })(typeof window==='object'?window:globalThis);
