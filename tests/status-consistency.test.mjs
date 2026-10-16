@@ -49,8 +49,8 @@ test('targeted readback accepts only the exact saved request and immutable proje
 });
 test('multiline continuation keeps exact selected equipment and rejects conflicting identifiers',()=>{
  const source=fs.readFileSync('apps-script/HF_REAL_SAFE_WRITE_V08.gs','utf8');
- const c=vm.createContext({resolveProject_:(_,id)=>({orderId:id,ambiguous:false})});
- vm.runInContext(source.slice(source.indexOf('function resolveUnifiedProject_'),source.indexOf('function workType_')),c);
+ const c=vm.createContext({resolveUnifiedCoreProject_:(_,id)=>({orderId:id,ambiguous:false})});
+ vm.runInContext(source.slice(source.indexOf('function resolveUnifiedProject_'),source.indexOf('// The unified app lists Core equipment')),c);
  const p={channel:'MOBILE|UNIFIED_EVENT',targetHint:job+' · 고객\n모델'};
  assert.equal(c.resolveUnifiedProject_(null,'10/8 입고예정',p).orderId,job);
  assert.equal(c.resolveUnifiedProject_(null,'260727A-060-02 전장 완료',p).ambiguous,true);
@@ -98,7 +98,7 @@ test('project phases keep unknown, pre-start, active and inventory separate',()=
 });
 
  test('today counters filter only their own rows and retain completed history',()=>{
- const c=vm.createContext({isCompletedOperational:x=>x.done,isCarryoverStock:x=>x.stock,productionClass:x=>x.stage,HfProductionRules:{today:()=> '2026-10-08',jobYear:id=>id.startsWith('26')?'2026':'2025'}});
+ const c=vm.createContext({isCompletedOperational:x=>x.done,isCarryoverStock:x=>x.stock,productionClass:x=>x.stage,projectViewBucket:x=>x.stage==='진행 중'?'active':'review',HfProductionRules:{today:()=> '2026-10-08',jobYear:id=>id.startsWith('26')?'2026':'2025'}});
  vm.runInContext(flow.slice(flow.indexOf('function homeStatRows('),flow.indexOf('function homeStatHtml(')),c);
  const rows=[{orderId:'a',stage:'진행 중',priority:1},{orderId:'b',stage:'작업 예정'},{orderId:'c',stage:'출고대기',priority:1},{orderId:'260101A-001',done:true,priority:1},{orderId:'250101A-002',done:true},{orderId:'e',stock:true,priority:1}];
  const ids=mode=>Array.from(c.homeStatRows(rows,mode),x=>x.orderId);
