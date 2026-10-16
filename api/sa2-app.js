@@ -1,5 +1,7 @@
 import crypto from 'node:crypto';
+export const config={api:{bodyParser:{sizeLimit:'2mb'}}};
 export default async function handler(req,res){
+ if(typeof req.body?.action==='string'&&req.body.action.startsWith('media-'))return (await import('../lib/sa2-media.mjs')).default(req,res);
  const {sameOrigin}=await import('../lib/person-auth.mjs');
  const {authUser}=await import('../lib/sa2-auth-user.mjs');
  const {reply,upstream}=await import('../lib/kmt-server.mjs');

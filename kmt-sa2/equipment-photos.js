@@ -3,7 +3,7 @@ const photoDraftStore={
  async db(){return new Promise((resolve,reject)=>{const r=indexedDB.open('hf-equipment-photos-v1',1);r.onupgradeneeded=()=>r.result.createObjectStore('drafts');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(Error('draft_storage_failed'));});},
  async run(mode,key,value){const db=await this.db();try{return await new Promise((resolve,reject)=>{const tx=db.transaction('drafts',mode),store=tx.objectStore('drafts');let result;const r=value===undefined?store.get(key):value===null?store.delete(key):store.put(value,key);r.onsuccess=()=>result=r.result;tx.oncomplete=()=>resolve(result);tx.onerror=tx.onabort=()=>reject(Error('draft_storage_failed'));});}finally{db.close();}}
 };
-async function photoCall(body){return api('/api/sa2-media',body,55000);}
+async function photoCall(body){return api('/api/sa2-app',body,55000);}
 async function prepareEquipmentPhoto(file){
  if(!file||!file.type.startsWith('image/')||file.size>25000000)throw Error('사진 파일은 25MB 이하로 선택하세요.');
  const image=await createImageBitmap(file);try{

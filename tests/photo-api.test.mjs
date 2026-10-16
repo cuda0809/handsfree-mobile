@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import handler from '../api/sa2-media.js';
+import handler from '../api/sa2-app.js';
 import {sa2Cookie} from '../lib/sa2-auth.mjs';
 test('photo API enforces method, origin, session and bounded signed metadata before upstream',async()=>{
  const before={...process.env};Object.assign(process.env,{HF_REAL_APP_KEY:'fixture-key',HF_REAL_ALLOWED_USERS:'{"fixture@example.test":"writer"}'});delete process.env.HF_SA2_WRITER_EMAIL;delete process.env.HF_REAL_READ_TOKEN;
