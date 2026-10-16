@@ -7,6 +7,8 @@
   const result={type:'NOTE',state:'',status:'OPEN',changesState:false,natural:true,needsDecision:false,candidates:[],facts:[],label:'내용 기록 · 공정 유지'};
   const decision=raw.match(/(?:^|\n)\[공정 확인\]\s*(상태 유지|(?:조립|전장|프로그램|마감조립|검수|테스트) (?:진행|완료))\s*$/);
   if(decision){result.facts.push('입력자가 공정을 확인함');if(decision[1]==='상태 유지')return result;return {...result,type:'PROGRESS',state:decision[1],changesState:true,explicitDecision:true,label:'확인한 공정 · '+decision[1]};}
+  const correction=raw.match(/(마감\s*조립|프로그램|전장|조립|검수|테스트)\s*(진행\s*중|진행|완료|대기)\s*(?:으?로)\s*(?:수정|정정|변경)/);
+  if(correction&&!/예정|여부|확인\s*필요/.test(raw)){const state=correction[1].replace(/\s/g,'')+' '+correction[2].replace(/\s*중$/,'');return {...result,type:'PROGRESS',state,changesState:true,explicitDecision:true,evidenceText:correction[0],label:'명시한 정정 · '+state};}
   const actual=[],uncertain=[];
   const parts=raw.replace(/(했으며|했고|끝났고|완료하고)/g,'$1;').split(/\r?\n|;|\/(?=\s*[가-힣])|[,，]|그리고/).map(v=>v.trim()).filter(Boolean);
   for(const part of parts){

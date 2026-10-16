@@ -15,3 +15,7 @@ test('uncertain, conflicting and regressive work offers immediate explicit decis
 test('plans and part completion never fabricate actual completion',()=>{
  for(const raw of ['전장 완료 예정','내일 전장 시작','전장 완료 후 검수 진행','베셀 입고 완료'])assert.equal(resolve(raw,{state:'조립 진행'}).changesState,false);
 });
+test('explicit completion-to-progress correction uses the corrected state, not the quoted old completion',()=>{
+ assert.equal(resolve('프레임조립 완료를 조립 진행으로 수정',{state:'1차 조립 진행 중'}).state,'조립 진행');
+ assert.equal(resolve('프로그램 완료를 전장 진행으로 정정',{state:'프로그램 완료'}).state,'전장 진행');
+});
