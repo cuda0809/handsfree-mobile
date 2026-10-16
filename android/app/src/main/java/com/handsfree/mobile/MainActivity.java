@@ -35,6 +35,7 @@ public class MainActivity extends Activity {
     private static final int PHOTO_PICK_REQUEST = 4103;
     private ValueCallback<Uri[]> pendingPhoto;
     private Uri cameraOutput;
+    private final ImprovementPdf improvementPdf = new ImprovementPdf();
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -57,6 +58,7 @@ public class MainActivity extends Activity {
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
+        settings.setUserAgentString(settings.getUserAgentString()+" HandsFreeNative/2.8.6");
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
         settings.setAllowFileAccess(false);
@@ -111,6 +113,15 @@ public class MainActivity extends Activity {
             }
         });
         webView.setWebViewClient(new WebViewClient() {
+            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                Uri uri=request.getUrl();
+                if ("handsfree-document".equals(uri.getScheme())) {
+                    Uri current=Uri.parse(view.getUrl()==null?"":view.getUrl());
+                    if (request.isForMainFrame() && isTrustedOrigin(current) && "/kmt-sa2/improvement.html".equals(current.getPath()) && ("save".equals(uri.getHost()) || "share".equals(uri.getHost()))) improvementPdf.export(MainActivity.this,view,"share".equals(uri.getHost()));
+                    return true;
+                }
+                return false;
+            }
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 super.onReceivedError(view, request, error);

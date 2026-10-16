@@ -276,7 +276,7 @@ function renderUnifiedHome(){
  '<div class="hybrid-section"><b>현장 이슈</b><span>'+(currentAvailable?issueActive.length+'대'+(!currentConfirmed?' · 최근 확인':''):'확인 불가')+'</span></div>'+
  '<div class="hf-card-list">'+(currentAvailable?(issueCards||'<div class="empty">'+(currentConfirmed?'현재 진행 이슈가 없습니다.':'최근 자료에 표시할 이슈가 없습니다. 최신 확인 중입니다.')+'</div>'):'<div class="empty">최신 이슈를 확인하지 못했습니다.</div>')+'</div>'))+
  '<button class="hybrid-quick hf-quick-card" onclick="todayIssues()"><span>🎙 오늘 이슈 입력</span><span>＋</span></button>'+
- reports()+'<p class="source">통합 운영 · 계획 + 현재상태 · 조회 '+esc(lastRead||'확인 전')+'</p>';
+ reports()+'<section><button class="secondary" onclick="openImprovement()">스마트 개선제안</button></section><p class="source">통합 운영 · 계획 + 현재상태 · 조회 '+esc(lastRead||'확인 전')+'</p>';
  main.querySelectorAll('[data-home-order]').forEach(b=>b.onclick=()=>{const x=operationalRows(true).find(v=>v.orderId===b.dataset.homeOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.homeOrder,'today',x);});
  banner();
 }
@@ -560,7 +560,7 @@ function projectDetailRow(orderId,fallback={}){
  };
 }
 function pageDetailHtml(x,purpose){
- const identity='<div class="job-number"><small>JOB NO.</small><b>'+esc(x.orderId)+'</b></div><button class="secondary" onclick="openEquipmentPhotos(\''+esc(x.orderId)+'\',false)">사진·메모 이력</button>';
+ const identity='<div class="job-number"><small>JOB NO.</small><b>'+esc(x.orderId)+'</b></div><button class="secondary" onclick="openEquipmentPhotos(\''+esc(x.orderId)+'\',false)">사진·메모 이력</button><button class="secondary" onclick="openImprovement(\''+esc(x.orderId)+'\')">이 장비 개선제안</button>';
  if(purpose==='today'){
   const stages=planStagesOnDay(x,HfProductionRules.today());
   return heading('오늘 현황',x.customer,x.model)+identity+
@@ -1354,3 +1354,5 @@ refresh=async function(force=true){const ok=await eventRefreshBase(force);if(scr
 home();
 
 applyProjectMeta(projectMetaCache()?.projects||[],projectMetaCache()?.source||'catalog');applyPlanOverview(planOverviewCache()?.byOrder||{});setTimeout(()=>refresh(false),300);setTimeout(()=>syncPlanOverview(true),500);
+
+function openImprovement(orderId=''){const x=items.find(r=>r.orderId===orderId);try{sessionStorage.setItem('hf-improvement-context',JSON.stringify(x?{job:x.orderId,customer:x.customer,equipment:x.model}:{}));location.href='./improvement.html';}catch{toast('임시 저장 공간을 사용할 수 없습니다. 입력 내용을 먼저 보존해 주세요.');}}

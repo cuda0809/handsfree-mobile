@@ -17,8 +17,8 @@ android {
         applicationId 'com.handsfree.mobile'
         minSdk 26
         targetSdk 35
-        versionCode 285
-        versionName '2.8.5'
+        versionCode 286
+        versionName '2.8.6'
         buildConfigField 'String', 'APP_URL', '"' + handsFreeAppUrl + '"'
         manifestPlaceholders = [appLabel: '핸즈프리 REAL']
     }
@@ -44,7 +44,7 @@ android {
             initWith debug
             applicationIdSuffix '.camera'
             versionNameSuffix '-camera'
-            manifestPlaceholders = [appLabel: '핸즈프리 REAL 카메라']
+            manifestPlaceholders = [appLabel: '핸즈프리 REAL 통합']
             matchingFallbacks = ['debug']
         }
         release {

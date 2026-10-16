@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KMT 스마트 개선제안</title>
+<style>
+:root{--blue:#0b63b6;--green:#21a84b;--bg:#f3f5f8;--line:#111}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);font-family:Arial,"Noto Sans KR",sans-serif;color:#111}
+header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid #ddd;padding:32px 14px 14px}
+.brand{font-size:19px;font-weight:900;color:#07518e}.sub{font-size:11px;color:#667;margin-top:2px}
+.tabs{display:flex;gap:8px;padding:10px 14px 0;background:#fff}
+.tab{flex:1;border:0;border-radius:10px;padding:12px 8px;font-weight:900;background:#dfe2e6}
+.tab.active{background:#0b63b6;color:#fff}
+.wrap{max-width:760px;margin:auto;padding:12px 14px 150px}
+.card{background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 2px 9px rgba(0,0,0,.06)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+label{display:block;font-size:13px;font-weight:800;margin:3px 0 6px}
+input,textarea{width:100%;border:1px solid #cfd4da;border-radius:9px;padding:11px;font-size:15px;background:#fff}
+textarea{min-height:110px;resize:vertical}
+.fixed{font-size:11px;color:#666;margin-top:4px}.fixed input{width:auto;vertical-align:middle}
+.section-title{font-size:16px;font-weight:900;margin:2px 0 10px}
+.checkgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.check{background:#fafafa;border:1px solid #ddd;border-radius:8px;padding:9px 3px;text-align:center;font-size:12px}
+.check input{width:auto;padding:0;margin:0 3px 0 0}
+.photo{margin-top:7px}
+.preview{display:none}.preview.show{display:block}
+.paper{box-sizing:border-box;width:100%;max-width:794px;min-height:1123px;background:#fff;margin:auto;padding:5.2% 8.8% 4%;font-family:Arial,"Noto Sans KR",sans-serif}
+.paper-top{position:relative;padding-top:3px}.admin{text-align:right;font-weight:800;font-size:12px;margin-bottom:2px}
+.p-head{display:grid;grid-template-columns:17fr 57fr 26fr;height:70px;width:100%;box-sizing:border-box;border:2px solid #111;border-bottom:1px solid #111;overflow:hidden;min-width:0;min-height:0}
+.p-head>*{min-width:0;min-height:0;box-sizing:border-box}.logo-cell{border-right:1px solid #111;display:flex;align-items:center;justify-content:center}
+.logo{width:92px;height:46px;object-fit:contain}
+.p-title{display:flex;align-items:center;justify-content:center;border-right:1px solid #111;font-size:25px;font-weight:900}
+.meta{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  grid-template-rows:repeat(3,minmax(0,1fr));
+  width:100%;
+  height:100%;
+  min-width:0;
+  min-height:0;
+  overflow:hidden;
+  font-size:10px;
+  font-weight:800;
+}
+.meta>div{
+  box-sizing:border-box;
+  width:100%;
+  height:100%;
+  min-width:0;
+  min-height:0;
+  padding:2px 3px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  white-space:nowrap;
+  overflow:hidden;
+  border:0;
+  border-bottom:1px solid #111;
+}
+.meta>div:nth-child(odd){border-right:1px solid #111}
+.meta>div:nth-last-child(-n+2){border-bottom:0}
+/* 세로 미리보기에서 작성일 날짜가 잘리지 않도록 날짜 칸만 여유 있게 표시 */
+.meta>div:nth-child(2){font-size:10px;letter-spacing:-0.2px;padding-left:0;padding-right:0}
+.p-info{display:grid;grid-template-columns:17% 28.5% 28.5% 26%;height:54px;border:2px solid #111;border-top:0;font-size:12px;font-weight:800;text-align:center}
+.p-info>div{border-right:1px solid #111;display:grid;grid-template-rows:1fr 1fr;min-height:0}.p-info>div:last-child{border-right:0}
+.p-info .h{border-bottom:1px solid #111;padding:4px 2px;min-height:0;display:flex;align-items:center;justify-content:center}.p-info .v{padding:3px 2px;min-height:0;display:flex;align-items:center;justify-content:center}
+.p-section{border:2px solid #111;margin-top:16px}
+.p-row{display:grid}
+.p-row.title{grid-template-columns:14% 86%;height:38px;border-bottom:1px solid #111}.p-row.cat{grid-template-columns:14% 86%;height:70px}
+.p-label{display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800;font-size:13px;border-right:1px solid #111;white-space:pre-line}
+.p-title-value{padding:10px;font-weight:700}
+.cat-body{display:grid;grid-template-columns:1fr 1fr 1fr;font-size:11px;font-weight:700}
+.cat-col{
+  display:grid;
+  grid-template-columns:24px 1fr;
+  grid-template-rows:repeat(4,15px);
+  align-content:center;
+  border-right:1px solid #111;
+  padding:5px;
+  line-height:15px;
+  box-sizing:border-box;
+  min-height:0;
+  overflow:hidden;
+}
+.cat-col:last-child{border-right:0}
+.cat-col>.cat-boxes,
+.cat-col>div:last-child{
+  display:grid;
+  grid-template-rows:repeat(4,15px);
+  min-height:0;
+}
+.cat-boxes{font-size:13px;text-align:center;font-weight:400}
+/* 세로 미리보기에서 "외주 (가공업체)"가 다음 줄(연구소)과 겹치지 않도록 축소 */
+.cat-col:nth-child(2)>div:last-child>div:nth-child(2),
+.cat-col:nth-child(3)>div:last-child>div:nth-child(1){font-size:8px;letter-spacing:-0.35px;white-space:nowrap;overflow:hidden}
+.big-section{border:2px solid #111;margin-top:16px}
+.big-row{display:grid;grid-template-columns:14% 86%;border-bottom:1px solid #111}
+.big-row:last-child{border-bottom:0}
+.big-label{display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800;font-size:13px;border-right:1px solid #111;white-space:pre-line}
+.big-content{padding:8px;font-size:12px;white-space:pre-wrap;overflow:hidden;line-height:1.45}
+.current-row{height:200px}.proposal-row{height:200px}.effect-row{height:90px}
+.approval{
+  margin-top:8px;
+  border:2px solid #111;
+  background:#d8edf3;
+  width:100%;
+  box-sizing:border-box;
+  overflow:hidden;
+}
+.approval-main{
+  display:grid;
+  grid-template-columns:2552fr 7088fr;
+  grid-template-rows:30px 30px;
+  width:100%;
+  height:60px;
+  box-sizing:border-box;
+  border-bottom:0;
+  min-width:0;
+}
+.approval-bottom{
+  border-top:1px solid #111;
+}
+.approval-label{
+  grid-column:1;
+  grid-row:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:800;
+  border-right:1px solid #111;
+  box-sizing:border-box;
+  min-width:0;
+}
+.approval-decision{
+  grid-column:1;
+  grid-row:2;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:11px;
+  font-weight:700;
+  border-right:1px solid #111;
+  box-sizing:border-box;
+  white-space:nowrap;
+}
+.approval-op{
+  grid-column:2;
+  grid-row:1 / span 2;
+  padding:9px;
+  font-size:12px;
+  font-weight:800;
+  box-sizing:border-box;
+  min-width:0;
+}
+.approval-bottom{
+  min-height:32px;
+  padding:7px;
+  box-sizing:border-box;
+  text-align:center;
+  font-size:10.5px;
+  font-weight:800;
+  line-height:18px;
+  white-space:nowrap;
+  overflow:hidden;
+}
+.additional{margin-top:9px;border:2px solid #111;background:#dce8f5;height:70px;padding:9px;font-size:12px;font-style:italic;font-weight:800}
+.content-with-photo{display:grid;grid-template-columns:40% 60%;gap:0;align-items:stretch;height:100%;min-height:0;overflow:hidden}.proposal-with-photo{grid-template-columns:40% 60%}.content-with-photo.no-photo{display:block}.photo-slot{min-width:0;min-height:0;height:100%;border-right:1px solid #111;box-sizing:border-box;padding:6px;display:flex;align-items:center;justify-content:center;overflow:hidden}.p-photo{width:100%;height:100%;max-width:100%;max-height:100%;display:block;margin:0;object-fit:contain;object-position:center}.content-text{min-width:0;min-height:0;padding:2px 8px;box-sizing:border-box;white-space:pre-wrap;overflow:hidden}
+.small{font-size:10px;color:#666}
+.actions{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.98);border-top:1px solid #ddd;padding:8px 10px 10px;display:grid;grid-template-columns:1fr 1fr 1.15fr 1fr 1fr;gap:7px;z-index:20}
+.actions button{min-width:0;border:0;border-radius:12px;padding:9px 5px;font-weight:900;font-size:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;line-height:1.05;box-sizing:border-box;box-shadow:0 2px 5px rgba(36,65,95,.12)}
+.actions button span{font-size:12px;white-space:nowrap}
+.action-temp{background:#63A9D6;color:#fff}
+.action-reset{background:#4FA1A7;color:#fff}
+.action-preview{background:#74A62F;color:#fff}
+.action-pdf{background:#CFE4F7;color:#24415f;border:1px solid #B8D4EA!important}
+.action-share{background:#E7D0F7;color:#5A466B;border:1px solid #D7B7EE!important}
+@media(max-width:430px){.actions{gap:5px;padding-left:6px;padding-right:6px}.actions button{padding-left:2px;padding-right:2px;border-radius:10px}.actions button span{font-size:11px}.actions button:first-letter{font-size:18px}.checkgrid{grid-template-columns:repeat(3,1fr)}.p-title{font-size:21px}.paper{padding-left:7%;padding-right:7%}}
+@media print{
+ /* A4: 현재 상태/개선제안 동일 높이 */
+ .current-row,.proposal-row{height:200px!important;min-height:200px!important;max-height:200px!important}
+
+ @page{size:A4 portrait;margin:0}
+ html,body{background:#fff!important;width:210mm;height:297mm;overflow:hidden}
+ header,.tabs,.actions,.form{display:none!important}
+ .wrap{padding:0!important;max-width:none!important}
+ .preview{display:block!important}
+ .paper{display:block!important;box-sizing:border-box!important;width:210mm;height:297mm;min-height:297mm;max-height:297mm;max-width:none;margin:0;padding:13mm 18.5mm 10mm;box-shadow:none;overflow:hidden;page-break-after:avoid;break-after:avoid}
+}
+
+
+/* 5.0 action palette — based on the user's reference image */
+.action-temp{background:#63A9D6!important;color:#fff!important;border-color:#63A9D6!important}
+.action-reset{background:#4FA1A7!important;color:#fff!important;border-color:#4FA1A7!important}
+.action-preview{background:#74A62F!important;color:#fff!important;border-color:#74A62F!important}
+.action-pdf{background:#CFE4F7!important;color:#24415f!important;border-color:#B8D4EA!important}
+.action-share{background:#E7D0F7!important;color:#5A466B!important;border-color:#D7B7EE!important}
+
+
+html.pdfExport, body.pdfExport{
+  background:#fff!important;
+}
+body.pdfExport header,
+body.pdfExport .tabs,
+body.pdfExport .actions,
+body.pdfExport .form{
+  display:none!important;
+}
+body.pdfExport .wrap{
+  padding:0!important;
+  margin:0!important;
+  max-width:none!important;
+}
+body.pdfExport .preview{
+  display:block!important;
+  margin:0!important;
+  padding:0!important;
+}
+body.pdfExport .paper{
+  margin:0!important;
+  box-shadow:none!important;
+}
+
+
+.photo-row{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  width:100%;
+  box-sizing:border-box;
+}
+.photo-row .photo{
+  flex:1;
+  min-width:0;
+}
+.photo-clear{
+  flex:0 0 38px;
+  width:38px;
+  height:38px;
+  border:1px solid #c9cfd6;
+  border-radius:9px;
+  background:#fff;
+  color:#777;
+  font-size:24px;
+  font-weight:700;
+  line-height:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  box-sizing:border-box;
+}
+.photo-clear:active{
+  background:#f0f2f4;
+  transform:scale(.97);
+}
+
+</style>
+<style>
+/* 5.11 PDF/A4 width fix: paper width includes its padding */
+.paper{box-sizing:border-box!important;}
+.p-head,.p-info,.p-section,.big-section,.approval,.additional{overflow:hidden}
+.p-head>*{min-width:0}
+
+/* PDF 저장 시 미리보기 배경색 유지 */
+.approval,
+.approval-main,
+.approval-bottom,
+.additional{
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+@media print{
+  .approval,
+  .approval-main,
+  .approval-bottom,
+  .additional{
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+.approval-label{grid-column:1;grid-row:1;border-bottom:1px solid #111}
+.approval-decision{grid-column:1;grid-row:2}
+.approval-op{grid-column:2;grid-row:1 / span 2}
+</style>
+
+
+<style>
+.hf-back{color:#0b63b6;display:inline-block;margin-bottom:8px;text-decoration:none}.hf-draft-note{font-size:13px;color:#526579}.photo-choices{display:flex;gap:8px;flex-wrap:wrap}.photo-choices label{border:1px solid #bbcadb;padding:10px;border-radius:8px;position:relative}.photo-choices input{position:absolute;inset:0;opacity:0;width:100%;height:100%}.photo-thumb{max-width:100%;max-height:180px;object-fit:contain}.approved-logo{display:inline-block;width:94px;height:50px;position:relative;overflow:hidden}.approved-logo img{position:absolute;left:-32px;top:-47px;max-width:none!important;width:auto!important;height:auto!important}.logo-cell{overflow:hidden}input,textarea{max-width:100%}@media print{.hf-back,.hf-draft-note{display:none!important}}
+</style></head>
+<body>
+<header><a class="hf-back" href="./">← HandsFree</a><div class="brand">KMT 스마트 개선제안</div><div class="sub">현장에서 바로 작성 · 미리보기 · PDF 저장</div></header>
+<div class="tabs">
+<button class="tab active" id="tabForm" onclick="showForm()">1. 내용 입력</button>
+<button class="tab" id="tabPreview" onclick="showPreview()">2. 미리보기</button>
+</div>
+<main class="wrap"><p class="hf-draft-note" id="draftStatus" role="status">이 기기에 초안으로 보관합니다. 제출·공유는 버튼을 눌렀을 때만 실행됩니다.</p>
+<section class="form" id="form">
+<div class="card">
+<div class="grid2">
+<div><label>작성일</label><input id="writeDate" type="date"></div>
+<div><label>접수일</label><input id="receiveDate" type="date"></div>
+</div>
+<div class="grid2" style="margin-top:9px">
+<div><label>작성자</label><input id="author" placeholder=""><div class="fixed"><input id="fixAuthor" type="checkbox"> 작성자 고정</div></div>
+<div><label>작성 부서</label><input id="dept" placeholder=""><div class="fixed"><input id="fixDept" type="checkbox"> 부서 고정</div></div>
+</div>
+<div class="grid2" style="margin-top:9px">
+<div><label>작업 번호</label><input id="job" placeholder=""></div>
+<div><label>고객사</label><input id="customer" placeholder=""></div>
+</div>
+<div style="margin-top:9px"><label>품명 (설비명)</label><input id="equipment" placeholder=""></div>
+</div>
+<div class="card"><div class="section-title">제목</div><input id="title" placeholder="개선 내용을 한 줄로 요약"></div>
+<div class="card"><div class="section-title">개선 및 제안 항목</div><div class="checkgrid" id="categories"></div></div>
+<div class="card"><div class="section-title">현재의 상태 (내용 및 사진)</div><textarea id="current" placeholder="현재 상태를 작성하세요."></textarea><div class="photo-row"><input class="photo" id="currentPhoto" type="file" accept="image/*"><button type="button" class="photo-clear" onclick="clearPhoto('currentPhoto')" aria-label="현재 사진 삭제">×</button></div></div>
+<div class="card"><div class="section-title">개선 & 제안 내용 (내용 및 사진)</div><textarea id="proposal" placeholder="개선 및 제안 내용을 작성하세요."></textarea><div class="photo-row"><input class="photo" id="proposalPhoto" type="file" accept="image/*"><button type="button" class="photo-clear" onclick="clearPhoto('proposalPhoto')" aria-label="개선 제안 사진 삭제">×</button></div></div>
+<div class="card"><div class="section-title">예상 효과 또는 참고사항</div><textarea id="effect" placeholder="작업단축, 품질향상, 안전개선, 누락방지 등"></textarea></div>
+</section>
+<section class="preview" id="preview"><div class="paper" id="paper"></div></section>
+</main>
+<div class="actions">
+<button class="action-reset" onclick="clearDraft()">↻<span>초기화</span></button>
+<button class="action-temp" onclick="saveDraft()">💾<span>임시저장</span></button>
+<button class="action-preview" onclick="showPreview()">👁<span>미리보기</span></button>
+<button class="action-pdf" onclick="savePdf()">📄<span>PDF 저장</span></button>
+<button class="action-share" onclick="sharePdf()">📤<span>카톡/공유</span></button>
+</div>
+<script>
+const context=(()=>{try{return JSON.parse(sessionStorage.getItem("hf-improvement-context")||"{}")}catch{return {}}})();
+const draftKey="hf-improvement-draft-v1:"+(context.job||"general");
+
+const LOGO="./kmt-approved-logo.png";
+const cats=["개발팀 설계","생산팀 조립","전장 (전기)","A/S","구매 / 자재","외주 (가공업체)","연구소","테스트","설치 / 시운전","영업","사무 / 회계","환경 / 기타"];
+const box=document.getElementById("categories");
+cats.forEach(c=>box.insertAdjacentHTML("beforeend",`<label class="check"><input type="checkbox" data-cat value="${c}">${c}</label>`));
+function pad(n){return String(n).padStart(2,"0")}
+function today(){let d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}
+function val(id){return document.getElementById(id).value||""}
+function setv(id,v){document.getElementById(id).value=v||""}
+function esc(s){return String(s||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;")}
+function fmt(s){return s?s.replaceAll("-",".")+".":""}
+function collect(){return {writeDate:val("writeDate"),receiveDate:val("receiveDate"),author:val("author"),dept:val("dept"),job:val("job"),customer:val("customer"),equipment:val("equipment"),title:val("title"),current:val("current"),proposal:val("proposal"),effect:val("effect"),cats:[...document.querySelectorAll("[data-cat]:checked")].map(e=>e.value)}}
+function clearPhoto(inputId){
+  const el=document.getElementById(inputId);
+  if(!el)return;
+  el.value="";
+}
+function imageData(input){return new Promise(resolve=>{let f=document.getElementById(input).files[0];if(!f)return resolve("");let r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>resolve("");r.readAsDataURL(f)})}
+async function showPreview(){
+let x=collect(), ci=await imageData("currentPhoto"), pi=await imageData("proposalPhoto");
+let catGroups=[[0,1,2,3],[4,5,6,7],[8,9,10,11]];
+let catHtml=catGroups.map(g=>`<div class="cat-col"><div class="cat-boxes">${g.map(i=>`<div>${x.cats.includes(cats[i])?"☑":"□"}</div>`).join("")}</div><div>${g.map(i=>`<div>${cats[i]}</div>`).join("")}</div></div>`).join("");
+document.getElementById("paper").innerHTML=`
+<div class="paper-top"><div class="admin">관리번호 : KMT - 요청 -</div>
+<div class="p-head"><div class="logo-cell"><span class="approved-logo"><img alt="KMT" src="${LOGO}"></span></div><div class="p-title">개선 &amp; 제안 요청서</div>
+<div class="meta"><div>작성일</div><div>${esc(fmt(x.writeDate))}</div><div>작성자</div><div>${esc(x.author)}</div><div>접수일</div><div>${esc(fmt(x.receiveDate))}</div></div></div>
+<div class="p-info"><div><div class="h">작성 부서</div><div class="v">${esc(x.dept)}</div></div><div><div class="h">작업 번호</div><div class="v">${esc(x.job)}</div></div><div><div class="h">고객사</div><div class="v">${esc(x.customer)}</div></div><div><div class="h">품명 (설비명)</div><div class="v">${esc(x.equipment)}</div></div></div>
+<div class="p-section"><div class="p-row title"><div class="p-label">제 목</div><div class="p-title-value">${esc(x.title)}</div></div>
+<div class="p-row cat"><div class="p-label">개선 및 제안<br>항목</div><div class="cat-body">${catHtml}</div></div></div>
+<div class="big-section">
+<div class="big-row current-row"><div class="big-label">현재의 상태</div><div class="big-content">${ci?`<div class="content-with-photo"><div class="photo-slot"><img class="p-photo" src="${ci}"></div><div class="content-text">${esc(x.current)}</div></div>`:`<div class="content-with-photo no-photo"><div class="content-text">${esc(x.current)}</div></div>`}</div></div>
+<div class="big-row proposal-row"><div class="big-label">개선 &amp; 제안<br>내용</div><div class="big-content">${pi?`<div class="content-with-photo proposal-with-photo"><div class="photo-slot"><img class="p-photo" src="${pi}"></div><div class="content-text">${esc(x.proposal)}</div></div>`:`<div class="content-with-photo no-photo"><div class="content-text">${esc(x.proposal)}</div></div>`}</div></div>
+<div class="big-row effect-row"><div class="big-label">예상 효과<br>또는<br>참고사항</div><div class="big-content">${esc(x.effect)}</div></div></div>
+<div class="approval">
+  <div class="approval-main">
+    <div class="approval-label">판 정</div>
+    <div class="approval-decision">□ 채택　□ 불채택　□ 보류</div>
+    <div class="approval-op"><i>대표이사 의견</i></div>
+  </div>
+  <div class="approval-bottom">□ 영업부　□ 연구소　□ 설계부　□ 생산관리부　□공장장　□ PM팀　□ A/S팀　□ 총무부　□ 구매부　□ 품질팀</div>
+</div>
+<div class="additional">추가 사항 (요청부서, 대표이사, 기타)</div></div>`;
+document.getElementById("form").style.display="none";document.getElementById("preview").classList.add("show");localStorage.setItem("hf-improvement-view-v1","preview");
+document.getElementById("tabForm").classList.remove("active");document.getElementById("tabPreview").classList.add("active");
+window.scrollTo(0,0);
+}
+function showForm(){document.getElementById("form").style.display="block";document.getElementById("preview").classList.remove("show");document.getElementById("tabForm").classList.add("active");document.getElementById("tabPreview").classList.remove("active")}
+function saveDraft(){localStorage.setItem(draftKey,JSON.stringify(collect()));alert("작성 내용이 스마트폰에 임시저장되었습니다.")}
+function clearDraft(){if(confirm("작성 내용을 초기화할까요?")){localStorage.removeItem(draftKey);location.reload()}}
+function savePdf(){
+  showPreview().then(()=>{
+    if(window.Android&&Android.savePdf) Android.savePdf((val("title")||"KMT 개선제안서").trim());
+    else setTimeout(()=>window.print(),300);
+  })
+}
+function sharePdf(){
+  showPreview().then(()=>{
+    if(window.Android&&Android.sharePdf) Android.sharePdf((val("title")||"KMT 개선제안서").trim());
+    else alert("브라우저에서는 PDF 저장 후 공유할 수 있습니다. Android 앱에서는 카톡/공유 버튼으로 바로 공유할 수 있습니다.");
+  })
+}
+function restore(){setv("writeDate",today());setv("receiveDate","");setv("author",localStorage.getItem("hf-improvement-author-v1")||"");setv("dept",localStorage.getItem("hf-improvement-dept-v1")||"");document.getElementById("fixAuthor").checked=!!localStorage.getItem("hf-improvement-author-v1");document.getElementById("fixDept").checked=!!localStorage.getItem("hf-improvement-dept-v1");let d=localStorage.getItem(draftKey);if(d)try{let x=JSON.parse(d);Object.keys(x).forEach(k=>{if(k!=="cats"&&document.getElementById(k))setv(k,x[k])});(x.cats||[]).forEach(c=>{let e=[...document.querySelectorAll("[data-cat]")].find(z=>z.value===c);if(e)e.checked=true})}catch(e){}}
+document.getElementById("fixAuthor").onchange=e=>e.target.checked?localStorage.setItem("hf-improvement-author-v1",val("author")):localStorage.removeItem("hf-improvement-author-v1");
+document.getElementById("fixDept").onchange=e=>e.target.checked?localStorage.setItem("hf-improvement-dept-v1",val("dept")):localStorage.removeItem("hf-improvement-dept-v1");
+document.getElementById("author").onblur=()=>{if(document.getElementById("fixAuthor").checked)localStorage.setItem("hf-improvement-author-v1",val("author"))};
+document.getElementById("dept").onblur=()=>{if(document.getElementById("fixDept").checked)localStorage.setItem("hf-improvement-dept-v1",val("dept"))};
+restore();</script><script src="./improvement.js"></script>
+</body></html>
