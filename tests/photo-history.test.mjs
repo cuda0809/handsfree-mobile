@@ -10,6 +10,7 @@ function fixture(){
  const ss={getSheetByName:n=>tables.get(n),insertSheet:sheet};
  const c=vm.createContext({Date,console,PropertiesService:{getScriptProperties:()=>({getProperty:()=> 'private-root'})},SpreadsheetApp:{flush(){}},safety_:()=>gate,hfLsHash_:v=>crypto.createHash('sha256').update(JSON.stringify(v)).digest('hex'),Utilities:{DigestAlgorithm:{SHA_256:'sha256'},base64Decode:v=>[...Buffer.from(v,'base64')],base64Encode:v=>Buffer.from(v).toString('base64'),computeDigest:(_,v)=>[...crypto.createHash('sha256').update(Buffer.from(v)).digest()],newBlob:v=>({getBytes:()=>[...Buffer.from(v)]})},hfLsCell_:(id,row,col,value)=>({id,row,col,value}),hfLsBatch_:(_,requests)=>{for(const r of requests){if(r.appendCells){const a=r.appendCells;tables.get(a.sheetId).data.push(a.rows[0].values.map(v=>v.userEnteredValue.stringValue));}else tables.get(r.id).data[r.row][r.col]=r.value;}}});
  vm.runInContext(backend,c);
+ c.hfMediaFreshRows_=(_,name)=>tables.get(name)?.data.slice(1).map(r=>r.map(String))||[];
  c.hfMediaFolder_=(parent,key,name)=>{folders.push({parent,key,name});return key;};
  c.hfMediaFile_=(folder,id,name,mime,bytes)=>{operations.push(id);if(files.has(id))assert.deepEqual(files.get(id),bytes);else files.set(id,bytes);if(interrupt){interrupt=false;throw Error('network_lost');}};
  c.hfMediaDrive_=(path)=>path.includes('generateIds')?{ids:['file-'+(++sequence),'file-'+(++sequence)]}:{getBlob:()=>({getBytes:()=>files.get(path.match(/files\/([^?]+)/)[1])})};
@@ -26,6 +27,12 @@ test('interrupted photo write requires explicit recovery and reuses reserved fil
  const f=fixture();f.interrupt();assert.throws(()=>f.c.hfMediaSave_(f.ss,f.b,f.body,f.target),/network_lost/);assert.equal(f.files.size,1);
  assert.throws(()=>f.c.hfMediaSave_(f.ss,f.b,f.body,f.target),/media_pending/);assert.equal(f.operations.length,1);
  assert.equal(f.c.hfMediaSave_(f.ss,{...f.b,resume:true},f.body,f.target).status,'STORED');assert.equal(f.files.size,2);assert.equal(f.tables.get('HF_MEDIA_사진이력').data.length,2);
+});
+test('stale SpreadsheetApp reads after an atomic batch do not produce false pending or duplicate records',()=>{
+ const f=fixture();f.c.hfMediaRows_=()=>[];
+ assert.equal(f.c.hfMediaSave_(f.ss,f.b,f.body,f.target).status,'STORED');
+ assert.equal(f.c.hfMediaSave_(f.ss,f.b,f.body,f.target).status,'STORED');
+ assert.equal(f.tables.get('HF_MEDIA_사진이력').data.length,2);assert.equal(f.files.size,2);
 });
 test('closed safety gate records classification but writes no photos or equipment history',()=>{
  const f=fixture();f.setGate('CLOSED');assert.throws(()=>f.c.hfMediaSave_(f.ss,f.b,f.body,f.target),/safe_write_not_ready/);assert.equal(f.files.size,0);assert.equal(f.tables.get('HF_MEDIA_저장대기').data[1][5],'PHOTO_NOTE');assert.equal(f.tables.has('HF_MEDIA_사진이력'),false);

@@ -12,6 +12,9 @@
         android:label="${appLabel}"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <provider android:name=".EquipmentPhotoProvider"
+            android:authorities="${applicationId}.photos"
+            android:exported="false" android:grantUriPermissions="true" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

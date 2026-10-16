@@ -4,6 +4,12 @@ import android.annotation.SuppressLint;
 import android.Manifest;
 import android.app.Activity;
 import android.content.pm.PackageManager;
+import android.content.Intent;
+import android.content.ClipData;
+import android.provider.MediaStore;
+import android.webkit.ValueCallback;
+import java.io.File;
+import java.util.UUID;
 import android.graphics.Color;
 import android.graphics.Insets;
 import android.net.Uri;
@@ -26,6 +32,9 @@ public class MainActivity extends Activity {
     private static final int AUDIO_PERMISSION_REQUEST = 4102;
     private WebView webView;
     private PermissionRequest pendingAudioRequest;
+    private static final int PHOTO_PICK_REQUEST = 4103;
+    private ValueCallback<Uri[]> pendingPhoto;
+    private Uri cameraOutput;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -65,6 +74,34 @@ public class MainActivity extends Activity {
 
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
+            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                if (pendingPhoto != null) pendingPhoto.onReceiveValue(null);
+                pendingPhoto = null;
+                if (!isTrustedOrigin(Uri.parse(view.getUrl() == null ? "" : view.getUrl()))
+                    || !String.valueOf(Uri.parse(view.getUrl()).getPath()).startsWith("/kmt-sa2/")) {
+                    callback.onReceiveValue(null); return true;
+                }
+                boolean image = false;
+                for (String type : params.getAcceptTypes()) if ("image/*".equals(type) || "image/jpeg".equals(type)) image = true;
+                if (!image) { callback.onReceiveValue(null); return true; }
+                pendingPhoto = callback;
+                File folder = new File(getCacheDir(), "equipment-photos");
+                if (!folder.exists() && !folder.mkdirs()) { pendingPhoto.onReceiveValue(null); pendingPhoto = null; return true; }
+                File[] old = folder.listFiles();
+                if (old != null) for (File file : old) if (file.lastModified() < System.currentTimeMillis() - 86400000L) file.delete();
+                cameraOutput = Uri.parse("content://" + getPackageName() + ".photos/" + UUID.randomUUID() + ".jpg");
+                Intent camera = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                camera.putExtra(MediaStore.EXTRA_OUTPUT, cameraOutput);
+                camera.setClipData(ClipData.newRawUri("equipment photo", cameraOutput));
+                camera.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*");
+                Intent chooser = Intent.createChooser(picker, "사진 촬영 또는 선택");
+                chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{camera});
+                try { startActivityForResult(chooser, PHOTO_PICK_REQUEST); }
+                catch (android.content.ActivityNotFoundException e) { pendingPhoto.onReceiveValue(null); pendingPhoto = null; cameraOutput = null; }
+                return true;
+            }
+            @Override
             public void onPermissionRequest(PermissionRequest request) {
                 runOnUiThread(() -> handleWebPermission(request));
             }
@@ -103,6 +140,22 @@ public class MainActivity extends Activity {
         Uri app = Uri.parse(APP_URL);
         return origin != null && "https".equalsIgnoreCase(origin.getScheme())
             && app.getHost() != null && app.getHost().equalsIgnoreCase(origin.getHost());
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != PHOTO_PICK_REQUEST || pendingPhoto == null) return;
+        Uri selected = resultCode == RESULT_OK ? (data != null && data.getData() != null ? data.getData() : cameraOutput) : null;
+        if (selected != null && !"content".equals(selected.getScheme())) selected = null;
+        ValueCallback<Uri[]> callback = pendingPhoto; pendingPhoto = null; cameraOutput = null;
+        callback.onReceiveValue(selected == null ? null : new Uri[]{selected});
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (pendingPhoto != null) { pendingPhoto.onReceiveValue(null); pendingPhoto = null; }
+        super.onDestroy();
     }
 
     private void handleWebPermission(PermissionRequest request) {
