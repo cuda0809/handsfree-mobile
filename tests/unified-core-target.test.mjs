@@ -31,6 +31,14 @@ test('B exact jobs and multiline continuations preserve selected target',()=>{
  const e=c.resolveUnifiedProject_(ss,'10/21 가공품 입고 대기',{...payload,targetHint:b[1]});
  assert.equal(e.orderId,b[1]);assert.equal(e.ambiguous,false);
 });
+test('unified incoming-parts progress stays in journal lane; legacy return handling unchanged',()=>{
+ const b=['PRJ-B','260728A-064','B','엔켓','ATM - 0.5B'];
+ const {c,ss}=fixture([b]);
+ const raw=b[1]+' 베셀입고 완료 /리크테스트 진행중/암 수정품 입고완료';
+ const e=c.normalEvent_(ss,raw,1,{...payload,targetHint:b[1]});
+ assert.equal(e.safe,true);assert.equal(e.orderId,b[1]);assert.equal(e.type,'일일작업');assert.equal(e.target,'업무이력');assert.match(e.raw,/암 수정품 입고완료$/);
+ assert.equal(c.workType_(raw),'재입고완료','legacy classifier keeps return-ledger behavior');
+});
 test('unknown, duplicate, cross-team, incomplete and malformed Core all fail closed',()=>{
  for(const [rows,opts] of [[[],{}],[[record,record],{}],[[[...record.slice(0,2),'C',...record.slice(3)]],{}],[[['',...record.slice(1)]],{}],[[record],{missing:true}],[[record],{id:1}],[[record],{header:['wrong']}]] ){
   const {c,ss,legacyReads}=fixture(rows,opts);

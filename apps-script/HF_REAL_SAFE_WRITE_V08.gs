@@ -128,7 +128,7 @@ function splitEvents_(raw){const a=String(raw).split(/\r?\n|;/).map(x=>x.trim())
 
 function normalEvent_(ss,line,index,p){
   if(String(p.channel||'').split('|').includes('GENERAL_EVENT')&&p.targetHint==='GENERAL_ISSUE')return generalEvent_(ss,line,index,p);
-  const now=new Date(),project=resolveUnifiedProject_(ss,line,p),type=workType_(line),people=extractPeople_(line),date=parseDate_(line,now),excludedDate=safety_(ss,'Excluded Actual Date')||'2026-09-14',dateKey=Utilities.formatDate(date,HF_SW.TZ,'yyyy-MM-dd');
+  const now=new Date(),project=resolveUnifiedProject_(ss,line,p),classified=workType_(line),type=classified==='재입고완료'&&String(p.channel||'').split('|').includes('UNIFIED_EVENT')?'일일작업':classified,people=extractPeople_(line),date=parseDate_(line,now),excludedDate=safety_(ss,'Excluded Actual Date')||'2026-09-14',dateKey=Utilities.formatDate(date,HF_SW.TZ,'yyyy-MM-dd');
   const excluded=dateKey===excludedDate,conf=confidence_(type,project,people,line),safe=!excluded&&highConfidence_(type,project,people,conf),reason=excluded?`EXCLUDED_DATE:${excludedDate}`:safe?'':'LOW_CONFIDENCE_OR_AMBIGUOUS_TARGET';
   return {receivedAt:now,source:'FIELD_INPUT',raw:line,eventIndex:index,target:type==='재입고완료'?'반출일지':'업무이력',date,type,customer:project.customer||'',model:project.model||'',orderId:project.orderId||'',actor:String(p.requester||'UNKNOWN'),work:workContent_(line,project,people),people:people.join(', '),link:project.orderId||'',confidence:conf,safe,excluded,reason,inputSheet:p.inputSheet,inputRow:p.inputRow};
 }

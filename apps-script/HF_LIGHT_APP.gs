@@ -36,10 +36,11 @@ function hfAppCurrentEvidence_(projects,events,today){
    if(issue.requestId===request){if(issue.lines.indexOf(text)<0)issue.lines.push(text);if(stamp>issue.stamp)issue.stamp=stamp;}
   }
   if(e[7]!=='일일작업'||date>today)return;
-  var match=text.match(/^(?:조립\s*가능\s*파트\s*)?(조립|마감\s*조립|전장|배선|프로그램|검수)\s*(완료|진행(?:\s*중)?|중)(?:\s+(?:20\d{2}[-/.])?\d{1,2}[-/.]\d{1,2})?\s*$/);
-  if(!match)return;
+  var candidates=text.split(/\r?\n|;|\/(?=\s*[가-힣])/).map(function(part){return part.trim().match(/^(?:조립\s*가능\s*파트\s*)?(조립|마감\s*조립|전장|배선|프로그램|검수|(?:리크|누설|구동)?\s*테스트)\s*(완료|진행(?:\s*중)?|중)(?:\s+(?:20\d{2}[-/.])?\d{1,2}[-/.]\d{1,2})?\s*$/);}).filter(Boolean);
+  if(candidates.length!==1)return;
+  var match=candidates[0],process=/테스트/.test(match[1])?'테스트':match[1],status=match[2]==='완료'?'완료':'진행';
   var stamp=String(e[1]||''),prior=latest[p.orderId];
-  if(!prior||date>prior.date||date===prior.date&&stamp>prior.stamp)latest[p.orderId]={date:date,stamp:stamp,state:match[1]+' '+match[2],process:/전장|배선/.test(match[1])?'전장':match[1],id:e[0],raw:text};
+  if(!prior||date>prior.date||date===prior.date&&stamp>prior.stamp)latest[p.orderId]={date:date,stamp:stamp,state:process+' '+status,process:/전장|배선/.test(process)?'전장':process==='테스트'?'검수':process,id:e[0],raw:text};
  });
  var projected=projects.map(function(p){
   var e=latest[p.orderId];if(!e||p.actualDelivery||/출고\s*완료|납품\s*완료|출고\s*대기/.test(p.state||''))return p;

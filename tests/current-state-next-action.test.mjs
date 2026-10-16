@@ -20,6 +20,14 @@ test('A-team confirmed field event uses the same state and manual-action preserv
  const p={...base,team:'A',nextAction:'후속 작업 확인'},e=event(),before=JSON.stringify([p,e]);
  const out=run(p,[e]);assert.equal(out.state,'전장 완료');assert.equal(out.nextAction,p.nextAction);assert.equal(JSON.stringify([p,e]),before);
 });
+test('B64 mixed incoming-parts and leak-test journal projects only confirmed test progress',()=>{
+ const id='260728A-064',raw='베셀입고 완료 /리크테스트 진행중/암 수정품 입고완료';
+ const p={...base,orderId:id,state:'마감조립 진행',nextAction:'검수 일정 확인'};
+ const e=event({3:id+' '+raw,10:raw,15:id,20:id}),before=JSON.stringify([p,e]);
+ const out=run(p,[e]);assert.equal(out.state,'테스트 진행');assert.equal(out.process,'검수');assert.equal(out.nextAction,p.nextAction);assert.equal(out.recentEvent,raw);assert.equal(JSON.stringify([p,e]),before);
+ assert.equal(run(p,[event({3:id+' '+raw,10:raw,15:id,20:id,17:'REVIEW'})]).state,p.state);
+ assert.equal(run(p,[event({3:id+' 조립 완료/전장 진행',10:'조립 완료/전장 진행',15:id,20:id})]).state,p.state,'multiple competing stages require review rather than guessed priority');
+});
 test('draft, failed, general, other equipment, future and older evidence cannot replace current state',()=>{
  for(const patch of [{17:'REVIEW'},{2:'GENERAL_EVENT'},{7:'기타'},{15:'OTHER'},{20:'OTHER'},{6:'2026-10-08'},{6:'2026-09-14'},{10:'전장 완료 예정'},{10:'전장 완료 아님'},{10:'전장 완료 여부 확인'},{3:job+' 260727A-060-03 전장 완료'}])assert.equal(run(base,[event(patch)]).state,base.state);
  for(const patch of [{team:'C'},{since:'2026-10-07'},{state:'검수 진행'},{recentEventAt:'2026-10-07 09:00:00 KST'},{actualDelivery:'2026-10-01'},{state:'출고완료'},{state:'출고대기'}])assert.equal(run({...base,...patch},[event()]).state,({...base,...patch}).state);
