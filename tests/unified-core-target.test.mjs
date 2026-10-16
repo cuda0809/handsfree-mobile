@@ -48,3 +48,19 @@ test('legacy field input and explicit general lane preserve existing behavior',(
  const e=c.normalEvent_(ss,'일반 지원 업무',1,{channel:'MOBILE|GENERAL_EVENT',targetHint:'GENERAL_ISSUE',requester:'사용자'});
  assert.equal(e.general,true);assert.equal(e.orderId,'');assert.equal(e.safe,true);assert.equal(legacyReads(),1);
 });
+test('isolated queued A45 input reaches journal with exact target; closed gate keeps it in review',()=>{
+ const {c,ss}=fixture();const before=JSON.stringify(record),normalized=[],journal=[],queueCells={};let gate=true;
+ Object.assign(c,{getSheet_:()=>({}),safety_:()=> '2026-09-14',fieldOpen_:()=>gate,dt_:()=> 'isolated-time',
+  appendNorm_:(s,e,id)=>{normalized.push({...e,id});return normalized.length-1;},
+  setNormStatus_:(s,n,status)=>normalized[n].status=status,setInputStatus_(){},
+  writeWork_:(s,e)=>{journal.push({...e});return {ok:true,row:8};}
+ });
+ const queue={getRange:(row,col)=>({setValue:v=>queueCells[col]=v,clearContent:()=>delete queueCells[col]})};
+ const p={...payload,source:'FIELD_INPUT',inputSheet:'MOBILE',inputRow:0,raw:job+' 테스트'};
+ c.processQueueRow_(ss,queue,2,['isolated-A45','','','isolated-actor',JSON.stringify(p),'QUEUED','',0]);
+ assert.equal(queueCells[6],'DONE',queueCells[13]);assert.match(queueCells[12],/반영 1/);
+ assert.equal(normalized[0].status,'WRITTEN');assert.equal(normalized[0].orderId,job);
+ assert.equal(journal.length,1);assert.equal(journal[0].actor,'isolated-actor');assert.equal(journal[0].link,job);
+ gate=false;c.processQueueRow_(ss,queue,3,['isolated-closed','','','isolated-actor',JSON.stringify(p),'QUEUED','',0]);
+ assert.equal(normalized[1].status,'REVIEW');assert.equal(journal.length,1);assert.equal(JSON.stringify(record),before);
+});
