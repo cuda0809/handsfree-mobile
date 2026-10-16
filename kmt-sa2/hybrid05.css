@@ -766,7 +766,8 @@ main{padding-bottom:210px!important}
 /* Main navigation belongs directly under the CORE/HYBRID build row. */
 .demo{display:block!important;margin:0 17px!important;padding:8px 0 6px!important;border-bottom:0!important}
 .demo>b{display:block!important}
-.hf-connection-row{margin:0 17px 8px;padding:2px 0 8px;border-bottom:1px solid var(--hy-line);color:var(--hy-sub);font-size:10px;line-height:1.35}
+.hf-connection-row{margin:0 17px 8px;padding:2px 0 8px;border-bottom:1px solid var(--hy-line);color:var(--hy-sub);font-size:10px;line-height:1.35;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#hfRefreshStatus{flex-basis:100%;margin:0}#hfRefreshNow{min-height:40px;flex-shrink:0}
 .bottom{
  position:relative!important;
  left:auto!important;

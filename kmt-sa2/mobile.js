@@ -1,6 +1,6 @@
 let coreReadGeneration=0;
 'use strict';
-const BUILD='2026.10.16.SA2.8.3-MOBILE18', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
+const BUILD='2026.10.16.SA2.8.3-MOBILE19', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
 const main=document.getElementById('main'),dialog=document.getElementById('detail');
 let coreSnapshot=false,teamSnapshotComplete=false;
 let items=[],live=false,readPending=null,sourceDate='',lastRead='',screen='home',filter='all',returnFocus=null,readMessage='현재 상태를 불러오는 중…',recognition=null,installPrompt=null,readStale=false,lastReadErrorStatus=0,lastCoreAttempt=0;
@@ -152,7 +152,7 @@ async function refreshCachedCore(){
  return {items:next,sourceDate:d.projects.map(p=>String(p.updatedAt||'')).sort().at(-1)||''};
 }
 function renderCoreScreen(){
- if(screen==='home')home();if(screen==='work')work(filter,$('search')?.value||'');if(screen==='plan'&&typeof productionPlan==='function')productionPlan(productionPlanMode,true);if(screen==='projects'&&typeof projects==='function')projects();if(screen==='issues'&&typeof todayIssues==='function')todayIssues();
+ if(screen==='home')home();if(screen==='work')work(filter,$('search')?.value||'');if(screen==='plan'&&typeof productionPlan==='function')productionPlan(productionPlanMode,true);if(screen==='projects'&&typeof projects==='function')projects(filter,true);if(screen==='issues'&&typeof todayIssues==='function')todayIssues();
 }
 
 function active(name){screen=name;document.querySelectorAll('.bottom button').forEach(b=>b.classList.toggle('selected',b.dataset.page===name));}
@@ -255,7 +255,7 @@ async function growAnswer(){const raw=$('growQuestion').value.trim(),result=$('g
 function settings(){open(heading('MY HANDSFREE','사용자와 설정',`버전 ${BUILD}`)+`<div class="action-box">${live?'현재 상태 연결됨':'앱 연결 필요'}</div><p>이름과 4자리 PIN으로 연결합니다. 연결 후에는 180일 동안 자동 유지됩니다. 푸시 알림은 아직 연결되지 않았습니다.</p><button class="primary" onclick="installApp()">휴대폰에 앱 설치</button><button class="secondary" onclick="login()">사용자 등록 · 연결</button><button class="secondary" onclick="showInbox()">기기에 보관한 입력 확인</button><button class="secondary" onclick="checkUpdate()">앱 업데이트 확인</button><p class="note">오프라인에서는 초안을 보관할 수 있습니다. 서버 전송은 연결 후 직접 확인하여 진행하며 자동 재전송하지 않습니다.</p>`);}
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;});
 async function installApp(){if(installPrompt){await installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;return;}open(heading('INSTALL','휴대폰에 설치','한 번 설치하면 홈 화면에서 열 수 있습니다')+'<p>아이폰: Safari에서 이 주소를 연 뒤 공유 → 홈 화면에 추가.</p><p>안드로이드: Chrome에서 이 주소를 연 뒤 메뉴 → 앱 설치 또는 홈 화면에 추가.</p><p class="note">이미 설치했거나 설치를 지원하지 않는 브라우저에서는 설치 버튼이 나타나지 않을 수 있습니다.</p>');}
-async function checkUpdate(){try{const r=await navigator.serviceWorker?.getRegistration('/kmt-sa2/');if(!r)return toast('현재 브라우저에서 업데이트 서비스를 사용할 수 없습니다.');await r.update();toast(r.waiting?'새 버전이 준비되었습니다. 앱 창을 모두 닫고 다시 여세요.':'업데이트 확인 완료. 새 버전은 앱을 다시 열 때 적용됩니다.');}catch{toast('업데이트 확인 실패. 네트워크를 확인하세요.');}}
+async function checkUpdate(){try{const r=await navigator.serviceWorker?.getRegistration('/kmt-sa2/');if(!r)return toast('현재 브라우저에서 업데이트 서비스를 사용할 수 없습니다.');await r.update();await checkForLiveUpdate();toast('업데이트 확인 완료. 새 버전 적용 버튼으로 현재 창에서 적용하세요.');}catch{toast('업데이트 확인 실패. 네트워크를 확인하세요.');}}
 const nav=document.querySelector('.bottom');nav.style.gridTemplateColumns='repeat(4,1fr)';nav.innerHTML=`<button data-page="home" id="homeNav" onclick="home()"><span class="nav-icon">⌂</span>오늘</button><button data-page="plan" id="planNav" onclick="productionPlan()"><span class="nav-icon">◫</span>계획</button><button data-page="projects" id="projectsNav" onclick="projects()"><span class="nav-icon">▦</span>프로젝트</button><button data-page="issues" id="issuesNav" onclick="todayIssues()"><span class="nav-icon">▤</span>오늘 이슈</button>`;document.querySelector('.demo')?.after(nav);
 document.querySelector('.top > button.icon')?.remove();
 const profile=document.createElement('button');profile.className='icon login-button';profile.textContent='로그인';profile.setAttribute('aria-label','로그인');profile.onclick=login;document.querySelector('.top').append(profile);

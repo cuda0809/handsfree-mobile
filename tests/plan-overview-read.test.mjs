@@ -17,7 +17,7 @@ function harness(response){
  const prior={completePlan:true,cachedAt:'2000-01-01',byOrder:{OLD:{planTimeline:[{date:'2026-10-06',process:'조립'}]}}};
  const ctx={Date,Map,JSON,Error,items:[{team:'B',orderId:'NEW'}],coreSnapshot:true,screen:'home',planReadStale:true,planOverviewPending:null,PLAN_OVERVIEW_KEY:'fixture',calls:[],saved:null,rendered:0,
   planOverviewCache:()=>prior,applyPlanOverview:()=>true,summarizePlanRecords:r=>({planTimeline:r}),
-  persist:(k,v)=>{ctx.saved=v;},home:()=>ctx.rendered++,toast(){},
+  persist:(k,v)=>{ctx.saved=v;},renderCoreScreen:()=>ctx.rendered++,home:()=>ctx.rendered++,toast(){},
   appCall:async b=>{ctx.calls.push(b);if(response instanceof Error)throw response;return response;}};
  scopeContext(ctx);return {ctx,run:()=>vm.runInContext(code+';syncPlanOverview(true)',ctx)};
 }
