@@ -9,7 +9,7 @@ function issuePlanProgress(x){
  return '<div class="issue-plan-progress" aria-label="생산계획 기준 공정 진행도">'+Array.from(grouped,([process,dates])=>{
   const completed=v=>/완료/.test(String(v||''))&&!/미완료|예정|아님|대기|취소|여부/.test(String(v||''));
   const field=x[fields[process]],same=!!current&&processKey(process)===current;
-  const done=completed(field)&&(!processKey(field)||processKey(field)===processKey(process))||same&&completed(x.state);
+  const done=same?completed(x.state):completed(field)&&(!processKey(field)||processKey(field)===processKey(process));
   const status=done?'완료':same?'진행':'예정';
   return '<div class="issue-plan-stage '+(done?'done':status==='진행'?'now':'future')+'"><b>'+esc(process)+'</b><span>'+esc(status)+'</span><small>'+esc(dates[0])+(dates.length>1?' ~ '+esc(dates.at(-1)):'')+'</small></div>';
  }).join('')+'</div>'+(!fresh?'<small class="note">이전 계획 표시 · 최신 계획 확인 필요</small>':'');
