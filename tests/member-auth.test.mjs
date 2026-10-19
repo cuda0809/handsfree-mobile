@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import {memberAuthenticate,memberPinHash,memberCodeHash} from '../lib/member-auth.mjs';
+import {memberAuthenticate,memberPinHash,memberCodeHash,memberAdmin} from '../lib/member-auth.mjs';
 import {sa2Cookie} from '../lib/sa2-auth.mjs';
 import {authUser,signedMemberActor} from '../lib/sa2-auth-user.mjs';
 import authHandler from '../api/sa2-auth.js';
@@ -75,9 +75,25 @@ test('write API binds the authenticated member and exact input to a proof instea
 });
 
 test('master is a pinned server identity, separate from factory manager and team lead',()=>{
- const f=fixture();f.rows.push(['HFU-007','이상준','ALL','master','ACTIVE','1','','','','','0','0','']);
+ const f=fixture();f.rows.push(['HFU-007','이상준','B','team_lead','ACTIVE','1','','','','','0','0','','MASTER']);
  const b={actor:{member:{id:'HFU-007',version:1}}};
  for(const job of ['260101A-001','260101A-002'])for(const kind of ['journal','photo','state','schedule'])assert.doesNotThrow(()=>f.c.hfMemberWrite_(f.ss,b,job,kind));
  f.rows[3][1]='다른사람';assert.throws(()=>f.c.hfMemberWrite_(f.ss,b,'260101A-001','state'),/member_denied/);
- f.rows[3][1]='이상준';f.rows[3][2]='B';assert.throws(()=>f.c.hfMemberActive_(f.ss,b.actor.member),/member_denied/);
+ f.rows[3][1]='이상준';f.rows[3][2]='ALL';assert.throws(()=>f.c.hfMemberActive_(f.ss,b.actor.member),/member_denied/);
+});
+
+test('only pinned B-team master can manage users; changes revoke sessions and preserve audit without secrets',async()=>{
+ const f=fixture();f.rows.push(['HFU-007','이상준','B','team_lead','ACTIVE','1','','','','','0','0','','MASTER']);
+ const owner={id:'HFU-007',version:1};
+ const list=await memberAdmin(owner,{action:'admin-list'},f.call);assert.equal(list.members.length,4);assert.equal(list.members[3].team,'B');assert.equal(list.members[3].role,'team_lead');assert.equal(list.members[3].isMaster,true);assert.ok(!JSON.stringify(list).includes('619283'));
+ await assert.rejects(memberAdmin({id:'HFU-001',version:1},{action:'admin-list'},f.call),/master_required/);
+ await assert.rejects(memberAdmin(owner,{action:'admin-block',id:'HFU-007',expected:1},f.call),/owner_protected/);
+ await assert.rejects(memberAdmin(owner,{action:'admin-permissions',id:'HFU-002',expected:1,team:'ALL',role:'master'},f.call),/invalid_permissions/);
+ const updated=await memberAdmin(owner,{action:'admin-permissions',id:'HFU-002',expected:1,team:'B',role:'team_lead'},f.call);assert.equal(updated.member.version,2);assert.equal(f.rows[1][2],'B');
+ await assert.rejects(f.call({action:'check',member:{id:'HFU-002',version:1}}),/member_session_revoked/);
+ await assert.rejects(memberAdmin(owner,{action:'admin-block',id:'HFU-002',expected:1},f.call),/stale_record/);
+ await memberAdmin(owner,{action:'admin-block',id:'HFU-002',expected:2},f.call);assert.equal(f.rows[1][4],'BLOCKED');
+ await assert.rejects(memberAdmin(owner,{action:'admin-approve',id:'HFU-002',expected:3},f.call),/invitation_required/);
+ const invite=await memberAdmin(owner,{action:'admin-invite',id:'HFU-002',expected:3},f.call);assert.equal(invite.invitation.length,24);assert.equal(f.rows[1][8],memberCodeHash(invite.invitation));assert.ok(!f.props.HF_MEMBER_AUDIT_V1.includes(invite.invitation));assert.equal(f.rows[1][4],'INVITED');
+ assert.ok(f.props.HF_MEMBER_REGISTRY_ROLLBACK_V1);assert.ok(JSON.parse(f.props.HF_MEMBER_AUDIT_V1).length>=3);
 });

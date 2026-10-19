@@ -37,7 +37,7 @@ export default async function handler(req,res){
  if(req.method==='GET'){
   if(!process.env.HF_REAL_APP_KEY)return reply(res,503,{ok:false,error:'not_configured'});
   try{const enabled=await memberMode(),p=sa2Person(req);
-   if(p?.member){const d=await memberCall({action:'check',member:p.member});return reply(res,200,{ok:true,memberEnabled:enabled,user:{label:d.member.name,role:d.member.role,team:d.member.team,memberId:d.member.id,auth:'member'}});}
+   if(p?.member){const d=await memberCall({action:'check',member:p.member});return reply(res,200,{ok:true,memberEnabled:enabled,user:{label:d.member.name,role:d.member.role,isMaster:d.member.isMaster===true,team:d.member.team,memberId:d.member.id,auth:'member'}});}
    return reply(res,200,{ok:true,memberEnabled:enabled,migrationRequired:enabled&&!!p,user:p?{label:p.label||'',role:enabled?'reader':'writer',auth:'legacy'}:null});
   }catch(e){if(/member_denied|member_session_revoked|registration_required/.test(e.message)){res.setHeader('Set-Cookie',clearSa2Cookie());return reply(res,200,{ok:true,memberEnabled:true,user:null});}return reply(res,503,{ok:false,error:'auth_unavailable'});}
  }
@@ -46,9 +46,14 @@ export default async function handler(req,res){
  const action=String(req.body?.action||'');
  if(action==='logout'){res.setHeader('Set-Cookie',clearSa2Cookie());return reply(res,200,{ok:true});}
  if(!process.env.HF_REAL_APP_KEY)return reply(res,503,{ok:false,error:'not_configured'});
+ if(action.startsWith('admin-')){
+  const person=sa2Person(req);if(!person?.member)return reply(res,401,{ok:false,error:'registration_required'});
+  try{const {memberAdmin}=await import('../lib/member-auth.mjs');return reply(res,200,await memberAdmin(person.member,req.body));}
+  catch(e){const known=/^(master_required|owner_protected|member_session_revoked|member_denied|registration_required|stale_record|invitation_required|invalid_permissions|invalid_invitation|invalid_request)$/;return reply(res,known.test(e.message)?403:503,{ok:false,error:known.test(e.message)?e.message:'auth_unavailable'});}
+ }
  if(blocked(req))return reply(res,429,{ok:false,error:'too_many_attempts'});
  if(['member-login','enroll'].includes(action)){
-  try{const profile=await memberAuthenticate({...req.body,action:action==='enroll'?'enroll':'login'});clearFailures(req);res.setHeader('Set-Cookie',sa2Cookie({sub:'member-'+profile.id,email:'MEMBER:'+profile.id,label:profile.name,member:{id:profile.id,version:profile.version}}));return reply(res,200,{ok:true,user:{label:profile.name,role:profile.role,team:profile.team,memberId:profile.id,auth:'member'}});}
+  try{const profile=await memberAuthenticate({...req.body,action:action==='enroll'?'enroll':'login'});clearFailures(req);res.setHeader('Set-Cookie',sa2Cookie({sub:'member-'+profile.id,email:'MEMBER:'+profile.id,label:profile.name,member:{id:profile.id,version:profile.version}}));return reply(res,200,{ok:true,user:{label:profile.name,role:profile.role,isMaster:profile.isMaster===true,team:profile.team,memberId:profile.id,auth:'member'}});}
   catch(e){failed(req);const known=/^(member_denied|member_locked|invalid_member_input|pin_confirmation_mismatch|member_auth_not_ready|already_registered)$/;return reply(res,e.message==='member_locked'?429:known.test(e.message)?401:503,{ok:false,error:known.test(e.message)?e.message:'auth_unavailable'});}
  }
  if(action!=='activate')return reply(res,400,{ok:false,error:'invalid_request'});
