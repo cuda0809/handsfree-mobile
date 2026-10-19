@@ -121,10 +121,10 @@ function hfAppPlanOverview_(ss){
 }
 function hfAppReceipt_(ss,b){
  var rows=hfAppRows_(ss,'HF_DATA_입력대기열',15).slice(1),matches=[];
- rows.forEach(function(r){if(r[3]!==b.actor.email)return;var p;try{p=JSON.parse(r[4]);}catch(e){return;}
+ rows.forEach(function(r){if(r[3]!==((typeof hfMemberRequester_==='function')?hfMemberRequester_(b.actor):b.actor.email))return;var p;try{p=JSON.parse(r[4]);}catch(e){return;}
   if(b.requestId?r[0]===b.requestId:b.submissionId&&p.submissionId===b.submissionId)matches.push(r);
  });
- if(!matches.length&&!b.requestId&&b.text)matches=rows.filter(function(r){if(r[3]!==b.actor.email)return false;try{var p=JSON.parse(r[4]);return p.raw===b.text&&String(p.targetHint||'')===String(b.targetHint||'');}catch(e){return false;}});
+ if(!matches.length&&!b.requestId&&b.text)matches=rows.filter(function(r){if(r[3]!==((typeof hfMemberRequester_==='function')?hfMemberRequester_(b.actor):b.actor.email))return false;try{var p=JSON.parse(r[4]);return p.raw===b.text&&String(p.targetHint||'')===String(b.targetHint||'');}catch(e){return false;}});
  if(matches.length>1)hfLsFail_('ambiguous_receipt');if(!matches.length)return {ok:true,status:'NOT_FOUND'};
  var r=matches[0],events=hfAppRows_(ss,'HF_DATA_입력정규화',23).slice(1).filter(function(x){return x[0].indexOf(r[0]+'-E')===0;});
  var statuses=events.map(function(x){return x[17];}),status=statuses.indexOf('FAILED')>=0?'FAILED':statuses.indexOf('REVIEW')>=0?'REVIEW':statuses.indexOf('EXCLUDED')>=0?'EXCLUDED':statuses.indexOf('WRITTEN')>=0?'WRITTEN':r[5];
@@ -181,7 +181,7 @@ function hfLightAppDispatch_(body){
  var lock=LockService.getScriptLock();if(!lock.tryLock(8000))hfLsFail_('busy');try{
   if(b.action==='receipt')return hfAppIssueReceipt_(hfAppIssueSnapshot_(ss),b)||{ok:true,status:'NOT_FOUND'};
   if(b.action==='issue')return hfAppIssueView_(hfAppIssueSnapshot_(ss),b.issueId);
-  if(b.action!=='edit')hfLsFail_('unsupported_operation');if(PropertiesService.getScriptProperties().getProperty('HF_LIGHT_APP_OPEN')!=='OPEN')hfLsFail_('edit_gate_closed');return hfAppIssueApply_(ss,b);
+  if(b.action!=='edit')hfLsFail_('unsupported_operation');if(PropertiesService.getScriptProperties().getProperty('HF_LIGHT_APP_OPEN')!=='OPEN')hfLsFail_('edit_gate_closed');if(typeof hfMemberWrite_==='function')hfMemberWrite_(ss,b,b.orderId,'state');return hfAppIssueApply_(ss,b);
  }finally{lock.releaseLock();}
 }
 function hfAppPriorSubmission_(ss,body,raw,requester,targetHint){

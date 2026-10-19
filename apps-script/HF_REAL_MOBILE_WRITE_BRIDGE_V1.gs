@@ -32,6 +32,7 @@ function doPost(e) {
     if (!expected || supplied !== expected) {
       return hfMobileJson_({ok:false, schema:'HF_REAL_READ_V2', error:'unauthorized'});
     }
+    if (String(body.op || '') === 'light_auth') return hfMobileJson_(hfLightAuthDispatch_(body));
     if (String(body.op || '') === 'light_media') {
       return hfMobileJson_(hfLightMediaDispatch_(body));
     }
@@ -39,6 +40,7 @@ function doPost(e) {
       return hfMobileJson_({ok:false, schema:'HF_REAL_READ_V2', error:'unsupported_operation'});
     }
 
+    if(typeof hfMemberJournal_==='function')hfMemberJournal_(body,SpreadsheetApp.openById(cfg.SSID));
     const raw = String(body.text || '').trim().slice(0, 1000);
     if (!raw) {
       return hfMobileJson_({ok:false, schema:'HF_REAL_READ_V2', error:'empty_text'});
