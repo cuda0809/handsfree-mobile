@@ -73,3 +73,11 @@ test('write API binds the authenticated member and exact input to a proof instea
  assert.equal(r.code,200);const proof=JSON.parse(sent.memberProof.signed);assert.equal(proof.actor.member.id,'HFU-003');assert.equal(proof.text,sent.text);assert.equal(proof.targetHint,sent.targetHint);assert.equal(sent.memberProof.signature,crypto.createHmac('sha256','fixture-token').update(sent.memberProof.signed).digest('base64url'));
  }finally{globalThis.fetch=fetchBefore;for(const k of Object.keys(process.env))if(!(k in old))delete process.env[k];Object.assign(process.env,old);}
 });
+
+test('master is a pinned server identity, separate from factory manager and team lead',()=>{
+ const f=fixture();f.rows.push(['HFU-007','이상준','ALL','master','ACTIVE','1','','','','','0','0','']);
+ const b={actor:{member:{id:'HFU-007',version:1}}};
+ for(const job of ['260101A-001','260101A-002'])for(const kind of ['journal','photo','state','schedule'])assert.doesNotThrow(()=>f.c.hfMemberWrite_(f.ss,b,job,kind));
+ f.rows[3][1]='다른사람';assert.throws(()=>f.c.hfMemberWrite_(f.ss,b,'260101A-001','state'),/member_denied/);
+ f.rows[3][1]='이상준';f.rows[3][2]='B';assert.throws(()=>f.c.hfMemberActive_(f.ss,b.actor.member),/member_denied/);
+});

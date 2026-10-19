@@ -8,7 +8,7 @@ function hfMemberSame_(a,b){a=String(a);b=String(b);if(a.length!==b.length)retur
 function hfMemberFind_(snapshot,key,value){var hits=[];snapshot.rows.forEach(function(r,i){if(r[key]===value)hits.push({row:r,index:i+2});});if(hits.length!==1)throw Error('member_denied');return hits[0];}
 function hfMemberLocked_(r){if(Number(r[11])>Date.now())throw Error('member_locked');}
 function hfMemberFailure_(snapshot,hit){var r=hit.row;r[10]=String(Number(r[10]||0)+1);if(Number(r[10])>=5){r[11]=String(Date.now()+10*60*1000);r[10]='0';}r[12]=new Date().toISOString();hfMemberSave_(snapshot,hit);throw Error('member_denied');}
-function hfMemberActive_(ss,identity){if(!identity||typeof identity.id!=='string'||!Number.isInteger(identity.version))throw Error('registration_required');var r=hfMemberFind_(hfMemberRows_(ss),0,identity.id).row;if(r[4]!=='ACTIVE'||Number(r[5])!==identity.version)throw Error('member_session_revoked');if(['factory_manager','team_lead','member'].indexOf(r[3])<0||['ALL','A','B'].indexOf(r[2])<0)throw Error('member_denied');return hfMemberPublic_(r);}
+function hfMemberActive_(ss,identity){if(!identity||typeof identity.id!=='string'||!Number.isInteger(identity.version))throw Error('registration_required');var r=hfMemberFind_(hfMemberRows_(ss),0,identity.id).row;if(r[4]!=='ACTIVE'||Number(r[5])!==identity.version)throw Error('member_session_revoked');if(['master','factory_manager','team_lead','member'].indexOf(r[3])<0||['ALL','A','B'].indexOf(r[2])<0)throw Error('member_denied');if(r[3]==='master'&&(r[0]!=='HFU-007'||r[1]!=='이상준'||r[2]!=='ALL'))throw Error('member_denied');return hfMemberPublic_(r);}
 function hfMemberActor_(ss,b){
  if(!hfMemberEnabled_())return b;
  if(!b.actor.member){if(['core','plans','catalog','reports','history','receipt','issue','media-list','media-get','media-receipt'].indexOf(b.action)>=0)return b;throw Error('registration_required');}
@@ -16,7 +16,7 @@ function hfMemberActor_(ss,b){
 }
 function hfMemberWrite_(ss,b,job,kind){
  if(!hfMemberEnabled_())return;
- var p=hfMemberActive_(ss,b.actor.member);if(p.role==='factory_manager')return;
+ var p=hfMemberActive_(ss,b.actor.member);if(p.role==='master'||p.role==='factory_manager')return;
  if(!job){if(kind==='journal')return;throw Error('forbidden');}
  var sh=ss.getSheetByName('HF_CORE_통합운영'),rows=sh.getRange(2,1,sh.getLastRow()-1,3).getDisplayValues().filter(function(r){return r[1]===job;});
  if(rows.length!==1||rows[0][2]!==p.team)throw Error('team_forbidden');
