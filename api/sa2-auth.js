@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
-import {memberCall,memberAuthenticate} from '../lib/member-auth.mjs';
+async function memberCall(body){return (await import('../lib/member-auth.mjs')).memberCall(body);}
+async function memberAuthenticate(body){return (await import('../lib/member-auth.mjs')).memberAuthenticate(body);}
 async function memberMode(){if(!process.env.HF_REAL_READ_TOKEN)return false;try{return (await memberCall({action:'status'})).enabled===true;}catch(e){if(e.message==='unsupported_operation')return false;throw e;}}
 
 
