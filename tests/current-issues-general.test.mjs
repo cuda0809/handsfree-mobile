@@ -21,7 +21,7 @@ test('current issue filter uses evidence, not job year; storage and history cann
  assert.notEqual(rules.classify({state:'출고완료 예정'},'2026-10-06'),'출고완료');
  assert.notEqual(rules.classify({actualDelivery:'2027-01-01'},'2026-10-06'),'출고완료');
  const today=src.slice(src.indexOf('function todayIssues('),src.indexOf('function generalIssueForm('));
- assert.match(today,/currentProductionRows\(\)/);assert.doesNotMatch(today,/items\.filter|merged\.set/);
+ assert.match(today,/currentIssueRows\(\)/);assert.doesNotMatch(today,/items\.filter|merged\.set/);
  assert.match(src.slice(src.indexOf('function renderUnifiedHome('),src.indexOf('function projectMetaCache(')),/reports\(\)/);
 });
 const engine=fs.readFileSync('apps-script/HF_REAL_SAFE_WRITE_V08.gs','utf8');
@@ -78,3 +78,4 @@ test('unallocated finished stock is separate from waiting shipment and active fa
  assert.equal(c.projectBucket({...stock,actualDelivery:'2026-10-01'}),'completed');
  assert.equal(stock.state,'출고대기');
 });
+

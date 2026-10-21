@@ -1,11 +1,11 @@
 // Refresh data in the running app. Never reload the page or retransmit a write.
-let liveRefreshPending=null,liveRenderDeferred=false;
+let liveRefreshPending=null,liveRenderDeferred=false,liveRefreshResult='';
 const liveRenderBase=renderCoreScreen,liveBannerBase=banner;
 function liveRefreshEditing(){
  const active=document.activeElement;
  return dialog.open||!!recognition||(typeof todayIssueRecognition!=='undefined'&&!!todayIssueRecognition)||!!active?.matches?.('input,textarea,select,[contenteditable="true"]')||
   Array.from(document.querySelectorAll('textarea')).some(x=>x.value.trim())||
-  notes().some(x=>x.status==='sending')||!!document.querySelector('button[data-today-save]:disabled,#generalIssueSave:disabled');
+  notes().some(x=>x.status==='sending'&&Date.now()-Date.parse(x.sentAt||x.createdAt||'')<65000)||!!document.querySelector('button[data-today-save]:disabled,#generalIssueSave:disabled');
 }
 function liveRefreshControls(){
  const host=document.querySelector('.hf-connection-row');if(!host)return;
@@ -18,7 +18,7 @@ function liveRefreshControls(){
  let status=$('hfRefreshStatus');
  if(!status){status=document.createElement('small');status.id='hfRefreshStatus';status.className='note';}
  if(status.parentElement!==host)host.appendChild(status);
- status.textContent=(liveRenderDeferred?'입력 보존 중 · ':'자동 갱신 · ')+(readStale?'최신 확인 필요':lastRead?'마지막 확인 '+lastRead:'대기');
+ status.textContent=(liveRefreshResult?liveRefreshResult+' · ':'')+(liveRenderDeferred?'입력 보존 중 · ':'자동 갱신 · ')+(readStale?'최신 확인 필요':lastRead?'마지막 확인 '+lastRead:'대기');
 }
 banner=function(){liveBannerBase();liveRefreshControls();};
 renderCoreScreen=function(){
@@ -43,8 +43,10 @@ async function refreshLiveData(manual=false){
   let plans=true;
   if(core&&typeof syncPlanOverview==='function'&&(manual||Date.now()-lastPlanAttempt>=120000))plans=!!await syncPlanOverview(true);
   if(typeof reconcileEventReceipts==='function')Promise.resolve(reconcileEventReceipts()).catch(()=>{});
-  return core===true&&plans;
- })().finally(()=>{liveRefreshPending=null;flushLiveRender();liveRefreshControls();});
+  const ok=core===true&&plans;
+  liveRefreshResult=ok?'장비·계획 조회 완료 · 입력 저장 별도 확인':'일부 조회 실패 · 이전 자료 유지';
+  return ok;
+ })().catch(()=>{liveRefreshResult='조회 실패 · 입력 원문 유지';return false;}).finally(()=>{liveRefreshPending=null;flushLiveRender();liveRefreshControls();});
  liveRefreshControls();return liveRefreshPending;
 }
 // Check every10s but issue a data read only after30s, including after manual refresh.
@@ -56,3 +58,4 @@ document.addEventListener('focusout',()=>setTimeout(flushLiveRender,0));
 document.addEventListener('input',()=>setTimeout(flushLiveRender,0));
 dialog.addEventListener('close',flushLiveRender);
 liveRefreshControls();
+

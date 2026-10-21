@@ -31,7 +31,7 @@ test('overlapping refreshes join one read, failures release the control',async()
 });
 test('open editor, drafts, keyboard, voice and pending save defer rendering but keep reads alive',async()=>{
  for(const mode of ['dialog','draft','keyboard','voice','save']){
-  const f=fixture();if(mode==='dialog')f.c.dialog.open=true;if(mode==='draft')f.doc.querySelectorAll=()=>[{value:'preserved draft'}];if(mode==='keyboard')f.doc.activeElement={matches:()=>true};if(mode==='voice')f.c.recognition={};if(mode==='save')f.c.notes=()=>[{status:'sending'}];
+  const f=fixture();if(mode==='dialog')f.c.dialog.open=true;if(mode==='draft')f.doc.querySelectorAll=()=>[{value:'preserved draft'}];if(mode==='keyboard')f.doc.activeElement={matches:()=>true};if(mode==='voice')f.c.recognition={};if(mode==='save')f.c.notes=()=>[{status:'sending',createdAt:new Date().toISOString()}];
   f.c.renderCoreScreen();assert.equal(f.renders,0,mode);await f.c.refreshLiveData(true);assert.equal(f.reads,1,mode);
   f.c.dialog.open=false;f.doc.querySelectorAll=()=>[];f.doc.activeElement=null;f.c.recognition=null;f.c.notes=()=>[];f.c.flushLiveRender();assert.equal(f.renders,1,mode);assert.deepEqual(f.scroll,[0,350]);
  }
@@ -46,3 +46,13 @@ test('plan completion uses the same protected renderer and page loads the new mo
  assert.match(plans,/renderCoreScreen\(\)/);assert.doesNotMatch(plans,/todayIssues\(\)/);
  assert.ok(html.indexOf('./live-refresh.js')>html.indexOf('./app-flow.js'));
 });
+test('stale sending notes do not freeze rendering after restart',()=>{
+ const f=fixture();f.c.notes=()=>[{status:'sending',createdAt:'2020-01-01T00:00:00Z'}];
+ f.c.renderCoreScreen();assert.equal(f.renders,1);
+});
+test('unexpected refresh rejection releases button and reports failure',async()=>{
+ const f=fixture();f.c.refresh=async()=>{throw Error('failed');};
+ assert.equal(await f.c.refreshLiveData(true),false);assert.equal(f.elements.get('hfRefreshNow').disabled,false);
+ assert.match(f.elements.get('hfRefreshStatus').textContent,/조회 실패/);
+});
+

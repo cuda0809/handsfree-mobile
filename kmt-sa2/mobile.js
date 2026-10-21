@@ -1,6 +1,6 @@
 let coreReadGeneration=0;
 'use strict';
-const BUILD='2026.10.16.SA2.8.3-MOBILE23', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
+const BUILD='2026.10.22.SA2.8.3-MOBILE25', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
 const main=document.getElementById('main'),dialog=document.getElementById('detail');
 let coreSnapshot=false,teamSnapshotComplete=false;
 let items=[],live=false,readPending=null,sourceDate='',lastRead='',screen='home',filter='all',returnFocus=null,readMessage='현재 상태를 불러오는 중…',recognition=null,installPrompt=null,readStale=false,lastReadErrorStatus=0,lastCoreAttempt=0;
@@ -82,7 +82,7 @@ function coreCacheRestore(){
 }
 coreCacheRestore();
 function notes(){const a=readStore(KEY,[]);return Array.isArray(a)?a:[];}
-function visibleNotes(){return notes().filter(r=>!r.orderId||items.some(x=>x.orderId===r.orderId&&teamMatches(x)));}
+function visibleNotes(){return notes().filter(r=>{const x=r.orderId&&items.find(x=>x.orderId===r.orderId);return !x||teamMatches(x);});}
 function updateNote(id,patch){const a=notes(),r=a.find(r=>r.id===id);if(!r)throw Error('missing_note');Object.assign(r,patch);persist(KEY,a);return r;}
 async function api(path,body,timeout=25000){const c=new AbortController(),timer=setTimeout(()=>c.abort(),timeout);try{const r=await fetch(path,{credentials:'same-origin',cache:'no-store',signal:c.signal,...(body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});let d;try{d=await r.json();}catch{const e=Error(!r.ok&&[429,502,503,504].includes(r.status)?'app_unavailable':'invalid_response');e.status=r.status;throw e;}if(!r.ok||d.ok!==true){const e=Error(d.error||'request_failed');e.status=r.status;e.data=d;throw e;}return d;}finally{clearTimeout(timer);}}
 async function readApp(body){
@@ -274,3 +274,4 @@ dialog.addEventListener('close',()=>{if(resumeReadNeeded)resumeRead();});
 window.addEventListener('online',()=>{toast('연결이 복구되었습니다. 최신 상태를 확인합니다.');lastResumeRead=0;refresh(true);});
 window.addEventListener('offline',()=>{if(!items.length)coreCacheRestore();live=!!items.length;readStale=true;readMessage=items.length?'오프라인 · 최근 정상값 유지':'오프라인 · 초안 보관 가능';banner();if(screen==='home')home();if(screen==='work')work(filter);if(screen==='plan'&&typeof productionPlan==='function')productionPlan(productionPlanMode,true);if(screen==='projects'&&typeof projects==='function')projects();if(screen==='issues'&&typeof todayIssues==='function')todayIssues();});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(()=>toast('오프라인 앱 준비에 실패했습니다. 온라인으로 사용할 수 있습니다.'));
+

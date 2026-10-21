@@ -29,3 +29,13 @@ test('seven stages keep test and inspection distinct and advance only from actua
  assert.equal(ambiguous.needsDecision,true);assert.ok(ambiguous.candidates.includes('전장 완료'));
  assert.equal(resolve('다음 주 테스트 예정',{state:'마감조립 완료'}).changesState,false);
 });
+test('offered waiting choices resolve explicitly and shipment is never offered as inferred completion',()=>{
+ for(const state of ['조립 대기','전장 수정대기']){
+  const raw=state,current={state:'검수 진행'};
+  assert.ok(resolve(raw,current).candidates.includes(state));
+  const chosen=resolve(raw+'\n[공정 확인] '+state,current);
+  assert.equal(chosen.explicitDecision,true);assert.equal(chosen.state,state);
+ }
+ assert.ok(!resolve('작업 완료',{state:'출고대기'}).candidates.includes('출고 완료'));
+});
+
