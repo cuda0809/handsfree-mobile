@@ -1,0 +1,21 @@
+:root{color-scheme:light}
+.web-boot .bottom,.web-boot .top,.web-boot .demo,.web-boot .hybrid-voice-fab,.web-boot .desktop-note{display:none!important}
+.web-loading{padding:60px 12px;max-width:560px;margin:auto}.web-loading p{line-height:1.7;color:#586b80}
+.web-loading button,.web-loading a{display:block;padding:14px 20px;border-radius:10px;margin:12px 0;background:#205bbb;color:#fff;text-align:center;text-decoration:none;border:0}
+[hidden]{display:none!important}
+.web-notice{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:0 18px 12px;padding:11px 14px;background:#edf3fd;border:1px solid #d7e3f6;border-radius:10px;font-size:12px;color:#355174}
+.web-notice b{font-size:11px;letter-spacing:.8px;color:#205bbb}.web-notice small{font-size:11px;flex-basis:100%;color:#63758b}
+body .top .login-button{white-space:normal;max-width:145px;line-height:1.5}
+body .desktop-note{display:none!important}
+@media(min-width:900px){
+ body{background:#edf1f6!important;padding:24px!important}
+ body .app{max-width:1440px!important;border-radius:18px!important;overflow:visible!important;box-shadow:0 10px 40px #1735570a}
+ body .web-notice{margin:0 32px 16px}.web-notice small{flex-basis:auto;margin-left:auto}
+ body .bottom{position:sticky!important;top:0!important;left:auto!important;bottom:auto!important;transform:none!important;z-index:5;background:#fff!important;border:1px solid #dfe6ef!important;box-shadow:0 4px 12px #17355708;min-height:66px!important}
+ body .today-issue-list{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+ body .today-issue-list>.empty{grid-column:1/-1}
+ body .today-issue-card{margin:0!important;height:100%;padding:22px!important}
+ body .issue-plan-stage{padding:12px;min-height:70px}
+ body #detail[open]{max-width:900px!important}
+}
+@media(max-width:899px){body .app{max-width:100%!important}body .web-notice{margin-left:16px;margin-right:16px}body .top .login-button{font-size:12px!important}}

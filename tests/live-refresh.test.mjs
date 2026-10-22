@@ -44,7 +44,8 @@ test('plan completion uses the same protected renderer and page loads the new mo
  const flow=fs.readFileSync('kmt-sa2/app-flow.js','utf8'),html=fs.readFileSync('kmt-sa2/index.html','utf8');
  const plans=flow.slice(flow.indexOf('const changed=applyPlanOverview(byOrder)'),flow.indexOf('function planCountLabel'));
  assert.match(plans,/renderCoreScreen\(\)/);assert.doesNotMatch(plans,/todayIssues\(\)/);
- assert.ok(html.indexOf('./live-refresh.js')>html.indexOf('./app-flow.js'));
+ const boot=html.includes('./web-start.js')?fs.readFileSync('kmt-sa2/web-start.js','utf8'):html;
+ assert.ok(boot.indexOf('./live-refresh.js')>boot.indexOf('./app-flow.js'));
 });
 test('stale sending notes do not freeze rendering after restart',()=>{
  const f=fixture();f.c.notes=()=>[{status:'sending',createdAt:'2020-01-01T00:00:00Z'}];

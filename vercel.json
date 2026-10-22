@@ -2,7 +2,16 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "api/sa2-app.js": {
-      "regions": ["iad1"]
+      "regions": [
+        "iad1"
+      ]
     }
-  }
+  },
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/kmt-sa2/",
+      "permanent": false
+    }
+  ]
 }
