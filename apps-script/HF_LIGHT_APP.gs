@@ -124,7 +124,7 @@ function hfAppReceipt_(ss,b){
  rows.forEach(function(r){if(r[3]!==b.actor.email)return;var p;try{p=JSON.parse(r[4]);}catch(e){return;}
   if(b.requestId?r[0]===b.requestId:b.submissionId&&p.submissionId===b.submissionId)matches.push(r);
  });
- if(!matches.length&&!b.requestId&&b.text)matches=rows.filter(function(r){if(r[3]!==b.actor.email)return false;try{var p=JSON.parse(r[4]);return p.raw===b.text&&String(p.targetHint||'')===String(b.targetHint||'');}catch(e){return false;}});
+ if(!matches.length&&!b.requestId&&!b.submissionId&&b.text)matches=rows.filter(function(r){if(r[3]!==b.actor.email)return false;try{var p=JSON.parse(r[4]);return p.raw===b.text&&String(p.targetHint||'')===String(b.targetHint||'');}catch(e){return false;}});
  if(matches.length>1)hfLsFail_('ambiguous_receipt');if(!matches.length)return {ok:true,status:'NOT_FOUND'};
  var r=matches[0],events=hfAppRows_(ss,'HF_DATA_입력정규화',23).slice(1).filter(function(x){return x[0].indexOf(r[0]+'-E')===0;});
  var statuses=events.map(function(x){return x[17];}),status=statuses.indexOf('FAILED')>=0?'FAILED':statuses.indexOf('REVIEW')>=0?'REVIEW':statuses.indexOf('EXCLUDED')>=0?'EXCLUDED':statuses.indexOf('WRITTEN')>=0?'WRITTEN':r[5];
