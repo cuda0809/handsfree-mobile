@@ -8,6 +8,13 @@ const attempts=globalThis.__hfSa2Attempts||(globalThis.__hfSa2Attempts=new Map()
 
 function validPin(pin){
   if(!/^[0-9]{4}$/.test(String(pin)))return false;
+  // A configured server-only PIN replaces the legacy verifier completely.
+  // Invalid configuration fails closed; never reactivate the old PIN silently.
+  if(process.env.HF_SA2_LOGIN_PIN!==undefined){
+    const configured=process.env.HF_SA2_LOGIN_PIN;
+    if(!/^[0-9]{4}$/.test(configured))return false;
+    return crypto.timingSafeEqual(Buffer.from(configured),Buffer.from(String(pin)));
+  }
   const salt=Buffer.from(PIN_SALT,'base64url');
   const expected=Buffer.from(PIN_HASH,'base64url');
   const actual=crypto.scryptSync(String(pin),salt,32,{N:16384,r:8,p:1,maxmem:64*1024*1024});
