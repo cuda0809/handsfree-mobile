@@ -19,7 +19,9 @@
   const period=String(e.sourceRef||'').match(/원본 기준기간 (20\d{2}-\d{2}-\d{2})~(20\d{2}-\d{2}-\d{2})/);
   return !period||today>=period[1]&&today<=period[2];
  }
+ function researchTransferred(x){return /^연구소\s*이관\s*완료$/.test(String(x.state||'').trim());}
  function classify(x,today){
+  if(researchTransferred(x))return '연구소 이관';
   const state=String(x.state||''),delivery=String(x.deliveryState||'');
   const actual=day(x.actualDelivery),complete=[state,delivery].some(s=>/출고\s*완료|납품\s*완료/.test(s)&&!/예정|계획|취소|미완료|아님|철회/.test(s));
   if((actual&&actual<=today)||complete)return '출고완료';
@@ -55,7 +57,7 @@
  }
  function manufacturingNow(x,today){
   const c=classify(x,today);
-  if(c==='출고완료'||c==='출고대기'||evidenceCurrent(x.productionEvidence,today)&&x.productionEvidence.status==='확인 필요')return false;
+  if(c==='연구소 이관'||c==='출고완료'||c==='출고대기'||evidenceCurrent(x.productionEvidence,today)&&x.productionEvidence.status==='확인 필요')return false;
   // Source-verified actual work is separate from calendar-only stages.
   // It remains fabrication when Core shows materials receipt or an
   // intermediate stage is complete and follow-up fabrication remains.
@@ -95,6 +97,6 @@
   for(const x of rows){const year=jobYear(x.orderId)||'연도 미확인';if(!groups.has(year))groups.set(year,[]);groups.get(year).push(x);}
   return [...groups].sort(([a],[b])=>a===currentYear?-1:b===currentYear?1:b.localeCompare(a)).map(([year,items])=>({year,items,open:!!query||year===currentYear}));
  }
- const rules={day,today,classify,resolve,manufacturingNow,nextAction,jobYear,completedGroups,evidenceCurrent};root.HfProductionRules=rules;
+ const rules={researchTransferred,day,today,classify,resolve,manufacturingNow,nextAction,jobYear,completedGroups,evidenceCurrent};root.HfProductionRules=rules;
  if(typeof module==='object'&&module.exports)module.exports=rules;
 })(typeof window==='object'?window:globalThis);

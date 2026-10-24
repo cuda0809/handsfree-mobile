@@ -13,8 +13,29 @@ function hfAppCore_(ss){
   planProgram:r[34],planInspection:r[35],planDelivery:r[36],actualDelivery:r[37],confidence:r[38],updatedAt:r[39]
  };});
  var events=hfAppRows_(ss,'HF_DATA_입력정규화',23).slice(1),today=Utilities.formatDate(new Date(),'Asia/Seoul','yyyy-MM-dd');
- return hfAppCurrentEvidence_(hfAppDeliveryEvidence_(projects,events,hfAppRows_(ss,'업무이력',9).slice(7),today),events,today);
+ return hfAppAuditedState_(hfAppCurrentEvidence_(hfAppDeliveryEvidence_(projects,events,hfAppRows_(ss,'업무이력',9).slice(7),today),events,today),hfAppRows_(ss,HF_APP.issue,19).slice(1),hfAppRows_(ss,HF_APP.audit,12).slice(1),events);
 }
+
+// A verified issue edit is canonical even while the collected Core snapshot lags.
+function hfAppAuditedState_(projects,issues,audits,events){
+ function stamp(v){var s=String(v||'');if(/ KST$/.test(s))s=s.replace(' ','T').replace(/ KST$/,'+09:00');return Date.parse(s)||0;}
+ return projects.map(function(p){
+  var matches=issues.filter(function(r){return r[3]===p.orderId&&['OPEN','MONITOR','CLOSED'].indexOf(r[8])>=0;});
+  var found=[];
+  audits.forEach(function(a){if(a[2]!==p.orderId||a[10]!=='APPLIED')return;var after;try{after=JSON.parse(a[7]);}catch(e){return;}
+   if(matches.some(function(r){return r[0]===a[3]&&r[0]===after[0]&&r[3]===after[3]&&r[16]===after[16]&&r[18]===after[18]&&r[8]===after[8];}))found.push({audit:a,after:after});
+  });
+  found.sort(function(a,b){return stamp(b.audit[1])-stamp(a.audit[1]);});if(!found.length)return p;
+  var hit=found[0],at=stamp(hit.audit[1]);if(!at)return p;
+  var stateEvent=events.find(function(e){return p.stateEvidence&&e[0]===p.stateEvidence.entryId;});
+  if(stateEvent&&stamp(stateEvent[1])>at)return p;
+  var out={};Object.keys(p).forEach(function(k){out[k]=p[k];});
+  out.state=hit.after[16];out.nextAction=hit.after[18];out.since=hit.after[17];
+  out.stateEvidence={source:'상태 변경 감사',requestId:hit.audit[0],businessDate:hit.after[17]};
+  if(stamp(out.updatedAt)<at)out.updatedAt=hit.audit[1];return out;
+ });
+}
+
 // Confirmed, precisely linked field events are operational evidence, not local drafts.
 // This read projection preserves Core/RAW, manual Next_Action, and shipping history.
 function hfAppCurrentEvidence_(projects,events,today){

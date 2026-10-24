@@ -158,7 +158,7 @@ function planStagesOnDay(x,day){
  }).filter(Boolean))];
 }
 function dueUrgency(x){
- if(isCarryoverStock(x)||isCompletedOperational(x))return {level:'none',days:null,label:''};
+ if(HfProductionRules.researchTransferred(x)||isCarryoverStock(x)||isCompletedOperational(x))return {level:'none',days:null,label:''};
  const due=formatHfDate(x?.due);
  if(!/^\d{4}-\d{2}-\d{2}$/.test(due))return {level:'none',days:null,label:''};
  const today=HfProductionRules.today();
@@ -171,6 +171,7 @@ function dueUrgency(x){
  return {level:'none',days,label:''};
 }
 function priorityAssessment(x){
+ if(HfProductionRules.researchTransferred(x))return {reasons:[],review:'연구소 이관 완료 · 기존 미해결 이력 보존'};
  if(isCarryoverStock(x))return {reasons:[],review:'미배정 보유 재고'};
  if(isCompletedOperational(x))return {reasons:[],review:''};
  const reasons=[],due=formatHfDate(x.due),today=HfProductionRules.today();
@@ -963,7 +964,7 @@ function productionPlan(mode='plan',skipMeta=false){
  productionPlanMode=mode;active('plan');screen='plan';
  if(!skipMeta){setTimeout(()=>syncProjectMeta(false),0);setTimeout(()=>syncPlanOverview(false),80);}
  const allPlanRows=productionPlanRows();
- const secondary=allPlanRows.filter(x=>['출고대기','확인 필요'].includes(productionClass(x)));
+ const secondary=allPlanRows.filter(x=>['출고대기','연구소 이관','확인 필요'].includes(productionClass(x)));
  const planToday=HfProductionRules.today();
  const selected=(mode==='delivery'?allPlanRows:allPlanRows.filter(x=>!secondary.includes(x))).sort((a,b)=>{
   const rank=x=>productionClass(x)==='진행 중'?0:1;
@@ -1003,7 +1004,7 @@ function productionPlan(mode='plan',skipMeta=false){
    '<div class="production-plan-stages">'+allStages.map(name=>'<div><small>'+name+'</small><b>'+esc(name==='마감조립'?finishingPlan(x).label:formatHfDate(planValue(x,name)))+'</b></div>').join('')+'</div>'+
    '<p class="production-plan-next"><span>다음 행동</span>'+esc(displayedNextAction(x))+'</p></button>';
  }).join(''):'<p class="empty">'+(readStale||planReadStale?'최신 목록을 확인하지 못했습니다.':'현재 작업 중이거나 예정된 장비가 없습니다.')+'</p>')+
- '</div>'+['출고대기','확인 필요'].map(label=>{const rows=secondary.filter(x=>productionClass(x)===label);return '<details><summary>'+esc(label)+' · '+planCountLabel(rows.length)+'</summary>'+rows.map(x=>'<button class="production-plan-card hf-card" data-plan-order="'+esc(x.orderId)+'"><small>JOB NO. '+esc(x.orderId)+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(currentStatusLabel(x))+'</p><p>다음 행동 · '+esc(displayedNextAction(x))+'</p></button>').join('')+'</details>';}).join('');
+ '</div>'+['출고대기','연구소 이관','확인 필요'].map(label=>{const rows=secondary.filter(x=>productionClass(x)===label);return '<details><summary>'+esc(label)+' · '+planCountLabel(rows.length)+'</summary>'+rows.map(x=>'<button class="production-plan-card hf-card" data-plan-order="'+esc(x.orderId)+'"><small>JOB NO. '+esc(x.orderId)+'</small><b>'+esc(x.customer)+' · '+esc(x.model)+'</b><p>'+esc(currentStatusLabel(x))+'</p><p>다음 행동 · '+esc(displayedNextAction(x))+'</p></button>').join('')+'</details>';}).join('');
  main.querySelectorAll('[data-plan-order]').forEach(b=>b.onclick=()=>{const x=productionPlanRows().find(v=>v.orderId===b.dataset.planOrder);if(x)rememberProjectDetail(x);openProject(b.dataset.planOrder,'plan',x);});
 }
 function delivery(skipMeta=false){return productionPlan('delivery',skipMeta);}
@@ -1274,11 +1275,12 @@ function todayIssues(){
  (readStale||planReadStale?'<p class="alert">최신 조회 미확인 · 이전 목록은 참고용입니다.</p>':'')+
  '<div class="today-issue-list">'+
  (activeRows.length?activeRows.map(x=>{const key=todayIssueKey(x),opened=todayIssueOpenId===key,hasIssue=!!x.issueId;return '<section class="today-issue-card hf-card '+hfCardTone(x,hasIssue?'issue':'plan')+' '+(opened?'open':'')+'">'+
- '<div class="today-issue-head"><div class="today-issue-ident"><small>JOB NO.</small><b>'+esc(x.orderId||key)+'</b><h3>'+esc(x.customer)+' · '+esc(x.model)+'</h3><small>담당 PM: '+esc(x.pm||'PM 미등록')+'</small></div><span class="today-issue-priority '+(hasIssue?'p'+esc(x.priority||2):'plan')+'">'+(x.priority===1?'P1':hasUnresolvedIssue(x)?'미해결':productionClass(x))+'</span></div>'+
+ '<div class="today-issue-head"><div class="today-issue-ident"><small>JOB NO.</small><b>'+esc(x.orderId||key)+'</b><h3>'+esc(x.customer)+' · '+esc(x.model)+'</h3><small>담당 PM: '+esc(x.pm||'PM 미등록')+'</small></div><span class="today-issue-priority '+(hasIssue?'p'+esc(x.priority||2):'plan')+'">'+(HfProductionRules.researchTransferred(x)?'연구소 이관':x.priority===1?'P1':hasUnresolvedIssue(x)?'미해결':productionClass(x))+'</span></div>'+
  hfDueAlert(x)+priorityReasonHtml(x)+
  (typeof issuePlanProgress==='function'?issuePlanProgress(x):'<p class="note">생산계획 공정 조회 준비 중</p>')+
  (String(x.recentEvent||x.currentIssue||x.cause||'').trim()?'<div class="today-issue-linked"><small>최근 이슈/진행 · '+esc(formatHfDate(String(x.recentEventAt||'').slice(0,10)))+'</small><p>'+esc(x.recentEvent||x.currentIssue||x.cause)+'</p></div>':'')+
  '<button class="secondary" onclick="projectHistory(\''+esc(x.orderId)+'\')">이 장비 전체 서버 이력</button>'+
+ (hasIssue?'<button class="secondary" data-edit-issue="'+esc(x.issueId)+'">현재 상태 수정</button>':'')+
  '<div class="issue-photo-actions"><button class="secondary" onclick="openEquipmentPhotos(\''+esc(x.orderId)+'\',true)">📷 사진·메모</button><button class="secondary" onclick="openEquipmentPhotos(\''+esc(x.orderId)+'\',false)">사진 이력</button></div>'+
  '<button class="secondary" onclick="openImprovement(\''+esc(x.orderId)+'\')">개선제안</button>'+
  (!opened?'<button class="today-issue-open" onclick="toggleTodayIssue(\''+esc(key)+'\')"><span>이 장비에 오늘 이슈 입력</span><span>＋</span></button>':
@@ -1294,6 +1296,7 @@ function todayIssues(){
  '<div class="hybrid-section today-records-head"><b>오늘 기록</b><span>'+todayLocal.length+'건</span></div>'+
  (todayLocal.length?todayLocal.slice(0,12).map(r=>'<button class="hybrid-record hf-card tone-neutral" data-note="'+esc(r.id)+'"><b>'+esc(r.target)+'</b><p>'+esc(r.text)+'</p><small>'+esc(new Date(r.createdAt).toLocaleString('ko-KR'))+' · '+esc((labels[r.status]||r.status)+(r.autoClassification?' · '+r.autoClassification:''))+'</small></button>').join(''):'<p class="empty">오늘 입력한 이슈가 없습니다.</p>')+
  '<button id="allInputHistory" class="secondary">이 기기 입력 이력 · 미확인 접수</button>';
+ main.querySelectorAll('[data-edit-issue]').forEach(b=>b.onclick=()=>editIssue(b.dataset.editIssue));
  main.querySelectorAll('[data-today-save]').forEach(b=>b.onclick=()=>saveTodayIssue(b.dataset.todaySave));
  main.querySelectorAll('[data-today-voice]').forEach(b=>b.onclick=()=>voiceTodayIssue(b.dataset.todayVoice));
  main.querySelectorAll('[data-note]').forEach(b=>b.onclick=()=>receiptDetail(b.dataset.note));

@@ -37,3 +37,9 @@ test('blank and invalid dates never establish completed production',()=>{
  for(const v of ['',null,'미정','2026-99-99','2026-02-30'])assert.equal(rules.day(v),'');
  assert.equal(rules.day('46307'),'2026-10-12');
 });
+
+test('confirmed internal transfer is distinct from shipment and active fabrication',()=>{
+ const x={state:'연구소 이관 완료',currentIssue:'조립 진행',due:'2026-05-29'};
+ assert.equal(rules.classify(x,today),'연구소 이관');assert.equal(rules.manufacturingNow(x,today),false);
+ for(const state of ['연구소 이관 예정','연구소 이관 미완료','연구소 이관 완료 아님'])assert.equal(rules.researchTransferred({state}),false);
+});
