@@ -37,18 +37,19 @@ function hfLsRecord_(s,orderId,key){
   if(rows.length!==1)hfLsFail_('monthly_project_missing');
   var y=Number(s.monthly[2][1]),mo=Number(s.monthly[2][4]);
   if(!Number.isInteger(y)||!Number.isInteger(mo)||mo<1||mo>12)hfLsFail_('invalid_month');
+  var daysInMonth=new Date(Date.UTC(y,mo,0)).getUTCDate();
   var start=new Date(Date.UTC(y,mo-1,1)).toISOString().slice(0,10),day=hfLsDay_(r[3]),offset=hfLsSerial_(day)-hfLsSerial_(start);
-  if(offset<0||offset>=31||r[13]!==HF_LS.month)hfLsFail_('outside_edit_month');
+  if(offset<0||offset>=daysInMonth||r[13]!==HF_LS.month)hfLsFail_('outside_edit_month');
   var ri=rows[0],col=6+offset,mrow=s.monthly[ri];
   if(String(mrow[col]||'')!==String(r[10]||'')||!r[10])hfLsFail_('source_mismatch');
   if((s.monthFormulas[ri]||[])[col])hfLsFail_('formula_cell');
   var revision=hfLsHash_([r,s.monthly[2],mrow,s.monthFormulas[ri],s.planFormulas[p.index]]);
-  return {row:r,index:p.index,monthRow:ri,oldCol:col,start:start,date:day,revision:revision,key:key};
+  return {row:r,index:p.index,monthRow:ri,oldCol:col,start:start,daysInMonth:daysInMonth,date:day,revision:revision,key:key};
 }
 function hfLsList_(s,orderId){
   return s.plans.slice(1).filter(function(r){return r[4]===orderId;}).map(function(r){
     var key=hfLsKey_(r),base={key:key,recordId:r[0],orderId:r[4],sourceMonth:r[12],process:r[10],editable:false};
-    try{base.date=hfLsDay_(r[3]);var p=hfLsRecord_(s,orderId,key);base.revision=p.revision;base.editable=true;base.minDate=p.start;base.maxDate=new Date(Date.parse(p.start)+30*86400000).toISOString().slice(0,10);}
+    try{base.date=hfLsDay_(r[3]);var p=hfLsRecord_(s,orderId,key);base.revision=p.revision;base.editable=true;base.minDate=p.start;base.maxDate=new Date(Date.parse(p.start)+(p.daysInMonth-1)*86400000).toISOString().slice(0,10);}
     catch(e){base.blockedReason=e.message;}return base;
   });
 }
@@ -66,7 +67,7 @@ function hfLsBuild_(s,b,now){
   if(typeof b.reason!=='string'||!b.reason.trim()||b.reason.length>500)hfLsFail_('invalid_reason');
   var p=hfLsRecord_(s,b.orderId,b.key);if(p.revision!==b.expected)hfLsFail_('stale_record');
   var date=hfLsDay_(b.date),offset=hfLsSerial_(date)-hfLsSerial_(p.start),newCol=6+offset;
-  if(offset<0||offset>=31)hfLsFail_('outside_edit_month');if(date===p.date)hfLsFail_('no_change');
+  if(offset<0||offset>=p.daysInMonth)hfLsFail_('outside_edit_month');if(date===p.date)hfLsFail_('no_change');
   if(s.monthly[p.monthRow][newCol])hfLsFail_('destination_occupied');
   if((s.monthFormulas[p.monthRow]||[])[newCol])hfLsFail_('formula_cell');
   [1,2,3,14,15].forEach(function(c){if((s.planFormulas[p.index]||[])[c])hfLsFail_('formula_cell');});
