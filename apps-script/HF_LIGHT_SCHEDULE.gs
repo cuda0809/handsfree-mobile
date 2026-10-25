@@ -111,7 +111,7 @@ function hfLsActor_(body,ss){
   var permissions=ss.getSheetByName('HF_SYS_권한관리');if(!permissions)hfLsFail_('forbidden');
   var allowed=permissions.getRange(1,1,permissions.getLastRow(),3).getDisplayValues().filter(function(r){return r[1].toLowerCase()===a.email&&/^(Owner|Writer\b|Reader\b)/i.test(r[2]);});
   if(b.action==='edit'&&allowed.length===1&&!/^(Owner|Writer\b)/i.test(allowed[0][2]))hfLsFail_('forbidden');
-  if(allowed.length!==1)hfLsFail_('forbidden');return b;
+  if(allowed.length!==1)hfLsFail_('forbidden');return typeof hfMemberActor_==='function'?hfMemberActor_(ss,b):b;
 }
 function hfLightScheduleDispatch_(body){
   var ss=SpreadsheetApp.openById(HF_SPREADSHEET_ID),b=hfLsActor_(body,ss);
@@ -122,6 +122,7 @@ function hfLightScheduleDispatch_(body){
     if(b.action==='receipt')return hfLsReceipt_(hfLsSnapshot_(ss),b)||{ok:true,status:'NOT_FOUND',requestId:b.requestId};
     if(b.action!=='edit')hfLsFail_('unsupported_operation');
     if(PropertiesService.getScriptProperties().getProperty('HF_LIGHT_SCHEDULE_OPEN')!=='OPEN')hfLsFail_('edit_gate_closed');
+    if(typeof hfMemberWrite_==='function')hfMemberWrite_(ss,b,b.orderId,'schedule');
     return hfLsApply_(ss,b);
   }finally{lock.releaseLock();}
 }

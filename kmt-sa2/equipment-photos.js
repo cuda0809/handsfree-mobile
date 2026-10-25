@@ -13,7 +13,7 @@ async function prepareEquipmentPhoto(file){
   return await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',')[1]);r.onerror=()=>reject(Error('사진을 읽지 못했습니다.'));r.readAsDataURL(blob);});
  }finally{image.close();}
 }
-function photoError(e){const code=e.data?.error||e.message;return ({invalid_metadata:'사진 기록 정보를 확인하세요. 원본은 보존되어 있습니다.',invalid_photo:'사진을 읽지 못했습니다. 다른 사진을 선택해 주세요.',activation_required:'연결 인증이 만료되었습니다. 다시 연결하면 사진·메모를 이어서 저장할 수 있습니다.',safe_write_not_ready:'저장 안전 확인을 통과하지 못했습니다. 입력은 보존됩니다.',media_not_ready:'사진 저장소 설정 대기 중입니다.',media_access_required:'사진 저장 권한 확인이 필요합니다.',media_pending:'저장 결과가 미확인입니다. 저장 확인을 먼저 눌러주세요.',request_conflict:'동일 기록의 내용이 달라 저장을 중단했습니다.',media_corrupt:'사진 검증에 실패했습니다.',forbidden:'저장 권한이 없습니다.'})[code]||'연결을 확인할 수 없습니다. 입력한 사진·메모는 보존됩니다.';}
+function photoError(e){const code=e.data?.error||e.message;return ({registration_required:'개별 초대코드로 개인 계정 등록이 필요합니다. 사진·메모는 보존됩니다.',member_session_revoked:'계정이 변경 또는 중지되었습니다. 개인 로그인을 확인하세요.',team_forbidden:'소속 팀의 장비만 사진을 저장할 수 있습니다.',invalid_metadata:'사진 기록 정보를 확인하세요. 원본은 보존되어 있습니다.',invalid_photo:'사진을 읽지 못했습니다. 다른 사진을 선택해 주세요.',activation_required:'연결 인증이 만료되었습니다. 다시 연결하면 사진·메모를 이어서 저장할 수 있습니다.',safe_write_not_ready:'저장 안전 확인을 통과하지 못했습니다. 입력은 보존됩니다.',media_not_ready:'사진 저장소 설정 대기 중입니다.',media_access_required:'사진 저장 권한 확인이 필요합니다.',media_pending:'저장 결과가 미확인입니다. 저장 확인을 먼저 눌러주세요.',request_conflict:'동일 기록의 내용이 달라 저장을 중단했습니다.',media_corrupt:'사진 검증에 실패했습니다.',forbidden:'저장 권한이 없습니다.'})[code]||'연결을 확인할 수 없습니다. 입력한 사진·메모는 보존됩니다.';}
 let photoScreenGeneration=0;
 async function openEquipmentPhotos(orderId,capture=false){
  const x=items.find(x=>x.orderId===orderId);if(!x)return toast('장비를 다시 조회하세요.');

@@ -32,3 +32,13 @@ test('legacy text-only lookup remains compatible and requester isolated',()=>{
   const {c,body}=fixture();assert.equal(c.hfAppReceipt_({},body).requestId,'request-old');
   assert.equal(c.hfAppReceipt_({}, {...body,actor:{email:'other@example.invalid'}}).status,'NOT_FOUND');
 });
+
+test('member receipt identity preserves exact submission isolation after login migration',()=>{
+  const {c,queue,body}=fixture();
+  c.hfMemberRequester_=actor=>actor.queueIdentity||actor.email;
+  queue[3]='HFU-007|이상준';
+  const member={...body,actor:{email:'writer@example.invalid',queueIdentity:'HFU-007|이상준'}};
+  assert.equal(c.hfAppReceipt_({}, {...member,submissionId:'submission-old-0001'}).requestId,'request-old');
+  assert.equal(c.hfAppReceipt_({}, {...member,submissionId:'submission-new-0002'}).status,'NOT_FOUND');
+  assert.equal(c.hfAppReceipt_({}, {...member,actor:{...member.actor,queueIdentity:'HFU-002|다른팀장'},submissionId:'submission-old-0001'}).status,'NOT_FOUND');
+});

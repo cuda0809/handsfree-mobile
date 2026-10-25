@@ -71,7 +71,7 @@ function hfLightMediaDispatch_(body){
  var ss=SpreadsheetApp.openById(HF_SPREADSHEET_ID),b=hfLsActor_(body,ss),target=hfMediaTarget_(ss,b.orderId);
  var permitted=ss.getSheetByName('HF_SYS_권한관리').getRange(1,1,ss.getSheetByName('HF_SYS_권한관리').getLastRow(),3).getDisplayValues().filter(function(r){return r[1].toLowerCase()===b.actor.email&&/^(Owner|Writer\b|Reader\b)/i.test(r[2]);});
  if(b.action==='media-save'&&(permitted.length!==1||!/^(Owner|Writer\b)/i.test(permitted[0][2])))throw Error('forbidden');
- if(b.action==='media-save'){var lock=LockService.getScriptLock();if(!lock.tryLock(8000))throw Error('busy');try{return hfMediaSave_(ss,b,body,target);}finally{lock.releaseLock();}}
+ if(b.action==='media-save'){if(typeof hfMemberWrite_==='function')hfMemberWrite_(ss,b,b.orderId,'photo');var lock=LockService.getScriptLock();if(!lock.tryLock(8000))throw Error('busy');try{return hfMediaSave_(ss,b,body,target);}finally{lock.releaseLock();}}
  var rows=hfMediaRows_(hfMediaTable_(ss,HF_MEDIA.index,HF_MEDIA.headers,false),16).filter(function(r){return r[1]===target.id&&r[15]==='STORED';});
  if(b.action==='media-list')return {ok:true,projectId:target.id,ready:!!PropertiesService.getScriptProperties().getProperty('HF_MEDIA_ROOT'),entries:rows.map(hfMediaView_).sort(function(a,c){return a.at.localeCompare(c.at);})};
  var hits=rows.filter(function(r){return r[0]===b.requestId;});if(hits.length>1)throw Error('request_conflict');if(!hits.length){if(b.action==='media-receipt')return {ok:true,status:'NOT_CONFIRMED'};throw Error('media_missing');}

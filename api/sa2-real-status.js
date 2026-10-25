@@ -98,6 +98,7 @@ export default async function handler(req,res){
   }
 
   try{
+    if(user?.member){const {memberCall}=await import('../lib/member-auth.mjs');await memberCall({action:'check',member:user.member});}
     const data=await readOnce(base,token);
     const raw=Array.isArray(data.currentStatus)?data.currentStatus.map(normalize):[];
     const currentStatus=raw.filter(isLiveItem).map(x=>{
@@ -123,6 +124,7 @@ export default async function handler(req,res){
       }
     });
   }catch(err){
+    if(/member_denied|member_session_revoked|registration_required/.test(err.message))return res.status(401).json({ok:false,live:false,error:'member_session_revoked'});
     console.error('[sa2-real-status-single-read]',String(err&&err.message?err.message:err));
     return res.status(502).json({ok:false,live:false,error:'core_read_unavailable'});
   }

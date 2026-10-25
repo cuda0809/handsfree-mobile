@@ -11,7 +11,7 @@ export default async function handler(req,res){
   if(!base||!token||!appKey) return res.status(503).json({ok:false,error:'not_configured'});
 
   const {sameOrigin}=await import('../lib/person-auth.mjs');
-  const {authUser}=await import('../lib/sa2-auth-user.mjs');
+  const {authUser,signedMemberActor}=await import('../lib/sa2-auth-user.mjs');
   if(!sameOrigin(req))return res.status(403).json({ok:false,error:'invalid_origin'});
   const actor=authUser(req);
   if(!actor)return res.status(401).json({ok:false,error:'activation_required'});
@@ -33,6 +33,7 @@ export default async function handler(req,res){
     targetHint:clean(body.targetHint||'',200)
   };
 
+  if(actor.member){const {createHmac}=await import('node:crypto');const signed=JSON.stringify({action:'journal-write',actor:signedMemberActor(actor),text:payload.text,targetHint:payload.targetHint,source:payload.source});payload.memberProof={signed,signature:createHmac('sha256',token).update(signed).digest('base64url')};}
   try{
     const upstream=await fetch(base,{
       method:'POST',
@@ -49,6 +50,7 @@ export default async function handler(req,res){
     if(!upstream.ok) return res.status(502).json({ok:false,error:`upstream_${upstream.status}`});
     if(!data||data.ok!==true){
       const err=String(data?.error||'safe_write_not_ready');
+      if(/^(registration_required|member_session_revoked|member_denied|team_forbidden|team_lead_required)$/.test(err))return res.status(/registration|required|revoked/.test(err)&&!err.includes('team_')?401:403).json({ok:false,error:err});
       const notReady=/unsupported_operation|safe_write_not_ready|unauthorized/.test(err);
       return res.status(notReady?503:422).json({ok:false,error:err,requestId:String(data?.requestId||''),status:String(data?.status||''),ack:String(data?.ack||'')});
     }
