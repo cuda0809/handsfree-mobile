@@ -1,22 +1,13 @@
 import crypto from 'node:crypto';
 async function memberCall(body){return (await import('../lib/member-auth.mjs')).memberCall(body);}
-async function memberAuthenticate(body){return (await import('../lib/member-auth.mjs')).memberAuthenticate(body);}
 async function memberConfiguration(){if(!process.env.HF_REAL_READ_TOKEN)return {enabled:false};try{return await memberCall({action:'status'});}catch(e){if(e.message==='unsupported_operation')return {enabled:false};throw e;}}
 
 
-const PIN_SALT='lJRTC5NU6xH9XhPZDUewlA';
-const PIN_HASH='BH_vzmRjgAljPZiEz4f7vroGaegZdb-F8ExdqfaGbsk';
 const WINDOW_MS=10*60*1000;
 const MAX_FAILS=5;
 const attempts=globalThis.__hfSa2Attempts||(globalThis.__hfSa2Attempts=new Map());
 
-function validPin(pin){
-  if(!/^[0-9]{4}$/.test(String(pin)))return false;
-  const salt=Buffer.from(PIN_SALT,'base64url');
-  const expected=Buffer.from(PIN_HASH,'base64url');
-  const actual=crypto.scryptSync(String(pin),salt,32,{N:16384,r:8,p:1,maxmem:64*1024*1024});
-  return expected.length===actual.length&&crypto.timingSafeEqual(expected,actual);
-}
+
 function clientKey(req){const ip=String(req.headers['x-forwarded-for']||req.socket?.remoteAddress||'unknown').split(',')[0].trim();const name=String(req.body?.name||'').trim();return ip+'|'+crypto.createHash('sha256').update(name).digest('hex').slice(0,16);}
 function blocked(req){
   const key=clientKey(req),row=attempts.get(key);
@@ -44,6 +35,7 @@ export default async function handler(req,res){
  if(req.method!=='POST')return reply(res,405,{ok:false,error:'method_not_allowed'});
  if(!sameOrigin(req))return reply(res,403,{ok:false,error:'invalid_origin'});
  const action=String(req.body?.action||'');
+ if(['activate','member-login','enroll'].includes(action))return reply(res,409,{ok:false,error:'account_login_required',loginUrl:'/kmt-sa2/account.html?manage=1'});
  if(action==='logout'){const {clearAdminCookie}=await import('../lib/admin-session.mjs');res.setHeader('Set-Cookie',[clearSa2Cookie(),clearAdminCookie()]);return reply(res,200,{ok:true});}
  if(!process.env.HF_REAL_APP_KEY)return reply(res,503,{ok:false,error:'not_configured'});
  if(action.startsWith('device-')){const {deviceHandler}=await import('../lib/master-device-handler.mjs');return deviceHandler({method:req.method,headers:req.headers,body:{...req.body,action:action.slice(7)}},res);}
@@ -72,14 +64,5 @@ export default async function handler(req,res){
    res.setHeader('Set-Cookie',cookies);clearFailures(req);return reply(res,200,{ok:true,user:{label:p.name,role:p.role,isMaster:p.isMaster===true,team:p.team,memberId:p.id,auth:'member'}});
   }catch(e){failed(req);const known=/^(account_denied|account_pending|username_taken|member_account_exists|member_denied|member_locked|invalid_username|invalid_password|password_confirmation_mismatch|invalid_member_input|registration_required|member_session_revoked|master_required|stale_record)$/;return reply(res,e.message==='member_locked'?429:known.test(e.message)?400:503,{ok:false,error:known.test(e.message)?e.message:'auth_unavailable'});}
  }
- if(['member-login','enroll'].includes(action)){
-  try{const profile=await memberAuthenticate({...req.body,action:action==='enroll'?'enroll':'login'});clearFailures(req);res.setHeader('Set-Cookie',sa2Cookie({sub:'member-'+profile.id,email:'MEMBER:'+profile.id,label:profile.name,member:{id:profile.id,version:profile.version}}));return reply(res,200,{ok:true,user:{label:profile.name,role:profile.role,isMaster:profile.isMaster===true,team:profile.team,memberId:profile.id,auth:'member'}});}
-  catch(e){failed(req);const known=/^(member_denied|member_locked|invalid_member_input|pin_confirmation_mismatch|member_auth_not_ready|already_registered)$/;return reply(res,e.message==='member_locked'?429:known.test(e.message)?401:503,{ok:false,error:known.test(e.message)?e.message:'auth_unavailable'});}
- }
- if(action!=='activate')return reply(res,400,{ok:false,error:'invalid_request'});
- try{const config=await memberConfiguration();if(config.enabled&&!config.ownerOnly)return reply(res,401,{ok:false,error:'registration_required'});}catch{return reply(res,503,{ok:false,error:'auth_unavailable'});}
- const name=String(req.body?.name||'').replace(/[\r\n\t]/g,' ').trim().slice(0,30),pin=String(req.body?.pin||'');
- if(!name)return reply(res,400,{ok:false,error:'invalid_name'});
- if(!validPin(pin)){failed(req);return reply(res,401,{ok:false,error:'pin_denied'});}clearFailures(req);
- const sub='sa2-'+crypto.createHash('sha256').update(name).digest('hex').slice(0,24);res.setHeader('Set-Cookie',sa2Cookie({sub,email:'SA2:'+name,label:name}));return reply(res,200,{ok:true,user:{label:name,role:'writer',auth:'sa2'},expiresInDays:180});
+ return reply(res,400,{ok:false,error:'invalid_request'});
 }

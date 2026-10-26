@@ -14,16 +14,16 @@ async function request(method,body,origin='https://test.example'){
 }
 test('missing session configuration is explicit and never issues a cookie',async()=>{
  try{delete process.env.HF_REAL_APP_KEY;
-  for(const [method,body] of [['GET',undefined],['POST',{action:'activate',name:'Fixture',pin:'invalid'}]]){
+  for(const [method,body] of [['GET',undefined],['POST',{action:'account-login',username:'fixture',password:'invalid-password'}]]){
    const r=await request(method,body);assert.equal(r.status,503);assert.equal(r.data.error,'not_configured');assert.equal(r.headers['Set-Cookie'],undefined);
   }
   assert.equal((await request('POST',{action:'activate'},'https://other.example')).status,403);
  }finally{restore();}
 });
-test('configured authentication still rejects invalid PIN',async()=>{
+test('retired PIN authentication cannot issue a session',async()=>{
  try{process.env.HF_REAL_APP_KEY='isolated-unit-test-only';
   assert.equal((await request('GET')).data.user,null);
   const r=await request('POST',{action:'activate',name:'Fixture',pin:'invalid'});
-  assert.equal(r.status,401);assert.equal(r.data.error,'pin_denied');assert.equal(r.headers['Set-Cookie'],undefined);
+  assert.equal(r.status,409);assert.equal(r.data.error,'account_login_required');assert.equal(r.headers['Set-Cookie'],undefined);
  }finally{restore();}
 });

@@ -47,6 +47,14 @@ test('account inputs reject short passwords and malformed identifiers, preserve 
  await assert.rejects(accountAuthenticate({...signup,confirmPassword:'different'},null,f.call),/password_confirmation_mismatch/);
 });
 test('login and management UI show username and password without PIN or invitation choices',()=>{
- for(const path of ['kmt-sa2/login.html','kmt-sa2/login.js','kmt-sa2/members.html','kmt-sa2/master-unlock.js']){const s=fs.readFileSync(path,'utf8');assert.doesNotMatch(s,/개인 PIN|기존.*PIN|초대코드|inputmode="numeric"/);}
- const html=fs.readFileSync('kmt-sa2/login.html','utf8');assert.match(html,/autocomplete="username"/);assert.match(html,/autocomplete="current-password"/);assert.match(html,/회원가입/);
+ for(const path of ['kmt-sa2/account.html','kmt-sa2/account.js','kmt-sa2/members.html','kmt-sa2/master-unlock.js']){const s=fs.readFileSync(path,'utf8');assert.doesNotMatch(s,/개인 PIN|기존.*PIN|초대코드|inputmode="numeric"/);}
+ const html=fs.readFileSync('kmt-sa2/account.html','utf8');assert.match(html,/autocomplete="username"/);assert.match(html,/autocomplete="current-password"/);assert.match(html,/회원가입/);
+});
+
+test('old login address is only a redirect and worker migrates only retired login windows',async()=>{
+ const html=fs.readFileSync('kmt-sa2/login.html','utf8');assert.doesNotMatch(html,/inviteCode|pinLabel|memberModes|<input/);assert.match(html,/account\.html/);
+ const config=JSON.parse(fs.readFileSync('vercel.json','utf8'));assert.ok(config.redirects.some(r=>r.source==='/kmt-sa2/login.html'&&r.destination.startsWith('/kmt-sa2/account.html')));
+ const listeners={},moves=[],waits=[];const origin='https://fixture.test';const clients=['/kmt-sa2/login.html?manage=1','/kmt-sa2/','/kmt-sa2/account.html','https://other.test/kmt-sa2/login.html'].map(p=>({url:p.startsWith('https:')?p:origin+p,navigate:async url=>moves.push(url)}));
+ const c=vm.createContext({URL,location:{origin},self:{location:{origin},registration:{scope:origin+'/kmt-sa2/'},clients:{claim:async()=>{},matchAll:async()=>clients},addEventListener:(name,fn)=>(listeners[name]??=[]).push(fn)},caches:{keys:async()=>[],delete:async()=>{throw Error('unexpected cache deletion');}}});
+ vm.runInContext(fs.readFileSync('kmt-sa2/sw.js','utf8'),c);for(const fn of listeners.activate)fn({waitUntil:p=>waits.push(p)});await Promise.all(waits);assert.deepEqual(moves,['/kmt-sa2/account.html?manage=1']);
 });

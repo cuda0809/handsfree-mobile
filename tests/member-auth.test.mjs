@@ -52,8 +52,8 @@ test('auth HTTP handler fails closed for missing config, foreign origin, short p
  const old={...process.env};async function call(method,body,origin='https://fixture.test'){const r={headers:{},setHeader(k,v){this.headers[k]=v;},status(s){this.code=s;return this;},json(b){this.body=b;return this;}};await authHandler({method,body,headers:{host:'fixture.test',origin,'x-forwarded-for':'fixture-http'}},r);return r;}
  try{delete process.env.HF_REAL_APP_KEY;delete process.env.HF_REAL_READ_TOKEN;assert.equal((await call('GET')).code,503);process.env.HF_REAL_APP_KEY='fixture-key';
  assert.equal((await call('POST',{action:'enroll'},'https://other.test')).code,403);
- const short=await call('POST',{action:'member-login',name:'검증자',pin:'1234'});assert.equal(short.code,401);assert.equal(short.body.error,'invalid_member_input');assert.equal(short.headers['Set-Cookie'],undefined);
- const missing=await call('POST',{action:'enroll',name:'검증자',pin:'619283',confirmPin:'619283',code:'fixture-code-12345678'});assert.equal(missing.code,503);assert.equal(missing.body.error,'auth_unavailable');assert.equal(missing.headers['Set-Cookie'],undefined);
+ const short=await call('POST',{action:'member-login',name:'검증자',pin:'1234'});assert.equal(short.code,409);assert.equal(short.body.error,'account_login_required');assert.equal(short.headers['Set-Cookie'],undefined);
+ const missing=await call('POST',{action:'enroll',name:'검증자',pin:'619283',confirmPin:'619283',code:'fixture-code-12345678'});assert.equal(missing.code,409);assert.equal(missing.body.error,'account_login_required');assert.equal(missing.headers['Set-Cookie'],undefined);
  assert.equal((await call('GET')).body.memberEnabled,false);
  }finally{for(const k of Object.keys(process.env))if(!(k in old))delete process.env[k];Object.assign(process.env,old);}
 });

@@ -1,5 +1,8 @@
-const CACHE='kmt-sa2-preview-sa283-live-refresh-mobile264-20261026';
+const CACHE='kmt-sa2-preview-sa283-live-refresh-mobile264b-20261026';
 const FILES=['./','./index.html','./mobile.js','./theme.js','./schedule.js','./app-flow.js','./live-refresh.js','./member-session.js','./master-unlock.js','./vendor/simplewebauthn-browser-14.0.0.js','./members.html','./members.js','./production-rules.js','./issue-context.js','./issue-workspace.js','./equipment-photos.js','./improvement.html','./improvement.js','./kmt-approved-logo.png','./manifest.webmanifest','./icon.svg','./hybrid05.css'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('kmt-sa2-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
+// Retired credential pages must not stay open after this worker is installed.
+// Do not touch operational editors, cookies, local drafts, or business records.
+self.addEventListener('activate',event=>event.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(clients=>Promise.all(clients.filter(client=>new URL(client.url).origin===self.location.origin&&new URL(client.url).pathname==='/kmt-sa2/login.html').map(client=>client.navigate('/kmt-sa2/account.html?manage=1'))))));
 self.addEventListener('fetch',event=>{const u=new URL(event.request.url);if(event.request.method!=='GET'||u.origin!==location.origin||!u.pathname.startsWith('/kmt-sa2/')||!FILES.some(f=>new URL(f,self.registration.scope).pathname===u.pathname))return;event.respondWith(caches.open(CACHE).then(async c=>{const cacheKey=u.origin+u.pathname;try{const fresh=await fetch(event.request,{cache:'no-store'});if(fresh.ok)try{await c.put(cacheKey,fresh.clone());}catch{}return fresh;}catch{return (await c.match(cacheKey))||Response.error();}}));});
