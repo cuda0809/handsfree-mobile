@@ -1,4 +1,4 @@
-const CACHE='kmt-sa2-preview-sa283-live-refresh-mobile263-20261026';
+const CACHE='kmt-sa2-preview-sa283-live-refresh-mobile263a-20261026';
 const FILES=['./','./index.html','./mobile.js','./theme.js','./schedule.js','./app-flow.js','./live-refresh.js','./member-session.js','./master-unlock.js','./vendor/simplewebauthn-browser-14.0.0.js','./members.html','./members.js','./production-rules.js','./issue-context.js','./issue-workspace.js','./equipment-photos.js','./improvement.html','./improvement.js','./kmt-approved-logo.png','./manifest.webmanifest','./icon.svg','./hybrid05.css'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('kmt-sa2-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
