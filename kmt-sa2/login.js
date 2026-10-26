@@ -9,7 +9,13 @@ $('memberLoginMode').onclick=()=>setMemberMode(false);$('memberEnrollMode').oncl
 function bindSecretToggles(){document.querySelectorAll('[data-secret]').forEach(button=>{button.onclick=()=>{const input=$(button.dataset.secret);if(!input)return;const show=input.type==='password';input.type=show?'text':'password';button.textContent=show?'숨기기':'보기';button.setAttribute('aria-pressed',show?'true':'false');};});}
 async function call(body,{timeout=body?55000:15000}={}){const c=new AbortController(),timer=setTimeout(()=>c.abort(),timeout);try{const r=await fetch('/api/sa2-auth',{method:body?'POST':'GET',credentials:'same-origin',cache:'no-store',signal:c.signal,headers:body?{'Content-Type':'application/json'}:{},...(body?{body:JSON.stringify(body)}:{})});let d={};try{d=await r.json();}catch{}if(!r.ok||d.ok!==true){const e=Error(d.error||'auth_failed');e.status=r.status;e.data=d;throw e;}return d;}finally{clearTimeout(timer);}}
 function showSetup(message='이름과 4자리 PIN을 입력하세요.'){setupEl.hidden=false;logoutEl.hidden=true;statusEl.textContent=message;}
-function connected(user){if(ownerOnly&&user.auth!=='member'&&user.label==='이상준'){setMemberMode(true);setupEl.hidden=false;logoutEl.hidden=false;statusEl.textContent='기존 연결 유지 · 마스터 개인 등록을 완료하세요.';return;}if(user.auth==='member'){try{localStorage.setItem('hf-selected-team-v1',user.team||'ALL');localStorage.setItem('hf-member-profile-v1',JSON.stringify({id:user.memberId,name:user.label,team:user.team,role:user.role,isMaster:user.isMaster===true}));}catch{}}setupEl.hidden=true;logoutEl.hidden=false;statusEl.textContent=(user.label||'내 계정')+' · 자동 연결됨';}
+function connected(user){
+ if(user.auth==='member'){try{localStorage.setItem('hf-selected-team-v1',user.team||'ALL');localStorage.setItem('hf-member-profile-v1',JSON.stringify({id:user.memberId,name:user.label,team:user.team,role:user.role,isMaster:user.isMaster===true}));}catch{}}
+ if(!String(location.search||'').includes('manage=1')){location.replace('/kmt-sa2/');return;}
+ if(ownerOnly&&user.auth!=='member'&&user.label==='이상준'){setMemberMode(true);setupEl.hidden=false;logoutEl.hidden=false;statusEl.textContent='기존 연결 유지 · 마스터 최초 등록';return;}
+ if(user.auth==='member'&&user.isMaster){location.replace('/kmt-sa2/members.html');return;}
+ setupEl.hidden=true;logoutEl.hidden=false;statusEl.textContent=(user.label||'내 계정')+' · 자동 연결됨';
+}
 function loginError(e){
  if(e.message==='not_configured')return '이 테스트 앱의 서버 연결 설정이 누락되었습니다. 관리자에게 설정을 요청하세요. PIN 오류가 아닙니다.';
  if(e.message==='registration_required'){setMemberMode(true);return '개인 계정 등록이 필요합니다. 이름·개별 초대코드·새 6자리 PIN을 입력하세요.';}

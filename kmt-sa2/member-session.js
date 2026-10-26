@@ -7,7 +7,7 @@
   const data=await response.json();if(!response.ok||!data.ok)throw Error('unavailable');
   const user=data.user;
   if(!user){slot.textContent='로그인 필요';return;}
-  if(user.auth!=='member'){slot.textContent=user.label+' · 기존 연결';return;}
+  if(user.auth!=='member'){slot.textContent=user.label+' · 자동 연결';if(user.label==='이상준'){const link=document.createElement('a');link.href='./login.html?manage=1';link.textContent='마스터 설정';link.style.marginLeft='8px';slot.append(link);}return;}
   const roles={team_lead:'팀장',factory_manager:'공장장',member:'팀원'};
   slot.textContent=user.label+' · '+(user.team==='ALL'?'전체':user.team+'팀')+' '+(roles[user.role]||'')+(user.isMaster?' · 마스터':'');
   if(user.isMaster){const link=document.createElement('a');link.href='./members.html';link.textContent='사용자 관리';link.style.marginLeft='8px';slot.append(link);}

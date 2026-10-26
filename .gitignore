@@ -16,3 +16,5 @@ Thumbs.db
 
 # Private per-user onboarding material (never deploy/commit)
 .private/
+.tools/
+node_modules/

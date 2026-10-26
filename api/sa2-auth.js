@@ -44,10 +44,11 @@ export default async function handler(req,res){
  if(req.method!=='POST')return reply(res,405,{ok:false,error:'method_not_allowed'});
  if(!sameOrigin(req))return reply(res,403,{ok:false,error:'invalid_origin'});
  const action=String(req.body?.action||'');
- if(action==='logout'){res.setHeader('Set-Cookie',clearSa2Cookie());return reply(res,200,{ok:true});}
+ if(action==='logout'){const {clearAdminCookie}=await import('../lib/admin-session.mjs');res.setHeader('Set-Cookie',[clearSa2Cookie(),clearAdminCookie()]);return reply(res,200,{ok:true});}
  if(!process.env.HF_REAL_APP_KEY)return reply(res,503,{ok:false,error:'not_configured'});
  if(action.startsWith('admin-')){
   const person=sa2Person(req);if(!person?.member)return reply(res,401,{ok:false,error:'registration_required'});
+  const {adminVerified}=await import('../lib/admin-session.mjs');if(!adminVerified(req,person.member))return reply(res,403,{ok:false,error:'admin_unlock_required'});
   try{const {memberAdmin}=await import('../lib/member-auth.mjs');return reply(res,200,await memberAdmin(person.member,req.body));}
   catch(e){const known=/^(master_required|owner_protected|member_session_revoked|member_denied|registration_required|stale_record|invitation_required|invalid_permissions|invalid_invitation|invalid_request)$/;return reply(res,known.test(e.message)?403:503,{ok:false,error:known.test(e.message)?e.message:'auth_unavailable'});}
  }
