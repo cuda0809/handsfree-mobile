@@ -49,6 +49,7 @@ function hfLightAuthDispatch_(body){
  if(!hfMemberEnabled_())throw Error('member_auth_not_ready');
  var ss=SpreadsheetApp.openById(HF_SPREADSHEET_ID),lock=LockService.getScriptLock();if(!lock.tryLock(8000))throw Error('busy');try{
   if(b.action==='check')return {ok:true,member:hfMemberActive_(ss,b.member)};
+  if(String(b.action).indexOf('account-')===0)return hfAccountAuth_(ss,b);
   if(String(b.action).indexOf('device-')===0)return hfMemberDevice_(ss,b);
   if(String(b.action).indexOf('admin-')===0)return hfMemberAdmin_(ss,b);
   var snapshot=hfMemberRows_(ss),hit=hfMemberFind_(snapshot,b.action==='lookup'?1:0,b.action==='lookup'?String(b.name||''):String(b.id||'')),r=hit.row;hfMemberLocked_(r);

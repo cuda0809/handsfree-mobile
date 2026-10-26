@@ -27,22 +27,3 @@ test('configured authentication still rejects invalid PIN',async()=>{
   assert.equal(r.status,401);assert.equal(r.data.error,'pin_denied');assert.equal(r.headers['Set-Cookie'],undefined);
  }finally{restore();}
 });
-test('login UI distinguishes server failure from PIN denial and retains input',async()=>{
- const source=readFileSync(new URL('../kmt-sa2/login.js',import.meta.url),'utf8');
- for(const error of ['not_configured','pin_denied','invalid_origin','server_error','too_many_attempts','timeout']){
-  const elements=Object.fromEntries(['status','setup','logout','displayName','pin','activateBtn','legacyLoginMode','memberLoginMode','memberEnrollMode','memberModes','enrollFields','pinLabel','inviteCode','confirmPin'].map(k=>[k,{hidden:false,value:k==='pin'?'619283':k==='displayName'?'Fixture':''}]));
-  let navigated=false;
-  const context={document:{getElementById:k=>elements[k],querySelectorAll:()=>[]},AbortController,setTimeout,clearTimeout,
-   location:{replace:()=>{navigated=true;}},fetch:async()=>{if(error==='timeout')throw Object.assign(new Error('timeout'),{name:'AbortError'});return {ok:false,status:error==='too_many_attempts'?429:error==='pin_denied'?401:503,json:async()=>({ok:false,error})};}};
-  vm.createContext(context);vm.runInContext(source,context);
-  await new Promise(resolve=>setImmediate(resolve));
-  await elements.activateBtn.onclick();
-  assert.equal(navigated,false);assert.equal(elements.pin.value,'619283');assert.equal(elements.activateBtn.disabled,false);
-  const message=elements.status.textContent;
-  if(error==='not_configured')assert.match(message,/설정이 누락/);
-  else if(error==='pin_denied')assert.match(message,/PIN이 일치하지/);
-  else if(error==='too_many_attempts')assert.match(message,/시도 횟수/);
-  else if(error==='timeout')assert.match(message,/시간이 초과/);
-  else assert.doesNotMatch(message,/PIN이 일치하지/);
- }
-});

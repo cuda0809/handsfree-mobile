@@ -1,0 +1,52 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import crypto from 'node:crypto';
+import {accountAuthenticate,accountId} from '../lib/account-auth.mjs';
+function fixture(){
+ const props={HF_MEMBER_AUTH_OPEN:'OPEN',HF_MEMBER_AUTH_PHASE:'OWNER_ONLY',HF_REAL_READ_TOKEN:'fixture-secret',HF_MEMBER_REGISTRY_V1:JSON.stringify({schema:1,rows:[['HFU-007','이상준','B','team_lead','ACTIVE','1','','','','','0','0','','MASTER'],['HFU-008','이성호','B','member','BLOCKED','1','','','','','0','0','','']]})};
+ const store={getProperty:k=>props[k]||null,setProperty:(k,v)=>props[k]=v,deleteProperty:k=>delete props[k]};
+ const ss={};const c=vm.createContext({PropertiesService:{getScriptProperties:()=>store},SpreadsheetApp:{openById:()=>ss,flush(){}},HF_SPREADSHEET_ID:'fixture',HF_TOKEN_KEY:'HF_REAL_READ_TOKEN',LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock(){}})},Utilities:{newBlob:s=>({getBytes:()=>Buffer.from(s)}),Charset:{UTF_8:'utf8'},computeHmacSha256Signature:(s,t)=>crypto.createHmac('sha256',t).update(s).digest(),base64EncodeWebSafe:b=>Buffer.from(b).toString('base64url')}});
+ for(const path of ['apps-script/HF_MEMBER_AUTH.gs','apps-script/HF_ACCOUNT_AUTH.gs'])vm.runInContext(fs.readFileSync(path,'utf8'),c);
+ async function call(body){const signed=JSON.stringify({...body,at:Date.now(),nonce:crypto.randomUUID()}),signature=crypto.createHmac('sha256',props.HF_REAL_READ_TOKEN).update(signed).digest('base64url');return c.hfLightAuthDispatch_({signed,signature});}
+ return {props,c,call};
+}
+const signup={action:'account-signup',username:'worker08',name:'이성호',password:'fixture-password-123',confirmPassword:'fixture-password-123'};
+const owner={id:'HFU-007',version:1};
+test('signup never grants access from a name, accepts no caller role, preserves legacy writes',async()=>{
+ const f=fixture();assert.equal((await accountAuthenticate({...signup,isMaster:true,role:'factory_manager'},null,f.call)).pending,true);
+ assert.equal(JSON.parse(f.props.HF_MEMBER_REGISTRY_V1).rows[1][4],'BLOCKED');
+ await assert.rejects(accountAuthenticate({...signup,action:'account-login'},null,f.call),/account_pending/);
+ assert.doesNotThrow(()=>f.c.hfMemberActor_({}, {actor:{},action:'edit'}));
+ assert.ok(!JSON.stringify(f.props).includes(signup.password));
+ await assert.rejects(accountAuthenticate(signup,null,f.call),/username_taken/);
+ await assert.rejects(accountAuthenticate({...signup,username:'otherid'},null,f.call),/member_account_exists/);
+ await assert.rejects(f.call({action:'account-approve',username:signup.username,member:{id:'HFU-008',version:1}}),/member_session_revoked/);
+});
+test('approval pins roster team and privilege, password login, persistent lock and rejection',async()=>{
+ const f=fixture();await accountAuthenticate(signup,null,f.call);await f.call({action:'account-approve',username:signup.username,member:owner});
+ const d=await accountAuthenticate({...signup,action:'account-login'},null,f.call);assert.equal(d.profile.id,'HFU-008');assert.equal(d.profile.team,'B');assert.equal(d.profile.isMaster,false);
+ for(let i=0;i<5;i++)await assert.rejects(accountAuthenticate({...signup,action:'account-login',password:'wrong-password'},null,f.call),/account_denied/);
+ await assert.rejects(accountAuthenticate({...signup,action:'account-login'},null,f.call),/member_locked/);
+ const g=fixture();await accountAuthenticate(signup,null,g.call);await g.call({action:'account-reject',username:signup.username,member:owner});assert.equal((await accountAuthenticate({...signup,username:'newworker'},null,g.call)).pending,true);
+});
+test('password change requires current password and identity; revokes old sessions',async()=>{
+ const f=fixture();await accountAuthenticate(signup,null,f.call);await f.call({action:'account-approve',username:signup.username,member:owner});
+ const before=(await accountAuthenticate({...signup,action:'account-login'},null,f.call)).profile;
+ const change={...signup,action:'account-change',newPassword:'replacement-password',confirmPassword:'replacement-password'};
+ await assert.rejects(accountAuthenticate(change,owner,f.call),/account_denied/);
+ const r=await accountAuthenticate(change,{id:before.id,version:before.version},f.call);assert.equal(r.member.version,before.version+1);
+ await assert.rejects(f.call({action:'check',member:{id:before.id,version:before.version}}),/member_session_revoked/);
+ await assert.rejects(accountAuthenticate({...signup,action:'account-login'},null,f.call),/account_denied/);
+ assert.equal((await accountAuthenticate({...signup,action:'account-login',password:change.newPassword},null,f.call)).profile.id,before.id);
+});
+test('account inputs reject short passwords and malformed identifiers, preserve whitespace passwords',async()=>{
+ assert.throws(()=>accountId('../admin'),/invalid_username/);assert.equal(accountId(' Worker08 '),'worker08');
+ const f=fixture();await assert.rejects(accountAuthenticate({...signup,password:'1234',confirmPassword:'1234'},null,f.call),/invalid_password/);
+ await assert.rejects(accountAuthenticate({...signup,confirmPassword:'different'},null,f.call),/password_confirmation_mismatch/);
+});
+test('login and management UI show username and password without PIN or invitation choices',()=>{
+ for(const path of ['kmt-sa2/login.html','kmt-sa2/login.js','kmt-sa2/members.html','kmt-sa2/master-unlock.js']){const s=fs.readFileSync(path,'utf8');assert.doesNotMatch(s,/개인 PIN|기존.*PIN|초대코드|inputmode="numeric"/);}
+ const html=fs.readFileSync('kmt-sa2/login.html','utf8');assert.match(html,/autocomplete="username"/);assert.match(html,/autocomplete="current-password"/);assert.match(html,/회원가입/);
+});

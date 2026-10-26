@@ -1,32 +1,6 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import vm from 'node:vm';
-async function fixture(fail=false,ownerOnly=false){
- const elements=new Map(),saved=new Map(),calls=[];let moved='';
- const get=id=>{if(!elements.has(id))elements.set(id,{value:'',hidden:false,textContent:'',dataset:{}});return elements.get(id);};
- const c=vm.createContext({document:{getElementById:get,querySelectorAll:()=>[]},AbortController,setTimeout,clearTimeout,localStorage:{setItem:(k,v)=>saved.set(k,v)},location:{replace:p=>moved=p},fetch:async(url,opt)=>{if(!opt.body)return {ok:true,status:200,json:async()=>({ok:true,memberEnabled:true,memberOwnerOnly:ownerOnly,user:null})};const b=JSON.parse(opt.body);calls.push(b);return {ok:!fail,status:fail?401:200,json:async()=>fail?{ok:false,error:'member_denied'}:{ok:true,user:{label:'검증자',team:'A',role:'member',memberId:'HFU-003',auth:'member'}}};}});
- vm.runInContext(fs.readFileSync('kmt-sa2/login.js','utf8'),c);await new Promise(r=>setImmediate(r));return {c,get,calls,saved,moved:()=>moved};
-}
-test('email-free enrollment exposes invitation and confirmation, fixes default team and clears only credentials on success',async()=>{
- const f=await fixture();assert.equal(f.get('memberModes').hidden,false);await f.get('memberEnrollMode').onclick();assert.equal(f.get('enrollFields').hidden,false);
- f.get('displayName').value='검증자';f.get('pin').value='619283';f.get('confirmPin').value='619283';f.get('inviteCode').value='fixture-one-use-code-1234';await f.get('activateBtn').onclick();
- assert.equal(f.calls[0].action,'enroll');assert.equal(f.calls[0].name,'검증자');assert.equal(f.calls[0].confirmPin,'619283');assert.equal(f.get('pin').value,'');assert.equal(f.get('inviteCode').value,'');assert.equal(f.saved.get('hf-selected-team-v1'),'A');assert.equal(f.moved(),'/kmt-sa2/');
-});
-test('personal login never sends the shared activation action and failure retains entered credentials',async()=>{
- const f=await fixture(true);f.get('displayName').value='검증자';f.get('pin').value='619283';await f.get('activateBtn').onclick();assert.equal(f.calls[0].action,'member-login');assert.equal(f.get('pin').value,'619283');assert.equal(f.get('activateBtn').disabled,false);assert.equal(f.moved(),'');assert.match(f.get('status').textContent,/초대코드/);
-});
-
-test('owner-only rollout keeps four-digit login available alongside personal master registration',async()=>{
- const f=await fixture(false,true);assert.equal(f.get('memberModes').hidden,false);assert.equal(f.get('legacyLoginMode').hidden,false);assert.equal(f.get('pin').maxLength,4);
- f.get('displayName').value='기존 팀원';f.get('pin').value='1234';await f.get('activateBtn').onclick();assert.equal(f.calls[0].action,'activate');
- f.get('memberEnrollMode').onclick();assert.equal(f.get('pin').maxLength,6);assert.equal(f.get('enrollFields').hidden,false);
- f.get('legacyLoginMode').onclick();assert.equal(f.get('pin').maxLength,4);assert.equal(f.get('enrollFields').hidden,true);
-});
-
-test('returning employee opens the app immediately; master first registration is only shown on the explicit management route',async()=>{
- const f=await fixture(false,true);
- await f.c.connected({label:'이상준',auth:'legacy'});assert.equal(f.moved(),'/kmt-sa2/');
- vm.runInContext("location.search='?manage=1'",f.c);await f.c.connected({label:'이상준',auth:'legacy'});assert.equal(f.get('enrollFields').hidden,false);
- await f.c.connected({label:'이상준',auth:'member',team:'B',role:'team_lead',isMaster:true,memberId:'HFU-007'});assert.equal(f.moved(),'/kmt-sa2/members.html');assert.equal(f.saved.get('hf-selected-team-v1'),'B');
-});
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';
+async function fixture(reply={ok:true,user:{label:'이성호',team:'B',auth:'member'}},status=200){const elements=new Map(),calls=[],saved=new Map();let moved='';const get=id=>{if(!elements.has(id))elements.set(id,{value:'',hidden:false,textContent:'',dataset:{}});return elements.get(id);};const c=vm.createContext({document:{getElementById:get,querySelectorAll:()=>[]},AbortController,setTimeout,clearTimeout,localStorage:{setItem:(k,v)=>saved.set(k,v)},location:{search:'',replace:p=>moved=p},fetch:async(_,o)=>{if(!o.body)return {ok:true,json:async()=>({ok:true,user:null})};calls.push(JSON.parse(o.body));return {ok:status===200,json:async()=>reply};}});vm.runInContext(fs.readFileSync('kmt-sa2/login.js','utf8'),c);await new Promise(r=>setImmediate(r));return {c,get,calls,saved,moved:()=>moved,submit:()=>get('accountForm').onsubmit({preventDefault(){}})};}
+test('signup submits chosen ID/password once, never PIN, shows pending without claiming login',async()=>{const f=await fixture({ok:true,pending:true});f.get('signupMode').onclick();f.get('displayName').value='이성호';f.get('username').value='worker08';f.get('password').value='fixture-password';f.get('confirmPassword').value='fixture-password';await f.submit();assert.equal(f.calls.length,1);assert.equal(f.calls[0].action,'account-signup');assert.equal(f.calls[0].pin,undefined);assert.equal(f.get('password').value,'');assert.equal(f.moved(),'');assert.match(f.get('status').textContent,/승인 후 로그인/);});
+test('password failure preserves credentials, does not navigate or retry',async()=>{const f=await fixture({ok:false,error:'account_denied'},400);f.get('username').value='worker08';f.get('password').value='wrong-password';await f.submit();assert.equal(f.calls.length,1);assert.equal(f.calls[0].action,'account-login');assert.equal(f.get('password').value,'wrong-password');assert.equal(f.get('submit').disabled,false);assert.equal(f.moved(),'');assert.match(f.get('status').textContent,/아이디 또는 비밀번호/);});
+test('successful login stores team only and redirects; regular existing session auto connects',async()=>{const f=await fixture();f.get('username').value='worker08';f.get('password').value='fixture-password';await f.submit();assert.equal(f.get('password').value,'');assert.equal(f.saved.get('hf-selected-team-v1'),'B');assert.equal(f.moved(),'/kmt-sa2/');assert.ok(!JSON.stringify([...f.saved]).includes('fixture-password'));f.c.connected({label:'기존 사용자',auth:'legacy'});assert.equal(f.moved(),'/kmt-sa2/');});
+test('explicit account page lets connected members change password and preserves legacy app access',async()=>{const f=await fixture();vm.runInContext("location.search='?manage=1'",f.c);f.c.connected({label:'이성호',auth:'member',team:'B'});assert.equal(f.get('changeMode').hidden,false);f.get('changeMode').onclick();assert.equal(f.get('newFields').hidden,false);assert.equal(f.get('newPasswordField').hidden,false);f.c.connected({label:'이상준',auth:'legacy'});assert.equal(f.get('changeMode').hidden,true);assert.equal(f.get('returnApp').hidden,false);});

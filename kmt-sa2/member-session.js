@@ -9,8 +9,8 @@
   if(!user){button.textContent='연결';button.setAttribute('aria-label','앱 연결');return;}
   const master=user.auth==='member'&&user.isMaster===true;
   const pendingOwner=user.auth!=='member'&&user.label==='이상준';
-  button.textContent=master?'마스터':pendingOwner?'마스터 설정':'연결됨';
-  button.setAttribute('aria-label',user.label+(master?' · B팀장 · 마스터 관리':pendingOwner?' · 기존 연결 유지 · 마스터 최초 설정':' · 자동 연결된 계정'));
+  button.textContent=master?'마스터':'내 계정';
+  button.setAttribute('aria-label',user.label+(master?' · B팀장 · 마스터 관리':pendingOwner?' · 기존 연결 유지 · 내 계정':' · 자동 연결된 계정'));
   button.onclick=()=>{location.href=master?'./members.html':'./login.html?manage=1';};
  }catch{button.textContent='계정 확인';button.setAttribute('aria-label','계정 확인 지연 · 일반 조회는 유지');}
 })();
