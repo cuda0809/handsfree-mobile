@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import fs from 'node:fs';
 function fixture(supported=false){
  const elements=new Map(),calls=[];const get=id=>{if(!elements.has(id))elements.set(id,{hidden:false,textContent:'',value:''});return elements.get(id);};
- const c=vm.createContext({document:{getElementById:get,querySelectorAll:()=>[]},AbortController,setTimeout,clearTimeout,memberLoad:async()=>{},...(supported?{PublicKeyCredential:{isUserVerifyingPlatformAuthenticatorAvailable:async()=>true},SimpleWebAuthnBrowser:{startAuthentication:async()=>{throw Object.assign(Error('cancelled'),{name:'NotAllowedError'});}}}:{}),fetch:async(_url,opts)=>{const b=JSON.parse(opts.body);calls.push(b);return {ok:true,json:async()=>b.action==='status'?{ok:true,registered:true,unlocked:false}:{ok:true,options:{challenge:'fixture'}}};}});
+ const c=vm.createContext({document:{getElementById:get,querySelectorAll:()=>[]},AbortController,setTimeout,clearTimeout,memberLoad:async()=>{},...(supported?{PublicKeyCredential:{isUserVerifyingPlatformAuthenticatorAvailable:async()=>true},SimpleWebAuthnBrowser:{startAuthentication:async()=>{throw Object.assign(Error('cancelled'),{name:'NotAllowedError'});}}}:{}),fetch:async(_url,opts)=>{const b=JSON.parse(opts.body);b.action=b.action.replace(/^device-/,'');calls.push(b);return {ok:true,json:async()=>b.action==='status'?{ok:true,registered:true,unlocked:false}:{ok:true,options:{challenge:'fixture'}}};}});
  vm.runInContext(fs.readFileSync('kmt-sa2/master-unlock.js','utf8'),c);return {c,get,calls};
 }
 test('unsupported installed WebView retains PIN-only management fallback without claiming biometric support',async()=>{

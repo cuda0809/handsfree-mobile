@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {isoCBOR} from '@simplewebauthn/server/helpers';
-import {deviceHandler as handler} from '../api/sa2-device.js';
+import {deviceHandler as handler} from '../lib/master-device-handler.mjs';
 import authHandler from '../api/sa2-auth.js';
 import {adminCookie,adminVerified} from '../lib/admin-session.mjs';
 import {sa2Cookie} from '../lib/sa2-auth.mjs';
