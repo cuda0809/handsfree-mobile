@@ -82,6 +82,17 @@ test('master is a pinned server identity, separate from factory manager and team
  f.rows[3][1]='이상준';f.rows[3][2]='ALL';assert.throws(()=>f.c.hfMemberActive_(f.ss,b.actor.member),/member_denied/);
 });
 
+test('owner-only migration preserves existing employee writes without allowing legacy master administration',async()=>{
+ const f=fixture();f.props.HF_MEMBER_AUTH_PHASE='OWNER_ONLY';
+ const legacy={action:'edit',actor:{email:'legacy@example.test'}};
+ assert.equal(f.c.hfMemberActor_(f.ss,legacy),legacy);
+ assert.doesNotThrow(()=>f.c.hfMemberWrite_(f.ss,legacy,'260101A-001','state'));
+ assert.doesNotThrow(()=>f.c.hfMemberJournal_({text:'기존 입력',source:'MOBILE'},f.ss));
+ await assert.rejects(f.call({action:'admin-list',member:null}),/registration_required/);
+ f.rows.push(['HFU-007','이상준','B','team_lead','ACTIVE','1','','','','','0','0','','MASTER']);
+ assert.equal((await f.call({action:'check',member:{id:'HFU-007',version:1}})).member.isMaster,true);
+});
+
 test('only pinned B-team master can manage users; changes revoke sessions and preserve audit without secrets',async()=>{
  const f=fixture();f.rows.push(['HFU-007','이상준','B','team_lead','ACTIVE','1','','','','','0','0','','MASTER']);
  const owner={id:'HFU-007',version:1};

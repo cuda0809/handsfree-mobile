@@ -30,7 +30,7 @@ test('configured authentication still rejects invalid PIN',async()=>{
 test('login UI distinguishes server failure from PIN denial and retains input',async()=>{
  const source=readFileSync(new URL('../kmt-sa2/login.js',import.meta.url),'utf8');
  for(const error of ['not_configured','pin_denied','invalid_origin','server_error','too_many_attempts','timeout']){
-  const elements=Object.fromEntries(['status','setup','logout','displayName','pin','activateBtn','memberLoginMode','memberEnrollMode','memberModes','enrollFields','pinLabel','inviteCode','confirmPin'].map(k=>[k,{hidden:false,value:k==='pin'?'619283':k==='displayName'?'Fixture':''}]));
+  const elements=Object.fromEntries(['status','setup','logout','displayName','pin','activateBtn','legacyLoginMode','memberLoginMode','memberEnrollMode','memberModes','enrollFields','pinLabel','inviteCode','confirmPin'].map(k=>[k,{hidden:false,value:k==='pin'?'619283':k==='displayName'?'Fixture':''}]));
   let navigated=false;
   const context={document:{getElementById:k=>elements[k],querySelectorAll:()=>[]},AbortController,setTimeout,clearTimeout,
    location:{replace:()=>{navigated=true;}},fetch:async()=>{if(error==='timeout')throw Object.assign(new Error('timeout'),{name:'AbortError'});return {ok:false,status:error==='too_many_attempts'?429:error==='pin_denied'?401:503,json:async()=>({ok:false,error})};}};

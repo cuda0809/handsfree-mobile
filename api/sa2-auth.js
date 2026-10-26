@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 async function memberCall(body){return (await import('../lib/member-auth.mjs')).memberCall(body);}
 async function memberAuthenticate(body){return (await import('../lib/member-auth.mjs')).memberAuthenticate(body);}
-async function memberMode(){if(!process.env.HF_REAL_READ_TOKEN)return false;try{return (await memberCall({action:'status'})).enabled===true;}catch(e){if(e.message==='unsupported_operation')return false;throw e;}}
+async function memberConfiguration(){if(!process.env.HF_REAL_READ_TOKEN)return {enabled:false};try{return await memberCall({action:'status'});}catch(e){if(e.message==='unsupported_operation')return {enabled:false};throw e;}}
 
 
 const PIN_SALT='lJRTC5NU6xH9XhPZDUewlA';
@@ -36,9 +36,9 @@ export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store, max-age=0');
  if(req.method==='GET'){
   if(!process.env.HF_REAL_APP_KEY)return reply(res,503,{ok:false,error:'not_configured'});
-  try{const enabled=await memberMode(),p=sa2Person(req);
-   if(p?.member){const d=await memberCall({action:'check',member:p.member});return reply(res,200,{ok:true,memberEnabled:enabled,user:{label:d.member.name,role:d.member.role,isMaster:d.member.isMaster===true,team:d.member.team,memberId:d.member.id,auth:'member'}});}
-   return reply(res,200,{ok:true,memberEnabled:enabled,migrationRequired:enabled&&!!p,user:p?{label:p.label||'',role:enabled?'reader':'writer',auth:'legacy'}:null});
+  try{const config=await memberConfiguration(),enabled=config.enabled===true,ownerOnly=config.ownerOnly===true,p=sa2Person(req);
+   if(p?.member){const d=await memberCall({action:'check',member:p.member});return reply(res,200,{ok:true,memberEnabled:enabled,memberOwnerOnly:ownerOnly,user:{label:d.member.name,role:d.member.role,isMaster:d.member.isMaster===true,team:d.member.team,memberId:d.member.id,auth:'member'}});}
+   return reply(res,200,{ok:true,memberEnabled:enabled,memberOwnerOnly:ownerOnly,migrationRequired:enabled&&!ownerOnly&&!!p,user:p?{label:p.label||'',role:enabled&&!ownerOnly?'reader':'writer',auth:'legacy'}:null});
   }catch(e){if(/member_denied|member_session_revoked|registration_required/.test(e.message)){res.setHeader('Set-Cookie',clearSa2Cookie());return reply(res,200,{ok:true,memberEnabled:true,user:null});}return reply(res,503,{ok:false,error:'auth_unavailable'});}
  }
  if(req.method!=='POST')return reply(res,405,{ok:false,error:'method_not_allowed'});
@@ -57,7 +57,7 @@ export default async function handler(req,res){
   catch(e){failed(req);const known=/^(member_denied|member_locked|invalid_member_input|pin_confirmation_mismatch|member_auth_not_ready|already_registered)$/;return reply(res,e.message==='member_locked'?429:known.test(e.message)?401:503,{ok:false,error:known.test(e.message)?e.message:'auth_unavailable'});}
  }
  if(action!=='activate')return reply(res,400,{ok:false,error:'invalid_request'});
- try{if(await memberMode())return reply(res,401,{ok:false,error:'registration_required'});}catch{return reply(res,503,{ok:false,error:'auth_unavailable'});}
+ try{const config=await memberConfiguration();if(config.enabled&&!config.ownerOnly)return reply(res,401,{ok:false,error:'registration_required'});}catch{return reply(res,503,{ok:false,error:'auth_unavailable'});}
  const name=String(req.body?.name||'').replace(/[\r\n\t]/g,' ').trim().slice(0,30),pin=String(req.body?.pin||'');
  if(!name)return reply(res,400,{ok:false,error:'invalid_name'});
  if(!validPin(pin)){failed(req);return reply(res,401,{ok:false,error:'pin_denied'});}clearFailures(req);
