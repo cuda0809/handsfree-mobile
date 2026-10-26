@@ -17,6 +17,15 @@ test('short admin session is bound to member version, expires, rejects tampering
  assert.equal(adminVerified({headers:{cookie:cookie+'tamper'}},member,secret,now),false);
  assert.equal(adminVerified(req,null,secret,now),false);
 });
+
+test('auth routing preserves inherited IncomingMessage headers and rejects unsigned device access explicitly',async()=>{
+ const old=process.env.HF_REAL_APP_KEY;try{
+  process.env.HF_REAL_APP_KEY=secret;
+  const request=Object.assign(Object.create({headers:{host:'fixture.test',origin}}),{method:'POST',body:{action:'device-status'}});
+  const response={setHeader(){},status(v){this.code=v;return this;},json(v){this.body=v;return this;}};
+  await authHandler(request,response);assert.equal(response.code,401);assert.equal(response.body.error,'registration_required');
+ }finally{if(old===undefined)delete process.env.HF_REAL_APP_KEY;else process.env.HF_REAL_APP_KEY=old;}
+});
 function fixture(){
  const props={},profile={...member,name:'이상준',team:'B',role:'team_lead',isMaster:true};
  const c=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:k=>props[k],setProperty:(k,v)=>props[k]=v})},Utilities:{newBlob:s=>({getBytes:()=>Buffer.from(s)})},hfMemberActive_:(_ss,m)=>{if(m?.id!==member.id||m?.version!==member.version)throw Error('member_session_revoked');return profile;}});

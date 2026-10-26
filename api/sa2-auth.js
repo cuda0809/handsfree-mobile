@@ -46,7 +46,7 @@ export default async function handler(req,res){
  const action=String(req.body?.action||'');
  if(action==='logout'){const {clearAdminCookie}=await import('../lib/admin-session.mjs');res.setHeader('Set-Cookie',[clearSa2Cookie(),clearAdminCookie()]);return reply(res,200,{ok:true});}
  if(!process.env.HF_REAL_APP_KEY)return reply(res,503,{ok:false,error:'not_configured'});
- if(action.startsWith('device-')){const {deviceHandler}=await import('../lib/master-device-handler.mjs');return deviceHandler({...req,body:{...req.body,action:action.slice(7)}},res);}
+ if(action.startsWith('device-')){const {deviceHandler}=await import('../lib/master-device-handler.mjs');return deviceHandler({method:req.method,headers:req.headers,body:{...req.body,action:action.slice(7)}},res);}
  if(action.startsWith('admin-')){
   const person=sa2Person(req);if(!person?.member)return reply(res,401,{ok:false,error:'registration_required'});
   const {adminVerified}=await import('../lib/admin-session.mjs');if(!adminVerified(req,person.member))return reply(res,403,{ok:false,error:'admin_unlock_required'});
