@@ -11,6 +11,6 @@
   const pendingOwner=user.auth!=='member'&&user.label==='이상준';
   button.textContent=master?'마스터':'내 계정';
   button.setAttribute('aria-label',user.label+(master?' · B팀장 · 마스터 관리':pendingOwner?' · 기존 연결 유지 · 내 계정':' · 자동 연결된 계정'));
-  button.onclick=()=>{location.href=master?'./members.html':'./account.html?v=20261026m264b&manage=1';};
+  button.onclick=()=>{location.href=master?'./members.html':'./account.html?v=20261027m264c&manage=1';};
  }catch{button.textContent='계정 확인';button.setAttribute('aria-label','계정 확인 지연 · 일반 조회는 유지');}
 })();
