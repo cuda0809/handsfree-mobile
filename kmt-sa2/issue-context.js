@@ -1,12 +1,14 @@
 (function(root){
  'use strict';
  const stages=['조립','전장','프로그램','마감조립','테스트','검수','출고'];
+ const statuses=['진행','완료','대기','수정대기'];
+ function selection(process,status){return stages.includes(process)&&statuses.includes(status)?process+' '+status:'';}
  function stage(v){v=String(v||'').replace(/\s/g,'');return /출고|납품/.test(v)?6:/검수/.test(v)?5:/테스트|시험/.test(v)?4:/마감/.test(v)?3:/프로그램/.test(v)?2:/전장|배선/.test(v)?1:/조립/.test(v)?0:-1;}
  function resolve(raw,current){
   raw=String(raw||'').trim();current=current||{};
   const result={type:'NOTE',state:'',status:'OPEN',changesState:false,natural:true,needsDecision:false,candidates:[],facts:[],label:'내용 기록 · 공정 유지'};
-  const decision=raw.match(/(?:^|\n)\[공정 확인\]\s*(상태 유지|(?:조립|전장|프로그램|마감조립|검수|테스트) (?:진행|완료|대기|수정대기))\s*$/);
-  if(decision){result.facts.push('입력자가 공정을 확인함');if(decision[1]==='상태 유지')return result;return {...result,type:'PROGRESS',state:decision[1],changesState:true,explicitDecision:true,label:'확인한 공정 · '+decision[1]};}
+  const decision=raw.match(/(?:^|\n)\[공정 확인\]\s*(상태 유지|(?:조립|전장|프로그램|마감조립|검수|테스트|출고) (?:진행|완료|대기|수정대기))\s*$/);
+  if(decision){result.facts.push('입력자가 공정을 확인함');if(decision[1]==='상태 유지')return {...result,explicitDecision:true};const delivery=decision[1]==='출고 완료';return {...result,type:delivery?'DELIVERY':'PROGRESS',status:delivery?'CLOSED':'OPEN',state:decision[1],changesState:true,explicitDecision:true,label:'확인한 공정 · '+decision[1]};}
   const correction=raw.match(/(마감\s*조립|프로그램|전장|조립|검수|테스트)\s*(진행\s*중|진행|완료|대기)\s*(?:으?로)\s*(?:수정|정정|변경)/);
   if(correction&&!/예정|여부|확인\s*필요/.test(raw)){const state=correction[1].replace(/\s/g,'')+' '+correction[2].replace(/\s*중$/,'');return {...result,type:'PROGRESS',state,changesState:true,explicitDecision:true,evidenceText:correction[0],label:'명시한 정정 · '+state};}
   const actual=[],uncertain=[];
@@ -32,10 +34,10 @@
   }else if(unique.length>1||uncertain.length){result.needsDecision=true;result.candidates=[...result.candidates,...unique.map(x=>x.state)];result.label='공정 해석이 나뉩니다 · 아래에서 바로 결정하세요';}
   else if(result.facts.length){result.type='ISSUE';result.label='입고·이슈 내용 기록 · 공정 유지';}
   if(!actual.length&&!uncertain.length&&/완료|끝났|마쳤|진행|끝냄/.test(raw)&&!/(입고|수령|부품|자재|가공품|예정)/.test(raw)){const phase=stage(current.state);result.needsDecision=true;result.label='대상 공정 확인 필요';if(phase>=0)result.candidates=[...(phase<6?[stages[phase]+' 완료']:[]),...(phase<5?[stages[phase+1]+' 진행']:[])];}
-  const planned=(current.planTimeline||[]).map(x=>String(x.process||'')).filter(v=>stages.includes(v)&&v!=='출고');
+  const planned=(current.planTimeline||[]).map(x=>String(x.process||'')).filter(v=>stages.includes(v));
   if(result.needsDecision)result.candidates=[...new Set([...result.candidates,...planned.map(v=>v+' 진행')])].slice(0,8);
   return result;
  }
- const api={resolve,stage};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.HfIssueContext=api;
+ const api={resolve,stage,stages,statuses,selection};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.HfIssueContext=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
 

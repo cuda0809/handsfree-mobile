@@ -17,7 +17,7 @@ function lifecycleCacheSet(orderId,history){
 }
 const appCall=b=>b.action==='edit'?api('/api/sa2-app',b,55000):readApp(b);
 function appError(e){if(!e.status&&!e.data)return '연결 실패 또는 응답 미확인입니다. 자동 재전송하지 않습니다.';const code=e.data?.error||e.message;return ({registration_required:'개별 초대코드로 개인 계정 등록이 필요합니다. 입력은 보존됩니다.',member_session_revoked:'계정이 변경 또는 중지되었습니다. 개인 로그인을 확인하세요.',team_forbidden:'소속 팀의 장비만 입력·수정할 수 있습니다.',team_lead_required:'공정 상태·일정 정정은 팀장 또는 공장장에게 요청하세요.',unauthorized:'로그인 상태를 확인할 수 없습니다. 개인 로그인을 다시 확인하세요.',invalid_identity:'개인 인증을 확인하지 못했습니다. 다시 로그인하세요.',identity_denied:'개인 인증 또는 허용 계정을 확인하세요.',invalid_origin:'앱 주소와 인증 출처 설정을 확인하세요.',personal_login_required:'사용자 등록이 필요합니다.',activation_required:'사용자 등록이 필요합니다.',forbidden:'이 계정의 권한을 확인하세요.',stale_record:'다른 변경이 있습니다. 최신 내용을 다시 열어 수정하세요.',project_mismatch:'프로젝트 연결을 확인하세요.',ambiguous_receipt:'같은 내용의 요청이 여러 건입니다. 요청 번호로 확인하세요.',invalid_reason:'변경 사유를 입력하세요.',invalid_next_action:'다음 행동을 입력하세요.',no_change:'변경한 내용이 없습니다.',edit_gate_closed:'수정 기능 연결을 확인 중입니다.'})[code]||scheduleErrors[code]||'연결 결과를 확인하지 못했습니다. 잠시 후 다시 확인하세요.';}
-function appFailure(el,e){if(el?.isConnected)el.innerHTML=esc(appError(e))+(e.status===401?' <a href="./account.html?v=20261027m264c">사용자 등록</a>':'');}
+function appFailure(el,e){if(el?.isConnected)el.innerHTML=esc(appError(e))+(e.status===401?' <a href="./account.html?v=20261030m265">사용자 등록</a>':'');}
 function appDay(v){if(/^\d{5}(?:\.\d+)?$/.test(String(v)))return new Date(Date.UTC(1899,11,30)+Math.floor(Number(v))*86400000).toISOString().slice(0,10);return String(v||'');}
 const PROJECT_META_KEY='hf-project-meta-v2';
 let projectMetaPending=null;
@@ -741,7 +741,8 @@ async function readBackSubmittedProject(r,requestId,receipt){
   const history=await appCall({action:'history',orderId:r.orderId});
   if(history.orderId!==r.orderId||!Array.isArray(history.events)||expected.some(e=>!history.events.some(h=>h.id===e.id&&h.requestId===requestId&&h.raw===e.raw&&h.status==='WRITTEN')))throw Error('history_mismatch');
  }
- if(!historical&&r.stateSyncVersion==='natural-v3'&&r.displayState&&p.state!==r.displayState)throw Error('state_readback_unconfirmed');
+ const deliveryConfirmed=r.eventType==='DELIVERY'&&!!p.actualDelivery&&!p.actualDeliveryReview&&p.actualDeliveryEvidence?.some(e=>e.source==='Event'&&String(e.sourceRef||'').split(' · ').pop().replace(/-E\d+$/,'')===requestId);
+ if(!historical&&r.stateSyncVersion==='natural-v3'&&r.displayState&&(r.eventType==='DELIVERY'?!deliveryConfirmed:p.state!==r.displayState))throw Error('state_readback_unconfirmed');
  const idx=items.findIndex(x=>x.orderId===r.orderId);
  if(idx<0||p.projectId!==items[idx].projectId)throw Error('project_mismatch');
  const previous=items[idx];coreReadGeneration++;
@@ -1223,7 +1224,9 @@ async function submitUnifiedEvent(key,text,statusEl){
  if(pending)return {ok:false,partial:true,eventSaved:!!pending.eventVerifiedAt||['saved_unverified','applied'].includes(pending.status),pendingId:pending.id};
  if(navigator.onLine===false)return {ok:false,error:'offline'};
  const context=classifyUnifiedEvent(bodyText,x);
- if(context.needsDecision){const choice=typeof issueDecision==='function'?issueDecision(key,bodyText):'';if(!choice){if(statusEl)statusEl.textContent='반영할 공정을 먼저 선택하세요. 원문은 보존됩니다.';return {ok:false,error:'decision_required'};}bodyText+='\n[공정 확인] '+choice;}
+ const choice=typeof issueDecision==='function'?issueDecision(key,bodyText):'';
+ if(context.needsDecision&&!choice||typeof issueDecisionIncomplete==='function'&&issueDecisionIncomplete(key,bodyText)){if(statusEl)statusEl.textContent='실제 공정과 진행상태를 먼저 선택하세요. 원문은 보존됩니다.';return {ok:false,error:'decision_required'};}
+ if(choice)bodyText+='\n[공정 확인] '+choice;
  const classification=classifyUnifiedEvent(bodyText,x),impact=classification.explicitDecision?{...classification,effectiveState:classification.state||x.state,effectiveNext:x.nextAction,label:classification.label}:resolveUnifiedImpact(x,classification,bodyText);
  const id=crypto.randomUUID(),target=[x.orderId,x.customer,x.model].map(v=>String(v||'').replace(/[\r\n;]+/g,' ').replace(/\s+/g,' ').trim()).filter(Boolean).join(' · ');
  const serverText=bodyText.split(/\r?\n|;/).map(v=>v.trim()).filter(Boolean).map(line=>target+' '+line).join('\n');
@@ -1245,7 +1248,9 @@ async function submitUnifiedEvent(key,text,statusEl){
   // The durable write is confirmed; keep readback pending without blocking the editor.
   setTimeout(async()=>{
    try{
-    if(x.issueId&&classification.changesState)await syncUnifiedStateBackground(id,{...x},classification,bodyText);
+    // Shipment completion must pass the server's actual-date/evidence checks.
+    // Do not close an issue through a generic state edit before those checks.
+    if(x.issueId&&classification.changesState&&classification.type!=='DELIVERY')await syncUnifiedStateBackground(id,{...x},classification,bodyText);
     await verifyEventNote(id,d);
    }catch(e){updateNote(id,{status:'saved_unverified',verifiedAt:'',ack:'이력 저장 확인 · 화면 반영 확인 중. 자동 재전송하지 않습니다.'});}
   },0);

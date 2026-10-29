@@ -1,5 +1,5 @@
-const CACHE='kmt-sa2-preview-sa283-live-refresh-mobile264c-20261027';
-const FILES=['./','./index.html','./mobile.js','./theme.js','./schedule.js','./app-flow.js','./live-refresh.js','./member-session.js','./master-unlock.js','./vendor/simplewebauthn-browser-14.0.0.js','./members.html','./members.js','./production-rules.js','./issue-context.js','./issue-workspace.js','./equipment-photos.js','./improvement.html','./improvement.js','./kmt-approved-logo.png','./manifest.webmanifest','./icon.svg','./hybrid05.css'];
+const CACHE='kmt-sa2-preview-sa283-live-refresh-mobile265-20261030';
+const FILES=['./','./index.html','./mobile.js','./theme.js','./schedule.js','./app-flow.js','./live-refresh.js','./member-session.js','./master-unlock.js','./vendor/simplewebauthn-browser-14.0.0.js','./members.html','./members.js','./production-rules.js','./issue-context.js','./issue-workspace.js','./equipment-photos.js','./improvement.html','./improvement.js','./kmt-approved-logo.png','./manifest.webmanifest','./icon.svg','./icon-192.png','./icon-512.png','./hybrid05.css'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('kmt-sa2-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 // Retired credential pages must not stay open after this worker is installed.
