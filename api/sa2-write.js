@@ -11,13 +11,14 @@ export default async function handler(req,res){
   if(!base||!token||!appKey) return res.status(503).json({ok:false,error:'not_configured'});
 
   const {sameOrigin}=await import('../lib/person-auth.mjs');
-  const {authUser}=await import('../lib/sa2-auth-user.mjs');
+  const {authUser,signedMemberActor}=await import('../lib/sa2-auth-user.mjs');
   if(!sameOrigin(req))return res.status(403).json({ok:false,error:'invalid_origin'});
   const actor=authUser(req);
   if(!actor)return res.status(401).json({ok:false,error:'activation_required'});
   if(!['owner','writer'].includes(actor.role))return res.status(403).json({ok:false,error:'forbidden'});
 
   const body=req.body&&typeof req.body==='object'?req.body:{};
+  if(typeof body.text!=='string'||body.text.trim().length>1000)return res.status(400).json({ok:false,error:'invalid_text_length'});
   const text=clean(body.text,1000);
   if(!text) return res.status(400).json({ok:false,error:'empty_text'});
   if(body.submissionId!==undefined&&!/^[a-zA-Z0-9-]{16,80}$/.test(body.submissionId))return res.status(400).json({ok:false,error:'invalid_submission_id'});
@@ -26,12 +27,13 @@ export default async function handler(req,res){
     token,
     op:'safe_write',
     text,
-    source:clean(body.source||'MOBILE',40),
+    source:clean((body.source||'MOBILE')+(actor.sa2Label?'|SA2:'+actor.sa2Label:''),40),
     requester:actor.email,
     submissionId:body.submissionId||'',
     targetHint:clean(body.targetHint||'',200)
   };
 
+  if(actor.member){const {createHmac}=await import('node:crypto');const signed=JSON.stringify({action:'journal-write',actor:signedMemberActor(actor),text:payload.text,targetHint:payload.targetHint,source:payload.source});payload.memberProof={signed,signature:createHmac('sha256',token).update(signed).digest('base64url')};}
   try{
     const upstream=await fetch(base,{
       method:'POST',
@@ -48,10 +50,12 @@ export default async function handler(req,res){
     if(!upstream.ok) return res.status(502).json({ok:false,error:`upstream_${upstream.status}`});
     if(!data||data.ok!==true){
       const err=String(data?.error||'safe_write_not_ready');
+      if(/^(registration_required|member_session_revoked|member_denied|team_forbidden|team_lead_required)$/.test(err))return res.status(/registration|required|revoked/.test(err)&&!err.includes('team_')?401:403).json({ok:false,error:err});
       const notReady=/unsupported_operation|safe_write_not_ready|unauthorized/.test(err);
       return res.status(notReady?503:422).json({ok:false,error:err,requestId:String(data?.requestId||''),status:String(data?.status||''),ack:String(data?.ack||'')});
     }
 
+    console.info('sa2-write-result',{status:String(data.status||''),applied:!!data.applied,requestId:String(data.requestId||'')});
     return res.status(200).json({
       ok:true,
       applied:!!data.applied,

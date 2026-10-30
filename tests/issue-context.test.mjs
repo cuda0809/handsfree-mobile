@@ -1,0 +1,41 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+const {resolve}=createRequire(import.meta.url)('../kmt-sa2/issue-context.js');
+test('mixed parts receipts do not imply equipment completion; active work wins over an earlier completed process',()=>{
+ const d=resolve('베셀입고 완료 /리크테스트 진행중/암 수정품 입고완료',{state:'마감조립 진행'});assert.equal(d.state,'테스트 진행');assert.equal(d.needsDecision,false);
+ assert.equal(resolve('조립 완료; 전장 진행',{state:'조립 진행'}).state,'전장 진행');
+});
+test('uncertain, conflicting and regressive work offers immediate explicit decisions',()=>{
+ for(const raw of ['전장 완료 여부 확인 필요','조립 진행; 전장 진행','조립 진행']){const d=resolve(raw,{state:'전장 완료',planTimeline:[{process:'전장'}]});assert.equal(d.needsDecision,true);assert.ok(d.candidates.length);}
+ const d=resolve('전장 완료 여부 확인 필요',{state:'전장 진행'});assert.ok(d.candidates.includes('전장 완료'));
+ assert.equal(resolve('조립 진행\n[공정 확인] 조립 진행',{state:'검수 진행'}).explicitDecision,true);
+ assert.equal(resolve('전장 완료\n[공정 확인] 상태 유지',{state:'조립 진행'}).changesState,false);
+});
+test('plans and part completion never fabricate actual completion',()=>{
+ for(const raw of ['전장 완료 예정','내일 전장 시작','전장 완료 후 검수 진행','베셀 입고 완료'])assert.equal(resolve(raw,{state:'조립 진행'}).changesState,false);
+});
+test('explicit completion-to-progress correction uses the corrected state, not the quoted old completion',()=>{
+ assert.equal(resolve('프레임조립 완료를 조립 진행으로 수정',{state:'1차 조립 진행 중'}).state,'조립 진행');
+ assert.equal(resolve('프로그램 완료를 전장 진행으로 정정',{state:'프로그램 완료'}).state,'전장 진행');
+});
+
+test('seven stages keep test and inspection distinct and advance only from actual work',()=>{
+ assert.equal(resolve('테스트 진행',{state:'마감조립 완료'}).state,'테스트 진행');
+ assert.equal(resolve('검수 진행',{state:'테스트 완료'}).state,'검수 진행');
+ assert.equal(resolve('전장 완료',{state:'전장 진행'}).nextStage,'프로그램');
+ assert.equal(resolve('마감 완료',{state:'프로그램 완료'}).state,'마감조립 완료');
+ const ambiguous=resolve('작업 완료',{state:'전장 진행'});
+ assert.equal(ambiguous.needsDecision,true);assert.ok(ambiguous.candidates.includes('전장 완료'));
+ assert.equal(resolve('다음 주 테스트 예정',{state:'마감조립 완료'}).changesState,false);
+});
+test('offered waiting choices resolve explicitly and shipment is never offered as inferred completion',()=>{
+ for(const state of ['조립 대기','전장 수정대기']){
+  const raw=state,current={state:'검수 진행'};
+  assert.ok(resolve(raw,current).candidates.includes(state));
+  const chosen=resolve(raw+'\n[공정 확인] '+state,current);
+  assert.equal(chosen.explicitDecision,true);assert.equal(chosen.state,state);
+ }
+ assert.ok(!resolve('작업 완료',{state:'출고대기'}).candidates.includes('출고 완료'));
+});
+

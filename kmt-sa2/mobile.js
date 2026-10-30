@@ -1,68 +1,276 @@
+let coreReadGeneration=0;
 'use strict';
-const BUILD='2026.09.29.SA2.4', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1';
+const BUILD='2026.10.30.SA2.8.3-MOBILE26.5', KEY='kmt-notes-v1', DRAFT='kmt-draft-v1', CORE_CACHE_KEY='hf-core-status-v1';
 const main=document.getElementById('main'),dialog=document.getElementById('detail');
-let items=[],live=false,readPending=null,sourceDate='',lastRead='',screen='home',filter='all',returnFocus=null,readMessage='현재 상태를 불러오는 중…',recognition=null,installPrompt=null;
+let coreSnapshot=false,teamSnapshotComplete=false;
+let items=[],live=false,readPending=null,sourceDate='',lastRead='',screen='home',filter='all',returnFocus=null,readMessage='현재 상태를 불러오는 중…',recognition=null,installPrompt=null,readStale=false,lastReadErrorStatus=0,lastCoreAttempt=0;
 const $=id=>document.getElementById(id);
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function norm(s){return String(s||'').toLowerCase().replace(/[\s\-‐‑–—]/g,'');}
 function heading(k,t,sub=''){return `<div class="sheet-head"><div><div class="eyebrow">${esc(k)}</div><h2>${esc(t)}</h2></div><button class="icon" aria-label="상세 닫기" onclick="dialog.close()">×</button></div><div class="sub">${esc(sub)}</div>`;}
-function open(html){stopVoice();if(!dialog.open)returnFocus=document.activeElement;$('sheetBody').innerHTML=html;if(!dialog.open)dialog.showModal();dialog.scrollTop=0;}
+// Attribute-managed detail: never enter the browser's native dialog show/close algorithms.
+// Keep dialog[open] and close() compatible with the installed Android Back handler.
+dialog.close=function(){if(!dialog.open)return;dialog.removeAttribute('open');dialog.dispatchEvent(new Event('close'));};
+function open(html){stopVoice();if(!dialog.open)returnFocus=document.activeElement;$('sheetBody').innerHTML=html;dialog.setAttribute('open','');dialog.scrollTop=0;$('sheetBody').querySelector('[aria-label="상세 닫기"]')?.focus({preventScroll:true});}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&dialog.open){e.preventDefault();dialog.close();}});
 dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});
-dialog.addEventListener('close',()=>{stopVoice();if(returnFocus?.isConnected)returnFocus.focus();});
+dialog.addEventListener('close',()=>{if(dialog.open)return;stopVoice();const target=returnFocus;returnFocus=null;if(target?.isConnected&&(document.activeElement===document.body||dialog.contains(document.activeElement)))target.focus({preventScroll:true});});
 function toast(text){clearTimeout(toast.timer);$('toast').hidden=true;let target=$('toast');if(dialog.open){target=$('dialogStatus');if(!target){target=document.createElement('p');target.id='dialogStatus';target.className='alert';target.setAttribute('role','status');$('sheetBody').appendChild(target);}}target.textContent=text;target.hidden=false;if(dialog.open)target.scrollIntoView({block:'nearest'});toast.timer=setTimeout(()=>target.hidden=true,4500);}
 function readStore(key,fallback){try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback;}catch{return fallback;}}
 function persist(key,value){localStorage.setItem(key,JSON.stringify(value));if(localStorage.getItem(key)!==JSON.stringify(value))throw Error('storage_failed');}
+const APP_ASSET_HASH_KEY='hf-ui-assets-hash-v3';
+let assetCheckPending=null;
+async function liveAssetHash(){
+ try{
+  const stamp=Date.now(),paths=['./app-flow.js','./hybrid05.css','./mobile.js','./index.html','./live-refresh.js','./issue-context.js','./issue-workspace.js','./equipment-photos.js','./member-session.js','./master-unlock.js','./account.html','./account.js'];
+  const parts=await Promise.all(paths.map(async path=>{
+   const r=await fetch(path+'?watch='+stamp,{cache:'no-store',credentials:'same-origin'});
+   if(!r.ok)throw Error('asset_fetch_failed');
+   return await r.text();
+  }));
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(parts.join('\n/*HF-ASSET*/\n')));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+ }catch{return '';}
+}
+async function checkForLiveUpdate(){
+ if(document.visibilityState==='hidden'||navigator.onLine===false)return;
+ if(assetCheckPending)return assetCheckPending;
+ assetCheckPending=(async()=>{
+ const hash=await liveAssetHash();if(!hash)return;
+ const prior=sessionStorage.getItem(APP_ASSET_HASH_KEY)||'';
+ if(!prior){sessionStorage.setItem(APP_ASSET_HASH_KEY,hash);return;}
+ if(prior!==hash){
+  // An automatic reload can interrupt a touch, keyboard input, or pending save.
+  // Keep the current screen usable and let the user choose when to update.
+  if(!$('hfUpdateAvailable')){
+   const button=document.createElement('button');button.id='hfUpdateAvailable';button.className='chip';button.textContent='새 버전 적용';
+   button.onclick=()=>{if(dialog.open||Array.from(document.querySelectorAll('textarea')).some(t=>t.value.trim())||notes().some(n=>n.status==='sending')||document.querySelector('button[data-today-save]:disabled,#generalIssueSave:disabled')){toast('입력·저장을 마친 뒤 새 버전을 적용하세요.');return;}sessionStorage.setItem(APP_ASSET_HASH_KEY,hash);location.reload();};
+   (document.querySelector('.hf-connection-row')||document.querySelector('.demo')).appendChild(button);
+  }
+ }
+ })().finally(()=>{assetCheckPending=null;});
+ return assetCheckPending;
+}
+setTimeout(checkForLiveUpdate,2500);
+setInterval(checkForLiveUpdate,60000);
+window.addEventListener('focus',()=>setTimeout(checkForLiveUpdate,300));
+function coreCacheRead(){const v=readStore(CORE_CACHE_KEY,null);return v&&Array.isArray(v.items)?v:null;}
+function itemIdentity(x){return String(x.projectId||x.issueId||x.orderId||'');}
+function isBTeam(x){return String(x?.team||'').trim()==='B';}
+let selectedTeam=['A','B','ALL'].includes(readStore('hf-selected-team-v1','B'))?readStore('hf-selected-team-v1','B'):'B';
+function isABTeam(x){return ['A','B'].includes(String(x?.team||'').trim());}
+function teamMatches(x){return selectedTeam==='ALL'?isABTeam(x):String(x?.team||'').trim()===selectedTeam;}
+function selectedTeamLabel(){return selectedTeam==='ALL'?'전체 A·B팀':selectedTeam+'팀';}
+function selectTeam(value){
+ if(!['A','B','ALL'].includes(value)||value===selectedTeam)return;
+ if(value!=='B'&&!teamSnapshotComplete){toast('A·B팀 전체 최신값을 먼저 조회합니다. 조회 후 다시 선택하세요.');refresh(true);return;}
+ if(dialog.open||document.querySelector('button[data-today-save]:disabled,#generalIssueSave:disabled'))return toast('상세·입력을 마친 뒤 팀을 선택하세요.');
+ stopVoice();
+ try{persist('hf-selected-team-v1',value);}catch{return toast('팀 선택을 저장하지 못했습니다.');}
+ selectedTeam=value;banner();renderCoreScreen();
+}
+function itemById(id){return typeof id==='object'?id:items.find(x=>x.id===String(id));}
+function coreCacheSave(verified=false){
+ if(!verified)return;
+ try{persist(CORE_CACHE_KEY,{completeCore:true,teamScope:'AB',cachedAt:new Date().toISOString(),sourceDate,items:items.map(({id,...x})=>x)});}catch{}
+}
+function coreCacheRestore(){
+ const c=coreCacheRead();if(!c)return false;teamSnapshotComplete=c.teamScope==='AB';if(selectedTeam!=='B'&&!teamSnapshotComplete)return false;coreSnapshot=c.completeCore===true;
+ items=c.items.filter(isABTeam).map(x=>({...x,priority:corePriorityFromState(x.state,x.nextAction,x.issueStatus,x.priority),id:itemIdentity(x)}));sourceDate=String(c.sourceDate||'');lastRead=c.cachedAt?new Date(c.cachedAt).toLocaleString('ko-KR'):'';
+ live=true;readStale=true;readMessage='이전 조회값 · 최신 동기화 대기';
+ return true;
+}
+coreCacheRestore();
 function notes(){const a=readStore(KEY,[]);return Array.isArray(a)?a:[];}
+function visibleNotes(){return notes().filter(r=>{const x=r.orderId&&items.find(x=>x.orderId===r.orderId);return !x||teamMatches(x);});}
 function updateNote(id,patch){const a=notes(),r=a.find(r=>r.id===id);if(!r)throw Error('missing_note');Object.assign(r,patch);persist(KEY,a);return r;}
-async function api(path,body,timeout=25000){const c=new AbortController(),timer=setTimeout(()=>c.abort(),timeout);try{const r=await fetch(path,{credentials:'same-origin',cache:'no-store',signal:c.signal,...(body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});let d;try{d=await r.json();}catch{throw Error('invalid_response');}if(!r.ok||d.ok!==true){const e=Error(d.error||'request_failed');e.status=r.status;e.data=d;throw e;}return d;}finally{clearTimeout(timer);}}
+async function api(path,body,timeout=25000){const c=new AbortController(),timer=setTimeout(()=>c.abort(),timeout);try{const r=await fetch(path,{credentials:'same-origin',cache:'no-store',signal:c.signal,...(body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});let d;try{d=await r.json();}catch{const e=Error(!r.ok&&[429,502,503,504].includes(r.status)?'app_unavailable':'invalid_response');e.status=r.status;throw e;}if(!r.ok||d.ok!==true){const e=Error(d.error||'request_failed');e.status=r.status;e.data=d;throw e;}return d;}finally{clearTimeout(timer);}}
+async function readApp(body){
+ const reads=['core','catalog','plans','reports','history','receipt','issue'];
+ if(!reads.includes(body.action))throw Error('read_action_required');
+ const overview=['core','catalog','plans'].includes(body.action);
+ for(let attempt=0;attempt<(overview?1:2);attempt++){
+  try{return await api('/api/sa2-app',body,55000);}
+  catch(e){
+   const transient=e.name==='AbortError'||e.name==='TypeError'||e.message==='app_unavailable'||e.message==='busy'||e.status===429||e.status===503||e.status===504;
+   if(overview||attempt||!transient||navigator.onLine===false){e.readAction=body.action;throw e;}
+   await new Promise(resolve=>setTimeout(resolve,1500));
+  }
+ }
+}
+function coreProcessFromState(state,next,previous=''){
+ const t=norm(state);
+ if(/출고|납품|포장/.test(t))return '출고';
+ if(/검수|점검|테스트|시험/.test(t))return '검수';
+ if(/마감조립|마감/.test(t))return '마감조립';
+ if(/프로그램|프로그래밍/.test(t))return '프로그램';
+ if(/전장|배선|전기/.test(t))return '전장';
+ if(/조립|기구|갭세팅|프레임/.test(t))return '조립';
+ if(/자재|입고|구매|발주/.test(t))return previous||'자재';
+ return previous;
+}
+function corePriorityFromState(state,next,status,previous=2){
+ const text=String(state||'')+' '+String(next||'');
+ if(status==='CLOSED'||/^(출고완료|납품완료|완료)$/.test(String(state||'')))return 3;
+ const shippingWait=/출고\s*대기|납품\s*대기/.test(text);
+ const blocking=/불량|문제|고장|지연|점검|재작업|수정중|에러|오류|멈춤/.test(text);
+ if(shippingWait&&!blocking)return 2;
+ if(blocking)return 1;
+ if(/대기|보류/.test(text))return 2;
+ return previous===1?2:(previous||2);
+}
+async function refreshCachedCore(){
+ // Both complete contracts are required; catalog alone cannot establish Core freshness.
+ const [d,catalog]=await Promise.all([
+  readApp({action:'core'}),
+  readApp({action:'catalog'})
+ ]);
+ if(d.coreFallback)throw Error('partial_core');
+ if(!Array.isArray(d.projects)||!d.generatedAt)throw Error('invalid_core');
+ const seen=new Set(),projectIds=new Set();
+ for(const p of d.projects){
+  if(!p||typeof p!=='object'||!String(p.projectId||'').trim()||!String(p.orderId||'').trim()||typeof p.state!=='string'||typeof p.nextAction!=='string'||typeof p.currentIssue!=='string'||typeof p.recentEvent!=='string'||seen.has(p.orderId)||projectIds.has(p.projectId))throw Error('invalid_core');
+  seen.add(p.orderId);projectIds.add(p.projectId);
+ }
+ if(!Array.isArray(catalog.issues))throw Error('partial_core');
+ const byOrder=new Map();
+ for(const v of catalog.issues){
+  if(!v||typeof v.issueId!=='string'||!v.issueId||typeof v.orderId!=='string'||typeof v.status!=='string')throw Error('invalid_catalog');
+  const prior=byOrder.get(v.orderId);
+  const active=v.status==='OPEN'||v.status==='MONITOR',priorActive=prior&&(prior.status==='OPEN'||prior.status==='MONITOR');
+  if(priorActive&&active&&prior.issueId!==v.issueId)throw Error('ambiguous_issue');
+  if(!prior||active&&!priorActive)byOrder.set(v.orderId,v);
+ }
+ const next=d.projects.filter(isABTeam).map(p=>{
+  const issue=byOrder.get(p.orderId),status=String(issue?.status||'');
+  return {...p,issueId:String(issue?.issueId||''),issueStatus:status,
+   cause:p.currentIssue||p.recentEvent||'',
+   sourceLatestUpdate:String(p.updatedAt||p.sourceLatestUpdate||''),
+   priority:corePriorityFromState(p.state,p.nextAction,status,2),
+   id:itemIdentity(p),coreVerified:true};
+ });
+ return {items:next,sourceDate:d.projects.map(p=>String(p.updatedAt||'')).sort().at(-1)||''};
+}
+function renderCoreScreen(){
+ if(screen==='home')home();if(screen==='work')work(filter,$('search')?.value||'');if(screen==='plan'&&typeof productionPlan==='function')productionPlan(productionPlanMode,true);if(screen==='projects'&&typeof projects==='function')projects(filter,true);if(screen==='issues'&&typeof todayIssues==='function')todayIssues();
+}
+
 function active(name){screen=name;document.querySelectorAll('.bottom button').forEach(b=>b.classList.toggle('selected',b.dataset.page===name));}
-function banner(){document.querySelector('.demo').innerHTML=`<b>수정 버전 ${BUILD}</b><span>${live?'연결됨 · ':''}${esc(readMessage)}</span>`;}
-async function refresh(){if(readPending)return readPending;readMessage='현재 상태를 불러오는 중…';banner();readPending=(async()=>{try{const d=await api('/api/sa2-real-status');if(d.live!==true||!Array.isArray(d.currentStatus))throw Error('invalid_response');items=d.currentStatus.map((x,id)=>({...x,id}));live=true;sourceDate=d.sourceLatestDate||'';lastRead=new Date().toLocaleString('ko-KR');readMessage=(d.test?'검증 데이터 · 운영 아님 · ':'')+`${items.length}건 · ${sourceDate||'기준일 미등록'}`;return true;}catch(e){items=[];live=false;readMessage=e.status===401?'사용자 등록 · 연결이 필요합니다':'현재 상태를 불러오지 못했습니다. 다시 시도하세요.';return false;}finally{readPending=null;banner();if(screen==='home')home();if(screen==='work')work(filter,$('search')?.value||'');}})();return readPending;}
-function card(x){return `<article class="item"><div class="item-top"><div class="item-status"><span class="tag">${esc(x.state)}</span><button class="schedule-button" onclick="scheduleReport(${x.id})">계획일정 ↗</button></div><span class="category">${esc(x.process)}</span></div><button class="item-detail" aria-label="${esc(x.customer)} ${esc(x.model)} 업무 상세" onclick="openItem(${x.id})"><h3>${esc(x.customer)}<small>${esc(x.model)}</small></h3><p class="issue">${esc(x.cause||'원인 미등록')}</p><div class="next"><span>${esc(x.nextAction||'다음 행동 확인 필요')}</span><span>›</span></div></button></article>`;}
+function banner(){
+ const demo=document.querySelector('.demo');
+ demo.innerHTML=`<b>${BUILD} · HYBRID 0.5</b><span>${live?'연결됨 · ':''}${esc(readMessage)}</span>`;
+ const nav=document.querySelector('.bottom');
+ let status=document.querySelector('.hf-connection-row');
+ if(!status){status=document.createElement('div');status.className='hf-connection-row';}
+ const span=demo.querySelector('span');
+ if(span)status.replaceChildren(span);
+ // Do not detach/reinsert touch targets on each status refresh or Home render.
+ if(status.previousElementSibling!==demo)demo.after(status);
+ if(nav&&nav.previousElementSibling!==status&&nav.previousElementSibling!==$('hfTeamSelector'))status.after(nav);
+ let teamBar=$('hfTeamSelector');if(!teamBar){teamBar=document.createElement('div');teamBar.id='hfTeamSelector';teamBar.className='tabs';teamBar.style.cssText='margin:8px 24px 14px;flex-wrap:wrap;align-items:center';status.after(teamBar);}
+ teamBar.innerHTML=[['ALL','전체'],['A','A팀'],['B','B팀']].map(([v,label])=>'<button class="chip '+(v===selectedTeam?'active':'')+'" aria-pressed="'+(v===selectedTeam)+'" onclick="selectTeam(\''+v+'\')">'+label+'</button>').join('');
+ if(selectedTeam!=='B')teamBar.innerHTML+='<small class="note">A팀 일부 일정 메모 확인 필요</small>';
+}
+async function refresh(force=true){
+ if(readPending)return readPending;
+ if(!force&&Date.now()-lastCoreAttempt<60000)return !readStale;
+ lastCoreAttempt=Date.now();readStale=true;
+ readMessage=live?'이전 조회값 표시 · 전체 최신값 확인 중…':'현재 상태를 불러오는 중…';banner();
+ readPending=(async()=>{
+  const previous={items,live,sourceDate,lastRead,coreSnapshot,teamSnapshotComplete},readGeneration=coreReadGeneration;
+  try{
+   const full=await refreshCachedCore();
+   if(readGeneration!==coreReadGeneration)return false;
+   items=full.items;coreSnapshot=true;teamSnapshotComplete=true;live=true;sourceDate=full.sourceDate;
+   renderCoreScreen(); // A failed application must not advance freshness or the cache.
+   readStale=false;lastReadErrorStatus=0;lastRead=new Date().toLocaleString('ko-KR');
+   readMessage='CORE A·B · '+items.length+'건 · 운영DB 조회 확인 · 최근 행 갱신 '+(sourceDate||'미등록');
+   coreCacheSave(true);return true;
+  }catch(e){
+   if(readGeneration!==coreReadGeneration)return false;
+   ({items,live,sourceDate,lastRead,coreSnapshot,teamSnapshotComplete}=previous);lastReadErrorStatus=e.status||0;readStale=true;
+   const action=['core','catalog'].includes(e.readAction)?e.readAction:'validation';
+   const reason=/^(upstream_timeout|upstream_invalid_json|upstream_failed|invalid_source_month|upstream_unavailable|not_configured|ENOTFOUND|EAI_AGAIN|ECONNRESET|ETIMEDOUT|UND_ERR_CONNECT_TIMEOUT|UND_ERR_HEADERS_TIMEOUT|UND_ERR_SOCKET)$/.test(e.data?.reason||'')?e.data.reason:e.name==='AbortError'?'upstream_timeout':e.name==='TypeError'?'network_unavailable':/^(invalid_core|invalid_catalog|ambiguous_issue|partial_core)$/.test(e.message)?e.message:'read_failed';
+   console.warn('HF_CORE_READ_FAILED',action,e.status||0,reason);
+   if(e.status===401||e.status===403){items=[];live=false;coreSnapshot=false;screen='home';readMessage='사용자 등록 · 연결이 필요합니다';}
+   else{const stage=action==='catalog'?'이슈 조회':action==='core'?'장비 조회':'자료 확인';const cause=/timeout/i.test(reason)||reason==='ETIMEDOUT'?'응답 시간 초과':reason==='network_unavailable'?'연결 끊김':reason==='not_configured'?'연결 설정 확인 필요':reason==='upstream_invalid_json'?'원본 서버 응답 오류':reason==='invalid_core'||reason==='invalid_catalog'||reason==='ambiguous_issue'?'자료 일관성 확인 필요':'서버 응답 실패';readMessage=(e.message==='core_not_supported'?'서버 조회 버전 불일치':e.message==='partial_core'?'일부 확인':'갱신 실패 · '+stage+' · '+cause)+' · '+(live?'이전 조회값 유지':'현재 상태 확인 불가');}
+   return false;
+  }finally{
+   readPending=null;banner();
+   try{renderCoreScreen();}catch{readStale=true;readMessage='화면 반영 실패 · 최신 확인 불가';banner();}
+  }
+ })();
+ return readPending;
+}
+
+function card(x){return `<article class="item"><div class="item-top"><div class="item-status"><span class="tag">현재 진행</span><button class="schedule-button" onclick="scheduleReport(${esc(JSON.stringify(x.id))})">계획일정 ↗</button></div><span class="category">${esc(x.process)}</span></div><button class="item-detail" aria-label="${esc(x.customer)} ${esc(x.model)} 업무 상세" onclick="openItem(${esc(JSON.stringify(x.id))})"><h3>${esc(x.customer)}<small>${esc(x.model)}</small></h3><p class="issue">${esc(x.state||'진행내용 미등록')}</p><div class="next"><span>다음 행동 · ${esc(x.nextAction||'확인 필요')}</span><span>›</span></div></button></article>`;}
 function reports(){return `<section><div class="section-title"><h2>생산 · 지원 집계</h2></div><div class="report-links"><button onclick="productionReport('month')">▥ 월간생산량<small>집계 연결 확인 ›</small></button><button onclick="productionReport('year')">▤ 연간생산량<small>집계 연결 확인 ›</small></button><button onclick="supportReport()">⇄ 타부서지원<small>누적 집계표 ›</small></button></div></section>`;}
-function home(){active('home');const urgent=items.filter(x=>x.priority===1).length,waiting=items.filter(x=>/대기|보류|지연/.test(x.state)).length;main.innerHTML=`<div class="date">${esc(new Date().toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul',month:'long',day:'numeric',weekday:'long'}))}<button class="chip" style="float:right" onclick="refresh()">새로고침</button></div><h1>오늘의 <span>생산 현황</span></h1><p class="lead">현재 상태와 다음 행동을 한눈에 확인하세요.</p><section class="brief"><div class="brief-label">✳ 그로우 · 현장 브리핑</div><h2>${live?`현재 관리 이슈 <em>${items.length}건</em>`:'현재 상태 연결을 확인하세요.'}</h2>${items.map(x=>`<button onclick="openItem(${x.id})"><span>${esc(x.customer)} · ${esc(x.model)}</span><strong>${esc(x.state)}</strong></button>`).join('')}${!live?'<button onclick="login()">앱 연결하기 ↗</button>':''}</section><div class="metrics"><button class="metric" onclick="work('waiting')"><small>대기·보류</small><strong>${live?waiting:'—'}<span>건</span></strong></button><button class="metric" onclick="work('urgent')"><small>우선순위 1</small><strong>${live?urgent:'—'}<span>건</span></strong></button><button class="metric" onclick="work()"><small>전체 이슈</small><strong>${live?items.length:'—'}<span>건</span></strong></button></div>${reports()}<div class="section-title"><h2>현재 관리 상세</h2><span>${live?items.length+'건':'연결 대기'}</span></div>${items.map(card).join('')}<p class="source">${live?`현재 상태 기준일 ${esc(sourceDate||'미등록')} · 조회 ${esc(lastRead)}`:esc(readMessage)}<br>담당·완료 여부는 원본 기록을 기준으로 확인합니다.</p>`;banner();}
+function home(){if(typeof renderUnifiedHome==='function')return renderUnifiedHome();active('home');const urgent=items.filter(x=>x.priority===1),done=items.filter(x=>x.priority===3),top=urgent[0],sorted=items.slice().sort((a,b)=>(a.priority||9)-(b.priority||9));main.innerHTML=`
+<div class="hybrid-eyebrow">${esc(new Date().toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',weekday:'long'}))}</div>
+<h1 class="hybrid-title">오늘 확인할 일<br>${live?urgent.length:'—'}건이 있습니다</h1>
+<p class="hybrid-desc">현재 상태와 다음 행동을 우선순위 기준으로 보여줍니다.</p>${readStale?`<button class="hybrid-quick" onclick="refresh()"><span>↻ 다시 불러오기</span><span>${items.length?'최근 정상값 유지':'재시도'}</span></button>`:''}
+${top?`<section class="hybrid-decision"><div class="hybrid-decision-top"><span>가장 먼저 볼 항목</span><span>P1 · ${esc(top.priorityReason||'확인 필요')}</span></div><h2>${esc(top.customer)} · ${esc(top.model)}<br><span>${esc(top.state)}</span></h2><p>다음 행동 · ${esc(top.nextAction||'확인 필요')}</p><button onclick="openItem(${esc(JSON.stringify(top.id))})"><span>상세와 변경 근거 보기</span><span>›</span></button></section>`:!live&&lastReadErrorStatus===401?'<section class="hybrid-decision"><h2>사용자 연결이 필요합니다.</h2><button onclick="login()"><span>앱 연결하기</span><span>›</span></button></section>':!live?'<section class="hybrid-decision"><h2>서버 연결이 잠시 지연되고 있습니다.</h2><p>사용자 연결은 정상입니다. 다시 불러오기를 눌러주세요.</p></section>':'<section class="hybrid-decision"><h2>우선 확인할 P1 항목이 없습니다.</h2><p>현재 관리 항목은 정상 진행 또는 완료 상태입니다.</p></section>'}
+<div class="hybrid-numbers"><button class="hybrid-number" onclick="projects()"><small>관리중</small><b>${live?items.length:'—'}</b><em>현재 Core</em></button><button class="hybrid-number risk" onclick="projects('urgent')"><small>우선순위 1</small><b>${live?urgent.length:'—'}</b><em>먼저 확인</em></button><button class="hybrid-number" onclick="showInbox()"><small>완료 상태</small><b>${live?done.length:'—'}</b><em>기록 확인</em></button></div>
+<div class="hybrid-section"><b>공정 신호</b><span>우선순위순</span></div>
+<div class="hybrid-floor">${sorted.map(x=>`<button class="hybrid-floor-row p${esc(x.priority||2)}" onclick="openItem(${esc(JSON.stringify(x.id))})"><span class="hybrid-code">${x.priority===1?'P1':x.priority===3?'완료':'P2'}</span><span><b>${esc(x.customer)} · ${esc(x.model)}</b><small>${esc(x.state||'미등록')} · 다음 ${esc(x.nextAction||'확인 필요')}</small></span><span class="hybrid-priority">${x.priority===1?'확인':x.priority===3?'완료':'진행'}</span></button>`).join('')||'<div class="empty">현재 관리 항목이 없습니다.</div>'}</div>
+<button class="hybrid-quick" onclick="todayIssues()"><span>🎙 오늘 이슈 입력</span><span>＋</span></button>
+<div class="hybrid-section"><b>생산 · 지원 집계</b><span>실제 집계</span></div>${reports()}
+<p class="source">${live?`Core 기준 · 조회 ${esc(lastRead)}`:esc(readMessage)}</p>`;banner();}
 function work(f='all',query=''){active('work');filter=f;main.innerHTML=`<h1>업무 <span>한눈에</span></h1><p class="lead">현재 관리 이슈를 검색합니다.</p><div class="search"><input id="search" aria-label="고객 또는 장비 검색" value="${esc(query)}" placeholder="고객명 · 장비명 · 상태" oninput="renderList()"></div><div class="tabs">${[['all','전체'],['waiting','대기·보류'],['urgent','우선순위 1']].map(([v,t])=>`<button class="chip ${f===v?'active':''}" onclick="work('${v}')">${t}</button>`).join('')}</div><div id="list"></div>`;renderList();}
-function renderList(){const q=norm($('search').value),a=items.filter(x=>(filter!=='waiting'||/대기|보류|지연/.test(x.state))&&(filter!=='urgent'||x.priority===1)&&norm([x.customer,x.model,x.state,x.cause,x.orderId].join(' ')).includes(q));$('list').innerHTML=a.length?a.map(card).join(''):`<div class="empty">${live?'일치하는 업무가 없습니다.':esc(readMessage)}</div>`;}
-function openItem(id){const x=items[id];if(!x)return toast('최신 상태를 다시 불러오세요.');open(heading(x.process,x.customer,x.model)+`<div class="action-box">현재 · ${esc(x.state)}</div><h4>상태 시작 · 지속</h4><p>${esc(x.since||'미등록')} · ${Number.isFinite(x.days)?x.days+'일째':'기간 미확인'}</p><h4>원인 / 이슈</h4><p>${esc(x.cause||'미등록')}</p><h4>다음 행동</h4><p>${esc(x.nextAction||'미등록')}</p><p class="note">${esc(x.issueId)} · ${esc(x.issueStatus)} · 원본 최신 ${esc(x.sourceLatestUpdate||sourceDate)}</p><button class="primary" onclick="input(${id})">이 업무에 진행 내용 입력</button><button class="secondary" onclick="scheduleReport(${id})">계획일정 확인</button>`);}
+function renderList(){const q=norm($('search').value),a=items.filter(x=>teamMatches(x)&&(filter!=='waiting'||/대기|보류|지연/.test(x.state))&&(filter!=='urgent'||x.priority===1)&&norm([x.customer,x.model,x.state,x.cause,x.orderId].join(' ')).includes(q));$('list').innerHTML=a.length?a.map(card).join(''):`<div class="empty">${live?'일치하는 업무가 없습니다.':esc(readMessage)}</div>`;}
+function openItem(id){const x=itemById(id);if(!x)return toast('최신 상태를 다시 불러오세요.');open(heading(x.process,x.customer,x.model)+`<div class="job-number"><small>JOB NO.</small><b>${esc(x.orderId||'미등록')}</b></div><h4>납기</h4><p>${esc(typeof formatHfDate==='function'?formatHfDate(x.due):(x.due||'미정'))}</p><h4>최근 진행내용</h4><div class="action-box">${esc(x.state||'미등록')}</div><h4>진행 시작 · 지속</h4><p>${esc(x.since||'미등록')} · ${Number.isFinite(x.days)?x.days+'일째':'기간 미확인'}</p><h4>기존 원인 / 이슈</h4><p>${esc(x.cause||'미등록')}</p><h4>다음 행동</h4><p>${esc(x.nextAction||'미등록')}</p><p class="note">${esc(x.issueId)} · ${esc(x.issueStatus)} · 원본 최신 ${esc(x.sourceLatestUpdate||sourceDate)}</p><button class="primary" onclick="openUnifiedEvent('${esc(x.issueId)}')">오늘 이슈 입력</button><button class="secondary" onclick="scheduleReport(${esc(JSON.stringify(id))})">계획일정 확인</button>`);}
 function unavailable(title,description){open(heading('연결 상태',title,'실제 데이터 연결이 필요합니다')+`<div class="alert">${esc(description)}</div><p>값을 0 또는 완료로 대신 표시하지 않습니다.</p><button class="secondary" onclick="dialog.close()">닫기</button>`);}
 function productionReport(mode){unavailable(mode==='month'?'월간생산량':'연간생산량','현재 조회 서비스에 생산 완료일·완료 수량이 없어 실적을 집계할 수 없습니다.');}
 function supportReport(){unavailable('타부서지원 누적 집계표','현재 조회 서비스에 지원 부서·지원 시간·기준일이 연결되지 않았습니다.');}
 let planRequest=0;
 async function scheduleReport(id){
- const x=items[id];if(!x)return;
+ const x=itemById(id);if(!x)return;
  const request=++planRequest;
  open(heading('계획일정',x.customer,x.model)+'<p id="planResult">원본 계획을 불러오는 중…</p>');
  const result=$('planResult');
  if(!x.orderId){result.textContent='프로젝트 ID가 없어 계획을 안전하게 연결할 수 없습니다.';return;}
  try{
-  const d=await api('/api/sa2-plans',{orderId:x.orderId});
+  const d=await api('/api/sa2-lifecycle',{action:'plans',orderId:x.orderId});
   if(request!==planRequest||!result.isConnected||!dialog.open)return;
   if(d.orderId!==x.orderId||!Array.isArray(d.plans))throw Error('invalid_plans');
   result.outerHTML='<div class="alert">계획은 완료 실적이 아닙니다. 일정 수정은 개인계정 권한과 변경이력 연결 검증이 필요합니다.</div><p>'+esc(x.orderId)+'</p>'+
     (d.plans.length?d.plans.map(r=>'<article class="item"><b>'+esc(r[3])+' · '+esc(r[10])+'</b><p>'+esc(r[11]||'상태 미등록')+'</p></article>').join(''):'<p>이 프로젝트 ID에 연결된 계획이 없습니다.</p>');
  }catch{if(request===planRequest&&result.isConnected)result.textContent='계획을 불러오지 못했습니다. 연결을 확인한 뒤 다시 여세요.';}
 }
-function input(id){const x=typeof id==='object'?id:items[id],d=readStore(DRAFT,{}),target=x?`${x.orderId?x.orderId+' · ':''}${x.customer} · ${x.model}`:d.target||'';open(heading('FIELD NOTE','현장 입력','기기에 보관한 뒤 내용을 확인하여 서버로 보냅니다')+`<label>입력 대상<input id="inputTarget" aria-label="입력 대상" maxlength="160" value="${esc(target)}" placeholder="고객명 · 장비명" oninput="saveDraft()"></label><label>무엇이 달라졌나요?<textarea id="draft" aria-label="진행 내용" maxlength="800" placeholder="확인한 사실과 다음 행동을 입력하세요." oninput="saveDraft()">${esc(d.text||'')}</textarea></label><button class="chip" onclick="voice()">◉ 음성 입력</button><p id="inputHint" class="note">${d.text?'보관한 초안을 불러왔습니다.':'입력 원문은 이 기기에 보관됩니다.'}</p><button class="primary" onclick="saveNote()">처리함에 보관하고 확인</button><p class="note">사진 첨부·QR 스캔은 아직 연결되지 않았습니다. 사진이나 인식 결과가 저장된 것처럼 표시하지 않습니다.</p>`);}
+function input(id){const x=typeof id==='object'?id:itemById(id),d=readStore(DRAFT,{}),target=x?`${x.orderId?x.orderId+' · ':''}${x.customer} · ${x.model}`:d.target||'',draftText=x&&d.target&&d.target!==target?'':d.text||'';open(heading('FIELD NOTE','진행내용 입력',x?.issueId?'입력한 첫 줄을 현재 업무 카드에도 바로 표시합니다.':'기기에 보관한 뒤 내용을 확인하여 서버로 보냅니다')+`<label>입력 대상<input id="inputTarget" aria-label="입력 대상" maxlength="160" value="${esc(target)}" placeholder="고객명 · 장비명" oninput="saveDraft()"></label><label>진행내용<textarea id="draft" aria-label="진행 내용" maxlength="800" placeholder="바뀐 진행내용을 입력하세요." oninput="saveDraft()">${esc(draftText)}</textarea></label><input id="inputIssueId" type="hidden" value="${esc(x?.issueId||'')}"><input id="inputOrderId" type="hidden" value="${esc(x?.orderId||'')}"><input id="inputNextAction" type="hidden" value="${esc(x?.nextAction||'')}"><input id="inputIssueStatus" type="hidden" value="${esc(x?.issueStatus||'OPEN')}"><button class="chip" onclick="voice()">◉ 음성 입력</button><p id="inputHint" class="note">${draftText?'보관한 초안을 불러왔습니다.':x?.issueId?'첫 줄은 현재 진행으로 표시하고, 다음 행동·일정은 그대로 둡니다.':'입력 원문은 이 기기에 보관됩니다.'}</p><button class="primary" onclick="saveAndSendNote()">서버로 보내고 바로 반영</button><button class="secondary" onclick="saveNote()">기기에만 보관</button><p class="note">서버 저장과 재조회를 확인한 뒤 업무 카드를 자동으로 갱신합니다.</p>`);}
 function saveDraft(){try{persist(DRAFT,{target:$('inputTarget').value,text:$('draft').value});$('inputHint').textContent='이 기기에 초안 보관됨';}catch{$('inputHint').textContent='기기 저장에 실패했습니다. 화면을 닫기 전에 원문을 복사하세요.';}}
-function saveNote(){const target=$('inputTarget').value.trim(),text=$('draft').value.trim();if(!target||!text){$('inputHint').textContent='입력 대상과 진행 내용을 모두 작성하세요.';return;}try{const id=crypto.randomUUID(),r={id,submissionId:id,target,text,status:'draft',createdAt:new Date().toISOString()};const a=notes();a.unshift(r);persist(KEY,a);localStorage.removeItem(DRAFT);receiptDetail(r.id);}catch{toast('저장에 실패했습니다. 원문을 복사하여 보관하세요.');}}
-const labels={draft:'기기에 보관 · 미전송',sending:'서버 응답 확인 중',unknown:'결과 확인 필요 · 재전송 보류',applied:'서버 반영 확인',review:'검토 필요',partial:'일부 반영 · 검토 필요',excluded:'운영 반영 제외',duplicate:'중복 접수 · 반영 확인 필요',received:'서버 접수 · 반영 대기',rejected:'서버 접수 거절'};
-function showInbox(){open(heading('ACTIVITY','처리함','이 기기에 보관한 입력 내역 · 새로고침 후에도 유지')+`<p class="note">다른 휴대폰과 자동 공유되지 않습니다. 서버 반영 여부는 각 기록에서 확인하세요.</p>${notes().map(r=>`<button class="item" onclick="receiptDetail('${r.id}')"><span class="tag">${esc(labels[r.status]||labels.unknown)}</span><h3>${esc(r.target)}</h3><p>${esc(r.text)}</p><small>${esc(new Date(r.updatedAt||r.createdAt).toLocaleString('ko-KR'))}${r.updatedAt?' · 수정됨':''}</small></button>`).join('')||'<p class="empty">아직 보관한 입력이 없습니다.</p>'}`);}
-function receiptDetail(id){const r=notes().find(r=>r.id===id);if(!r)return;open(heading('INPUT RESULT',labels[r.status]||labels.unknown,r.target)+`<div class="action-box" style="white-space:pre-wrap">${esc(r.text)}</div><p class="note">보관 번호 ${esc(r.id)}${r.requestId?'<br>서버 요청 '+esc(r.requestId):''}</p>${r.ack?`<p>${esc(r.ack)}</p>`:''}${r.status==='draft'?`<div class="alert">보내기를 누르면 운영 입력으로 접수됩니다. 대상과 내용을 확인하세요.</div><button id="sendNote" class="primary" onclick="sendNote('${r.id}')">확인한 내용 서버로 보내기</button>`:''}${['unknown','sending'].includes(r.status)?'<div class="alert">응답이 확인되지 않아 자동 재전송하지 않습니다. 중복 입력을 피하려면 서버 기록을 먼저 확인해야 합니다.</div>':''}${r.status==='applied'?'<p>업무이력 저장을 확인했습니다. 현재 상태와 일정은 별도 원장 기준이며 자동 변경되지 않습니다.</p>':''}<button class="secondary" onclick="refreshAndShow()">최신 업무 상태 확인</button><button class="secondary" onclick="showInbox()">처리함으로</button>`);}
-async function sendNote(id){const r=notes().find(r=>r.id===id);if(!r||r.status!=='draft')return;try{updateNote(id,{status:'sending'});}catch{return toast('원문 보관에 실패하여 전송하지 않았습니다.');}receiptDetail(id);try{const d=await api('/api/sa2-write',{op:'safe_write',submissionId:r.submissionId||r.id,text:`${r.target} ${r.text}`,targetHint:r.target,source:'MOBILE',requester:'Emotion'},55000);const status=/REVIEW/i.test(d.status)?(d.applied?'partial':'review'):d.applied?'applied':/EXCLUDED/i.test(d.status)?'excluded':/DUPLICATE/i.test(d.status)?'duplicate':'received';updateNote(id,{status,requestId:d.requestId||'',ack:d.ack||'',respondedAt:new Date().toISOString()});if(d.applied)await refresh();}catch(e){try{updateNote(id,{status:e.status===401||e.status===400?'rejected':'unknown',requestId:e.data?.requestId||'',ack:e.status===401?'인증이 만료되었습니다. 다시 연결하세요.':e.data?.ack||'서버 응답을 확정하지 못했습니다.'});}catch{toast('결과 보관 실패. 서버 기록을 확인하세요.');}}receiptDetail(id);}
+function saveNote(){const target=$('inputTarget').value.trim(),text=$('draft').value.trim();if(!target||!text){$('inputHint').textContent='입력 대상과 진행 내용을 모두 작성하세요.';return;}try{const id=crypto.randomUUID(),r={id,submissionId:id,target,text,status:'draft',createdAt:new Date().toISOString(),issueId:$('inputIssueId')?.value||'',orderId:$('inputOrderId')?.value||'',displayState:text.split(/\r?\n/).map(v=>v.trim()).find(Boolean)?.slice(0,80)||'',nextAction:$('inputNextAction')?.value||'',issueStatus:$('inputIssueStatus')?.value||'OPEN'};const a=notes();a.unshift(r);persist(KEY,a);localStorage.removeItem(DRAFT);receiptDetail(r.id);return r.id;}catch{toast('저장에 실패했습니다. 원문을 복사하여 보관하세요.');}}
+async function saveAndSendNote(){const id=saveNote();if(id)await sendNote(id);}
+const labels={draft:'기기에 보관 · 미전송',sending:'서버 응답 확인 중',unknown:'결과 확인 필요 · 재전송 보류',applied:'업무이력 저장 · 재조회 확인',saved_unverified:'서버 저장 응답 · 재조회 확인 필요',review:'검토 필요',partial:'일부 반영 · 검토 필요',excluded:'운영 반영 제외',duplicate:'중복 접수 · 반영 확인 필요',received:'서버 접수 · 반영 대기',rejected:'서버 접수 거절'};
+function showInbox(){const all=visibleNotes(),done=r=>r.status==='applied'&&!!r.verifiedAt;const rows=a=>a.map(r=>`<button class="item" onclick="receiptDetail('${r.id}')"><span class="tag">${esc(r.status==='applied'&&!r.verifiedAt?labels.saved_unverified:(labels[r.status]||labels.unknown))}</span><h3>${esc(r.target)}</h3><p>${esc(r.text)}</p><small>${esc(new Date(r.updatedAt||r.createdAt).toLocaleString('ko-KR'))}${r.updatedAt?' · 수정됨':''}</small></button>`).join('')||'<p class="empty">기록이 없습니다.</p>';open(heading('ACTIVITY','처리함','이 기기의 원문과 이력을 보존합니다')+'<p class="note">업무 카드에서 입력한 진행내용은 이력 저장과 현재 진행 표시를 함께 확인합니다. 다음 행동·일정은 그대로 유지합니다.</p><h3>확인 필요</h3>'+rows(all.filter(r=>!done(r)))+'<h3>저장 완료</h3>'+rows(all.filter(done)));}
+function receiptDetail(id){const r=notes().find(r=>r.id===id);if(!r)return;open(heading('INPUT RESULT',r.status==='applied'&&!r.verifiedAt?labels.saved_unverified:(labels[r.status]||labels.unknown),r.target)+`<div class="action-box" style="white-space:pre-wrap">${esc(r.text)}</div><p class="note">보관 번호 ${esc(r.id)}${r.requestId?'<br>서버 요청 '+esc(r.requestId):''}</p>${r.ack?`<p>${esc(r.ack)}</p>`:''}${r.status==='draft'?`<div class="alert">보내기를 누르면 업무이력으로 저장되고, 연결된 업무 카드의 현재 진행도 함께 바뀝니다.</div><button id="sendNote" class="primary" onclick="sendNote('${r.id}')">서버로 보내고 바로 반영</button>`:''}${['unknown','sending'].includes(r.status)?'<div class="alert">응답이 확인되지 않아 자동 재전송하지 않습니다. 중복 입력을 피하려면 서버 기록을 먼저 확인해야 합니다.</div>':''}${r.status==='applied'?'<p>'+(r.issueId?'업무이력 저장과 현재 진행 표시를 확인했습니다. 다음 행동·일정은 그대로입니다.':'업무이력 저장을 확인했습니다.')+'</p>':''}<button class="secondary" onclick="refreshAndShow()">최신 업무 상태 확인</button><button class="secondary" onclick="showInbox()">처리함으로</button>`);}
+async function sendNote(id){const r=notes().find(r=>r.id===id);if(!r||r.status!=='draft')return;if(!canSendNote(r))return;if(navigator.onLine===false)return toast('오프라인입니다. 수정 내용은 기기에 보관했습니다.');try{updateNote(id,{status:'sending'});}catch{return toast('원문 보관에 실패하여 전송하지 않았습니다.');}receiptDetail(id);try{const d=await api('/api/sa2-write',{op:'safe_write',submissionId:r.submissionId||r.id,text:`${r.target} ${r.text}`,targetHint:r.target,source:'MOBILE',requester:'Emotion'},55000);const status=/REVIEW/i.test(d.status)?(d.applied?'partial':'review'):d.applied?'saved_unverified':/EXCLUDED/i.test(d.status)?'excluded':/DUPLICATE/i.test(d.status)?'duplicate':'received';const messages={partial:'일부 업무이력은 저장됐고 일부는 검토가 필요합니다.',saved_unverified:'업무이력 저장 완료. 현재 업무 카드 반영을 확인 중입니다.',review:'자동 반영하지 않고 검토 대상으로 접수했습니다.',excluded:'운영 기록 반영 제외로 접수했습니다.',duplicate:'중복 가능성이 있어 기존 서버 기록을 확인합니다.',received:'서버가 요청을 접수했습니다. 저장 상태를 자동으로 다시 확인합니다.'};updateNote(id,{status,requestId:d.requestId||'',ack:d.ack||messages[status],respondedAt:new Date().toISOString()});receiptDetail(id);if(d.applied){toast('업무이력 저장 완료. 현재 상태 반영을 확인 중입니다.');if(typeof verifyEventNote==='function'){await verifyEventNote(id,d);receiptDetail(id);}else if(typeof scheduleEventReceiptCheck==='function')scheduleEventReceiptCheck(id,0,false);}else if(typeof scheduleEventReceiptCheck==='function')scheduleEventReceiptCheck(id,0,false);}catch(e){try{const rejected=[400,401,403].includes(e.status);updateNote(id,{status:rejected?'rejected':'unknown',requestId:e.data?.requestId||'',ack:appError(e)});receiptDetail(id);if(!rejected&&typeof scheduleEventReceiptCheck==='function')scheduleEventReceiptCheck(id,1500,false);}catch{toast('결과 보관 실패. 서버 기록을 확인하세요.');}}}
 async function refreshAndShow(){dialog.close();home();await refresh();}
 function stopVoice(){if(recognition){recognition.abort();recognition=null;}}
 function voice(){const Speech=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Speech)return toast('이 브라우저는 음성 인식을 지원하지 않습니다. 키보드의 음성 입력을 사용할 수 있습니다.');if(recognition){stopVoice();return;}recognition=new Speech();recognition.lang='ko-KR';recognition.interimResults=false;recognition.onresult=e=>{if($('draft')){$('draft').value=($('draft').value+' '+e.results[0][0].transcript).trim().slice(0,800);saveDraft();}};recognition.onerror=e=>toast(e.error==='not-allowed'?'마이크 사용 권한이 필요합니다.':'음성 인식에 실패했습니다. 다시 시도하세요.');recognition.onend=()=>{recognition=null;};try{recognition.start();toast('듣고 있습니다. 인식 후 내용을 확인하세요.');}catch{stopVoice();toast('마이크를 시작하지 못했습니다.');}}
-function login(){location.href='./login.html';}
+function login(){location.href='./account.html?v=20261030m265';}
 async function unlock(){const key=$('appKey').value.trim();if(!key){$('loginHint').textContent='앱 연결 키를 입력하세요.';return;}$('loginHint').textContent='연결 중…';try{await api('/api/unlock',{key});$('appKey').value='';dialog.close();await refresh();if(!live)toast(readMessage);}catch{$('loginHint').textContent='인증하지 못했습니다. 연결 키와 네트워크를 확인하세요.';}}
-function grow(){open(heading('GROW','업무 근거 찾기','현재 조회한 이슈에서 검색합니다 · AI 모델 미연결')+`<textarea id="growQuestion" aria-label="그로우 질문" placeholder="예: 미코 상태 알려줘"></textarea><button class="primary" onclick="growAnswer()">현재 기록에서 찾기</button><div id="growResult" aria-live="polite"></div><button class="secondary" onclick="input()">진행 내용 입력하기</button>`);}
-function growAnswer(){const raw=$('growQuestion').value.trim();if(!raw){$('growResult').textContent='질문을 입력하세요.';return;}if(!live){$('growResult').textContent='먼저 앱 연결을 완료하고 현재 상태를 불러오세요.';return;}if(/변경|삭제|등록|기록|반영/.test(raw)){$('growResult').textContent='이 화면은 기록 검색입니다. 변경 내용은 현장 입력에서 확인 후 접수하세요.';return;}const q=norm(raw.replace(/알려줘|보여줘|지금|현재|상태|현황|어때|확인/g,'')),found=/오늘|전체/.test(raw)?items:items.filter(x=>q&&(norm(x.customer).includes(q)||q.includes(norm(x.customer))||norm(x.model).includes(q)||q.includes(norm(x.model))));$('growResult').innerHTML=found.length?found.map(card).join(''):'<p>관련 근거를 찾지 못했습니다. 고객명이나 장비명을 입력하세요.</p>';}
+function grow(){open(heading('GROW','운영DB 근거 찾기','현재 상태와 프로젝트 원장을 다시 조회해 답합니다')+`<textarea id="growQuestion" aria-label="그로우 질문" placeholder="예: 미코 상태와 다음 행동 알려줘"></textarea><button id="growSearch" class="primary" onclick="growAnswer()">운영DB에서 찾기</button><div id="growResult" aria-live="polite"></div><button class="secondary" onclick="input()">진행 내용 입력하기</button>`);}
+async function growAnswer(){const raw=$('growQuestion').value.trim(),result=$('growResult');if(!raw){result.textContent='질문을 입력하세요.';return;}if(!live){result.textContent='먼저 앱 연결을 완료하고 현재 상태를 불러오세요.';return;}if(/변경|삭제|등록|저장|반영|수정해|바꿔/.test(raw)){result.textContent='이 화면은 운영DB 조회입니다. 변경은 업무 상세의 상태 수정 또는 현장 입력에서 확인 후 진행하세요.';return;}result.textContent='운영DB를 다시 조회하는 중…';try{const projects=await getAppProjects(),rawNorm=norm(raw),q=norm(raw.replace(/알려줘|보여줘|지금|현재|상태|현황|어때|확인|다음행동|일정/g,'')),all=/오늘|전체|업무/.test(raw);const found=projects.filter(p=>all||[p.orderId,p.customer,p.model,p.pm].some(v=>v&&rawNorm.includes(norm(v)))||(q&&norm([p.orderId,p.customer,p.model,p.state,p.pm].join(' ')).includes(q))).slice(0,20);const current=new Map(items.map(x=>[x.orderId,x]));result.innerHTML=found.length?'<p class="note">운영DB 재조회 '+esc(new Date().toLocaleString('ko-KR'))+' · 현재 상태 기준 '+esc(sourceDate||'미등록')+'</p>'+found.map(p=>{const x=current.get(p.orderId);return '<button class="item" data-grow-project="'+esc(p.orderId)+'"><b>'+esc(p.customer)+' · '+esc(p.model)+'</b><p>현재 '+esc(x?.state||p.state||'미등록')+'</p><p>다음 행동 '+esc(x?.nextAction||'상세에서 확인')+'</p><small>Project ID '+esc(p.orderId)+' · PM '+esc(p.pm||'미등록')+'</small></button>';}).join(''):'<p>운영DB에서 관련 프로젝트를 찾지 못했습니다. 고객명·장비명·Project ID로 다시 검색하세요.</p>';result.querySelectorAll('[data-grow-project]').forEach(b=>b.onclick=()=>openProject(b.dataset.growProject));}catch(e){result.textContent=appError(e);}}
 function settings(){open(heading('MY HANDSFREE','사용자와 설정',`버전 ${BUILD}`)+`<div class="action-box">${live?'현재 상태 연결됨':'앱 연결 필요'}</div><p>이름과 4자리 PIN으로 연결합니다. 연결 후에는 180일 동안 자동 유지됩니다. 푸시 알림은 아직 연결되지 않았습니다.</p><button class="primary" onclick="installApp()">휴대폰에 앱 설치</button><button class="secondary" onclick="login()">사용자 등록 · 연결</button><button class="secondary" onclick="showInbox()">기기에 보관한 입력 확인</button><button class="secondary" onclick="checkUpdate()">앱 업데이트 확인</button><p class="note">오프라인에서는 초안을 보관할 수 있습니다. 서버 전송은 연결 후 직접 확인하여 진행하며 자동 재전송하지 않습니다.</p>`);}
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;});
 async function installApp(){if(installPrompt){await installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;return;}open(heading('INSTALL','휴대폰에 설치','한 번 설치하면 홈 화면에서 열 수 있습니다')+'<p>아이폰: Safari에서 이 주소를 연 뒤 공유 → 홈 화면에 추가.</p><p>안드로이드: Chrome에서 이 주소를 연 뒤 메뉴 → 앱 설치 또는 홈 화면에 추가.</p><p class="note">이미 설치했거나 설치를 지원하지 않는 브라우저에서는 설치 버튼이 나타나지 않을 수 있습니다.</p>');}
-async function checkUpdate(){try{const r=await navigator.serviceWorker?.getRegistration('/kmt-sa2/');if(!r)return toast('현재 브라우저에서 업데이트 서비스를 사용할 수 없습니다.');await r.update();toast(r.waiting?'새 버전이 준비되었습니다. 앱 창을 모두 닫고 다시 여세요.':'업데이트 확인 완료. 새 버전은 앱을 다시 열 때 적용됩니다.');}catch{toast('업데이트 확인 실패. 네트워크를 확인하세요.');}}
-const nav=document.querySelector('.bottom');nav.style.gridTemplateColumns='repeat(5,1fr)';nav.innerHTML=`<button data-page="home" id="homeNav" onclick="home()"><span class="nav-icon">⌂</span>오늘</button><button data-page="work" id="workNav" onclick="work()"><span class="nav-icon">▦</span>업무</button><button onclick="grow()"><span class="nav-icon">✳</span>그로우</button><button class="new" onclick="input()"><span class="nav-icon">＋</span>입력</button><button onclick="showInbox()"><span class="nav-icon">▤</span>처리함</button>`;
-const profile=document.createElement('button');profile.className='icon';profile.textContent='나';profile.setAttribute('aria-label','사용자와 설정');profile.onclick=settings;document.querySelector('.top').append(profile);
-const style=document.createElement('style');style.textContent=`label{display:block;margin:16px 0;font-size:13px}label input{display:block;width:100%;padding:13px;border:1px solid var(--line);border-radius:12px;margin-top:8px}label textarea{margin-top:8px}input,textarea,select{font-size:16px!important}.item-detail{width:100%;text-align:left;background:none;border:0;padding:0}.item-status{display:flex;align-items:center;gap:6px}.schedule-button{background:white;border:1px solid var(--line);border-radius:6px;padding:8px;font-size:11px}.plan-list li{display:flex;flex-wrap:wrap;gap:12px;padding:12px 0}.brief button{gap:8px;text-align:left}.brief button strong{white-space:nowrap}.top .icon{min-width:38px}.demo{flex-wrap:wrap}.sheet{padding-bottom:calc(26px + env(safe-area-inset-bottom))}.item,.action-box,p{overflow-wrap:anywhere}@media(max-width:380px){.top{padding-left:12px!important;padding-right:12px!important}.kmt-brand{gap:5px!important}.kmt-brand strong{font-size:14px!important}}`;document.head.append(style);
-window.addEventListener('online',()=>{toast('연결이 복구되었습니다. 보관한 입력은 처리함에서 확인하세요.');refresh();});
-window.addEventListener('offline',()=>{items=[];live=false;readMessage='오프라인 · 초안 보관 가능';banner();if(screen==='home')home();if(screen==='work')work(filter);});
+async function checkUpdate(){try{const r=await navigator.serviceWorker?.getRegistration('/kmt-sa2/');if(!r)return toast('현재 브라우저에서 업데이트 서비스를 사용할 수 없습니다.');await r.update();await checkForLiveUpdate();toast('업데이트 확인 완료. 새 버전 적용 버튼으로 현재 창에서 적용하세요.');}catch{toast('업데이트 확인 실패. 네트워크를 확인하세요.');}}
+const nav=document.querySelector('.bottom');nav.style.gridTemplateColumns='repeat(4,1fr)';nav.innerHTML=`<button data-page="home" id="homeNav" onclick="home()"><span class="nav-icon">⌂</span>오늘</button><button data-page="plan" id="planNav" onclick="productionPlan()"><span class="nav-icon">◫</span>계획</button><button data-page="projects" id="projectsNav" onclick="projects()"><span class="nav-icon">▦</span>프로젝트</button><button data-page="issues" id="issuesNav" onclick="todayIssues()"><span class="nav-icon">▤</span>오늘 이슈</button>`;document.querySelector('.demo')?.after(nav);
+document.querySelector('.top > button.icon')?.remove();
+const profile=document.createElement('button');profile.className='icon login-button';profile.textContent='로그인';profile.setAttribute('aria-label','로그인');profile.onclick=login;document.querySelector('.top').append(profile);
+const style=document.createElement('style');style.textContent=`label{display:block;margin:16px 0;font-size:13px}label input{display:block;width:100%;padding:13px;border:1px solid var(--line);border-radius:12px;margin-top:8px}label textarea{margin-top:8px}input,textarea,select{font-size:16px!important}.item-detail{width:100%;text-align:left;background:none;border:0;padding:0}.item-status{display:flex;align-items:center;gap:6px}.schedule-button{background:white;border:1px solid var(--line);border-radius:6px;padding:8px;font-size:11px}.plan-list li{display:flex;flex-wrap:wrap;gap:12px;padding:12px 0}.brief button{gap:8px;text-align:left}.brief button strong{white-space:nowrap}.top .icon{min-width:58px;width:auto!important;padding:0 10px;font-size:11px;font-weight:800}.kmt-brand small{white-space:nowrap!important}.demo{flex-wrap:wrap}.sheet{padding-bottom:calc(26px + env(safe-area-inset-bottom))}.item,.action-box,p{overflow-wrap:anywhere}@media(max-width:380px){.top{padding-left:12px!important;padding-right:12px!important}.kmt-brand{gap:5px!important}.kmt-brand strong{font-size:14px!important}}`;document.head.append(style);
+// Resume reads only: never retry a write, and never invalidate an open editor's item IDs.
+let resumeReadNeeded=false,lastResumeRead=0;
+function resumeRead(){
+ if(document.visibilityState==='hidden'||navigator.onLine===false)return;
+ if(dialog.open){resumeReadNeeded=true;return;}
+ if(Date.now()-lastResumeRead<60000)return;
+ resumeReadNeeded=false;lastResumeRead=Date.now();refresh(false);
+}
+window.addEventListener('focus',resumeRead);
+document.addEventListener('visibilitychange',resumeRead);
+dialog.addEventListener('close',()=>{if(resumeReadNeeded)resumeRead();});
+window.addEventListener('online',()=>{toast('연결이 복구되었습니다. 최신 상태를 확인합니다.');lastResumeRead=0;refresh(true);});
+window.addEventListener('offline',()=>{if(!items.length)coreCacheRestore();live=!!items.length;readStale=true;readMessage=items.length?'오프라인 · 최근 정상값 유지':'오프라인 · 초안 보관 가능';banner();if(screen==='home')home();if(screen==='work')work(filter);if(screen==='plan'&&typeof productionPlan==='function')productionPlan(productionPlanMode,true);if(screen==='projects'&&typeof projects==='function')projects();if(screen==='issues'&&typeof todayIssues==='function')todayIssues();});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(()=>toast('오프라인 앱 준비에 실패했습니다. 온라인으로 사용할 수 있습니다.'));

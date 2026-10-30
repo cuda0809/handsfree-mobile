@@ -1,0 +1,16 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const source=fs.readFileSync(new URL('../kmt/mobile.js',import.meta.url),'utf8');
+let now=10000,reads=0;
+const events={};
+const listen=(name,cb)=>events[name]=cb;
+const context=vm.createContext({Date:{now:()=>now},document:{visibilityState:'visible',addEventListener:listen},navigator:{onLine:true},dialog:{open:false,addEventListener:listen},window:{addEventListener:listen},refresh:()=>reads++,toast(){}});
+vm.runInContext(source.slice(source.indexOf('let resumeReadNeeded='),source.indexOf("window.addEventListener('offline'")),context);
+events.focus();events.visibilitychange();assert.equal(reads,1);
+now+=4000;context.dialog.open=true;events.focus();assert.equal(reads,1);
+context.dialog.open=false;events.close();assert.equal(reads,2);
+now+=4000;context.document.visibilityState='hidden';events.visibilitychange();assert.equal(reads,2);
+context.document.visibilityState='visible';context.navigator.onLine=false;events.focus();assert.equal(reads,2);
+context.navigator.onLine=true;events.online();assert.equal(reads,3);
+console.log('PASS resume read dedupes focus, defers open editors, skips background/offline, reads on reconnect');

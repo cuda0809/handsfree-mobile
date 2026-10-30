@@ -1,0 +1,15 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const src=fs.readFileSync(new URL('../kmt/schedule.js',import.meta.url),'utf8');
+const pending={requestId:'request-1',orderId:'P-1',key:'record-1',date:'2026-09-30'};
+let removed=0,shown=0,latest={orderId:'P-1',records:[{key:'record-1',date:pending.date}]};
+const c=vm.createContext({readStore:()=>pending,localStorage:{removeItem:()=>removed++},api:async()=>latest,open:()=>shown++,heading:()=>'',esc:String});
+vm.runInContext(src.slice(src.indexOf('async function showScheduleReceipt('),src.indexOf('async function checkScheduleReceipt(')),c);
+const receipt={...pending,status:'APPLIED',beforeDate:'2026-09-29'};
+await c.showScheduleReceipt(receipt);assert.equal(removed,1);assert.equal(shown,1);
+latest.records[0].date='2026-09-29';await assert.rejects(c.showScheduleReceipt(receipt),/readback_mismatch/);
+latest.records=[];await assert.rejects(c.showScheduleReceipt(receipt),/readback_mismatch/);
+await assert.rejects(c.showScheduleReceipt({...receipt,requestId:'other'}),/receipt_mismatch/);
+assert.equal(removed,1);assert.equal(shown,1);
+console.log('PASS schedule success requires matching personal request and fresh plan date; mismatches retain pending request');

@@ -1,11 +1,24 @@
 package com.handsfree.mobile;
 
 import android.annotation.SuppressLint;
+import android.Manifest;
 import android.app.Activity;
-import android.graphics.Bitmap;
+import android.content.pm.PackageManager;
+import android.content.Intent;
+import android.content.ClipData;
+import android.provider.MediaStore;
+import android.webkit.ValueCallback;
+import java.io.File;
+import java.util.UUID;
+import android.graphics.Color;
+import android.graphics.Insets;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
+import android.view.WindowInsets;
 import android.webkit.CookieManager;
+import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
@@ -15,24 +28,46 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 public class MainActivity extends Activity {
-    private static final String APP_URL = "https://handsfree-mobile-alpha-02-cuda0809-8210.vercel.app/kmt/?app=202609295";
+    private static final String APP_URL = BuildConfig.APP_URL;
+    private static final int AUDIO_PERMISSION_REQUEST = 4102;
     private WebView webView;
+    private PermissionRequest pendingAudioRequest;
+    private static final int PHOTO_PICK_REQUEST = 4103;
+    private ValueCallback<Uri[]> pendingPhoto;
+    private Uri cameraOutput;
+    private final ImprovementPdf improvementPdf = new ImprovementPdf();
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        getWindow().setStatusBarColor(Color.rgb(23,105,86));
+        getWindow().setNavigationBarColor(Color.WHITE);
         webView = new WebView(this);
-        webView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            getWindow().setDecorFitsSystemWindows(false);
+            webView.setOnApplyWindowInsetsListener((view, windowInsets) -> {
+                Insets bars = windowInsets.getInsets(WindowInsets.Type.systemBars());
+                Insets ime = windowInsets.getInsets(WindowInsets.Type.ime());
+                view.setPadding(bars.left, bars.top, bars.right, Math.max(bars.bottom, ime.bottom));
+                return windowInsets;
+            });
+        } else webView.setFitsSystemWindows(true);
         setContentView(webView);
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
+        settings.setUserAgentString(settings.getUserAgentString()+" HandsFreeNative/2.8.6");
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
         settings.setAllowFileAccess(false);
-        settings.setAllowContentAccess(false);
+        // Only selected content URIs have OS grants; local file and cross-origin file access remain disabled.
+        settings.setAllowContentAccess(true);
+        settings.setAllowFileAccessFromFileURLs(false);
+        settings.setAllowUniversalAccessFromFileURLs(false);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) settings.setSafeBrowsingEnabled(true);
         settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
         settings.setMediaPlaybackRequiresUserGesture(false);
 
@@ -40,27 +75,58 @@ public class MainActivity extends Activity {
         cookies.setAcceptCookie(true);
         cookies.setAcceptThirdPartyCookies(webView, true);
 
-        webView.setWebChromeClient(new WebChromeClient());
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                if (pendingPhoto != null) pendingPhoto.onReceiveValue(null);
+                pendingPhoto = null;
+                if (!isTrustedOrigin(Uri.parse(view.getUrl() == null ? "" : view.getUrl()))
+                    || !String.valueOf(Uri.parse(view.getUrl()).getPath()).startsWith("/kmt-sa2/")) {
+                    callback.onReceiveValue(null); return true;
+                }
+                boolean image = false;
+                for (String type : params.getAcceptTypes()) if ("image/*".equals(type) || "image/jpeg".equals(type)) image = true;
+                if (!image) { callback.onReceiveValue(null); return true; }
+                pendingPhoto = callback;
+                File folder = new File(getCacheDir(), "equipment-photos");
+                if (!folder.exists() && !folder.mkdirs()) { pendingPhoto.onReceiveValue(null); pendingPhoto = null; return true; }
+                File[] old = folder.listFiles();
+                if (old != null) for (File file : old) if (file.lastModified() < System.currentTimeMillis() - 86400000L) file.delete();
+                cameraOutput = Uri.parse("content://" + getPackageName() + ".photos/" + UUID.randomUUID() + ".jpg");
+                Intent camera = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                camera.putExtra(MediaStore.EXTRA_OUTPUT, cameraOutput);
+                camera.setClipData(ClipData.newRawUri("equipment photo", cameraOutput));
+                camera.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                Intent picker = Build.VERSION.SDK_INT >= 33 ? new Intent(MediaStore.ACTION_PICK_IMAGES).setType("image/*") : new Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*");
+                try { startActivityForResult(params.isCaptureEnabled() ? camera : picker, PHOTO_PICK_REQUEST); }
+                catch (android.content.ActivityNotFoundException e) { pendingPhoto.onReceiveValue(null); pendingPhoto = null; cameraOutput = null; }
+                return true;
+            }
+            @Override
+            public void onPermissionRequest(PermissionRequest request) {
+                runOnUiThread(() -> handleWebPermission(request));
+            }
+
+            @Override
+            public void onPermissionRequestCanceled(PermissionRequest request) {
+                if (request == pendingAudioRequest) pendingAudioRequest = null;
+            }
+        });
         webView.setWebViewClient(new WebViewClient() {
-            private boolean mainLoaded = false;
-
-            @Override
-            public void onPageStarted(WebView view, String url, Bitmap favicon) {
-                mainLoaded = false;
-                super.onPageStarted(view, url, favicon);
+            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                Uri uri=request.getUrl();
+                if ("handsfree-document".equals(uri.getScheme())) {
+                    Uri current=Uri.parse(view.getUrl()==null?"":view.getUrl());
+                    if (request.isForMainFrame() && isTrustedOrigin(current) && "/kmt-sa2/improvement.html".equals(current.getPath()) && ("save".equals(uri.getHost()) || "share".equals(uri.getHost()))) improvementPdf.export(MainActivity.this,view,"share".equals(uri.getHost()));
+                    return true;
+                }
+                return false;
             }
-
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                mainLoaded = true;
-                super.onPageFinished(view, url);
-            }
-
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 super.onReceivedError(view, request, error);
                 if (request != null && request.isForMainFrame()) {
-                    showLoadError("NETWORK " + error.getErrorCode(), request.getUrl().toString());
+                    showLoadError("NETWORK " + error.getErrorCode());
                 }
             }
 
@@ -68,7 +134,7 @@ public class MainActivity extends Activity {
             public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
                 super.onReceivedHttpError(view, request, response);
                 if (request != null && request.isForMainFrame() && response.getStatusCode() >= 400) {
-                    showLoadError("HTTP " + response.getStatusCode(), request.getUrl().toString());
+                    showLoadError("HTTP " + response.getStatusCode());
                 }
             }
         });
@@ -80,11 +146,57 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void showLoadError(String code, String url) {
+    private boolean isTrustedOrigin(Uri origin) {
+        Uri app = Uri.parse(APP_URL);
+        return origin != null && "https".equalsIgnoreCase(origin.getScheme())
+            && app.getHost() != null && app.getHost().equalsIgnoreCase(origin.getHost());
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (improvementPdf.result(this,requestCode,resultCode,data)) return;
+        if (requestCode != PHOTO_PICK_REQUEST || pendingPhoto == null) return;
+        Uri selected = resultCode == RESULT_OK ? (data != null && data.getData() != null ? data.getData() : cameraOutput) : null;
+        if (selected != null && !"content".equals(selected.getScheme())) selected = null;
+        ValueCallback<Uri[]> callback = pendingPhoto; pendingPhoto = null; cameraOutput = null;
+        callback.onReceiveValue(selected == null ? null : new Uri[]{selected});
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (pendingPhoto != null) { pendingPhoto.onReceiveValue(null); pendingPhoto = null; }
+        super.onDestroy();
+    }
+
+    private void handleWebPermission(PermissionRequest request) {
+        if (!isTrustedOrigin(request.getOrigin())) { request.deny(); return; }
+        boolean audioOnly = request.getResources().length == 1
+            && PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(request.getResources()[0]);
+        if (!audioOnly) { request.deny(); return; }
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+        } else {
+            pendingAudioRequest = request;
+            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, AUDIO_PERMISSION_REQUEST);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != AUDIO_PERMISSION_REQUEST || pendingAudioRequest == null) return;
+        PermissionRequest request = pendingAudioRequest;
+        pendingAudioRequest = null;
+        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+        } else request.deny();
+    }
+
+    private void showLoadError(String code) {
         String html = "<html><body style='font-family:sans-serif;padding:28px'>"
             + "<h2>HandsFree 연결 오류</h2>"
             + "<p>" + code + "</p>"
-            + "<p style='word-break:break-all'>" + url + "</p>"
             + "<button style='font-size:18px;padding:12px 18px' onclick=\"location.href='" + APP_URL + "'\">다시 연결</button>"
             + "</body></html>";
         webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
@@ -98,6 +210,16 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
+        if (webView != null) {
+            webView.evaluateJavascript("(()=>{const d=document.querySelector('dialog[open]');if(d){d.close();return true}return false})()", value -> {
+                if (!"true".equals(value)) navigateBackOrFinish();
+            });
+            return;
+        }
+        super.onBackPressed();
+    }
+
+    private void navigateBackOrFinish() {
         if (webView != null && webView.canGoBack()) {
             webView.goBack();
         } else {
