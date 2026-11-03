@@ -8,7 +8,7 @@ const MAX_FAILS=5;
 const attempts=globalThis.__hfSa2Attempts||(globalThis.__hfSa2Attempts=new Map());
 
 
-function clientKey(req){const ip=String(req.headers['x-forwarded-for']||req.socket?.remoteAddress||'unknown').split(',')[0].trim();const name=String(req.body?.name||'').trim();return ip+'|'+crypto.createHash('sha256').update(name).digest('hex').slice(0,16);}
+function clientKey(req){const ip=String(req.headers['x-forwarded-for']||req.socket?.remoteAddress||'unknown').split(',')[0].trim();const account=String(req.body?.username||req.body?.name||'').trim().toLowerCase();return ip+'|'+crypto.createHash('sha256').update(account).digest('hex').slice(0,16);}
 function blocked(req){
   const key=clientKey(req),row=attempts.get(key);
   if(!row)return false;
@@ -62,7 +62,7 @@ export default async function handler(req,res){
    const cookies=[sa2Cookie({sub:'member-'+p.id,email:'MEMBER:'+p.id,label:p.name,member:{id:p.id,version:p.version}})];
    const {adminCookie,clearAdminCookie}=await import('../lib/admin-session.mjs');cookies.push(p.isMaster?adminCookie({id:p.id,version:p.version}):clearAdminCookie());
    res.setHeader('Set-Cookie',cookies);clearFailures(req);return reply(res,200,{ok:true,user:{label:p.name,role:p.role,isMaster:p.isMaster===true,team:p.team,memberId:p.id,auth:'member'}});
-  }catch(e){failed(req);const known=/^(account_denied|account_pending|username_taken|member_account_exists|member_denied|member_locked|invalid_username|invalid_password|password_confirmation_mismatch|invalid_member_input|registration_required|member_session_revoked|master_required|stale_record)$/;return reply(res,e.message==='member_locked'?429:known.test(e.message)?400:503,{ok:false,error:known.test(e.message)?e.message:'auth_unavailable'});}
+  }catch(e){if(['account_denied','member_locked'].includes(e.message))failed(req);const known=/^(account_denied|account_pending|username_taken|member_account_exists|member_denied|member_locked|invalid_username|invalid_password|password_confirmation_mismatch|invalid_member_input|registration_required|member_session_revoked|master_required|stale_record)$/;return reply(res,e.message==='member_locked'?429:known.test(e.message)?400:503,{ok:false,error:known.test(e.message)?e.message:'auth_unavailable'});}
  }
  return reply(res,400,{ok:false,error:'invalid_request'});
 }

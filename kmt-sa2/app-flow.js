@@ -16,8 +16,8 @@ function lifecycleCacheSet(orderId,history){
  }catch{}
 }
 const appCall=b=>b.action==='edit'?api('/api/sa2-app',b,55000):readApp(b);
-function appError(e){if(!e.status&&!e.data)return '연결 실패 또는 응답 미확인입니다. 자동 재전송하지 않습니다.';const code=e.data?.error||e.message;return ({registration_required:'개별 초대코드로 개인 계정 등록이 필요합니다. 입력은 보존됩니다.',member_session_revoked:'계정이 변경 또는 중지되었습니다. 개인 로그인을 확인하세요.',team_forbidden:'소속 팀의 장비만 입력·수정할 수 있습니다.',team_lead_required:'공정 상태·일정 정정은 팀장 또는 공장장에게 요청하세요.',unauthorized:'로그인 상태를 확인할 수 없습니다. 개인 로그인을 다시 확인하세요.',invalid_identity:'개인 인증을 확인하지 못했습니다. 다시 로그인하세요.',identity_denied:'개인 인증 또는 허용 계정을 확인하세요.',invalid_origin:'앱 주소와 인증 출처 설정을 확인하세요.',personal_login_required:'사용자 등록이 필요합니다.',activation_required:'사용자 등록이 필요합니다.',forbidden:'이 계정의 권한을 확인하세요.',stale_record:'다른 변경이 있습니다. 최신 내용을 다시 열어 수정하세요.',project_mismatch:'프로젝트 연결을 확인하세요.',ambiguous_receipt:'같은 내용의 요청이 여러 건입니다. 요청 번호로 확인하세요.',invalid_reason:'변경 사유를 입력하세요.',invalid_next_action:'다음 행동을 입력하세요.',no_change:'변경한 내용이 없습니다.',edit_gate_closed:'수정 기능 연결을 확인 중입니다.'})[code]||scheduleErrors[code]||'연결 결과를 확인하지 못했습니다. 잠시 후 다시 확인하세요.';}
-function appFailure(el,e){if(el?.isConnected)el.innerHTML=esc(appError(e))+(e.status===401?' <a href="./account.html?v=20261030m265">사용자 등록</a>':'');}
+function appError(e){if(!e.status&&!e.data)return '연결 실패 또는 응답 미확인입니다. 자동 재전송하지 않습니다.';const code=e.data?.error||e.message;return ({registration_required:'개인 계정으로 로그인하세요. 작성한 입력은 보존됩니다.',activation_required:'로그인이 필요합니다. 작성한 입력은 보존됩니다.',unauthorized_app:'로그인 연결이 만료되었습니다. 다시 로그인하세요. 작성한 입력은 보존됩니다.',member_session_revoked:'계정이 변경 또는 중지되었습니다. 개인 로그인을 확인하세요.',team_forbidden:'소속 팀의 장비만 입력·수정할 수 있습니다.',team_lead_required:'공정 상태·일정 정정은 팀장 또는 공장장에게 요청하세요.',unauthorized:'로그인 상태를 확인할 수 없습니다. 개인 로그인을 다시 확인하세요.',invalid_identity:'개인 인증을 확인하지 못했습니다. 다시 로그인하세요.',identity_denied:'개인 인증 또는 허용 계정을 확인하세요.',invalid_origin:'앱 주소와 인증 출처 설정을 확인하세요.',personal_login_required:'사용자 등록이 필요합니다.',activation_required:'사용자 등록이 필요합니다.',forbidden:'이 계정의 권한을 확인하세요.',stale_record:'다른 변경이 있습니다. 최신 내용을 다시 열어 수정하세요.',project_mismatch:'프로젝트 연결을 확인하세요.',ambiguous_receipt:'같은 내용의 요청이 여러 건입니다. 요청 번호로 확인하세요.',invalid_reason:'변경 사유를 입력하세요.',invalid_next_action:'다음 행동을 입력하세요.',no_change:'변경한 내용이 없습니다.',edit_gate_closed:'수정 기능 연결을 확인 중입니다.'})[code]||scheduleErrors[code]||'연결 결과를 확인하지 못했습니다. 잠시 후 다시 확인하세요.';}
+function appFailure(el,e){if(el?.isConnected)el.innerHTML=esc(appError(e))+(e.status===401?' <a href="./account.html?v=20261103m267">사용자 등록</a>':'');}
 function appDay(v){if(/^\d{5}(?:\.\d+)?$/.test(String(v)))return new Date(Date.UTC(1899,11,30)+Math.floor(Number(v))*86400000).toISOString().slice(0,10);return String(v||'');}
 const PROJECT_META_KEY='hf-project-meta-v2';
 let projectMetaPending=null;
@@ -697,23 +697,56 @@ async function projectHistory(orderId){open(heading('Event · 변경이력',orde
  }catch(e){appFailure(el,e);}}
 async function editIssue(issueId){open(heading('상태 수정',issueId)+'<div id="issueEditResult">최신 상태를 불러오는 중…</div>');const el=$('issueEditResult');try{const d=await appCall({action:'issue',issueId});if(!el.isConnected)return;if(!['OPEN','MONITOR','CLOSED'].includes(d.status)){el.textContent='취소된 과거 이슈는 수정할 수 없습니다. 변경이력에서 확인하세요.';appIssue=null;return;}appIssue=d;
  el.innerHTML='<p>'+esc(d.customer)+' · '+esc(d.model)+'<br>'+esc(d.orderId)+'</p><label>현재 상태<input id="issueState" maxlength="80" value="'+esc(d.state)+'"></label><label>다음 행동<textarea id="issueNext" maxlength="500">'+esc(d.nextAction)+'</textarea></label><label>이슈 관리 상태<select id="issueStatus">'+[['OPEN','진행 중'],['MONITOR','관찰 중'],['CLOSED','종결']].map(([v,t])=>'<option value="'+v+'" '+(d.status===v?'selected':'')+'>'+t+'</option>').join('')+'</select></label><label>변경 사유<textarea id="issueReason" maxlength="500"></textarea></label><p id="issueSaveHint" role="status"></p><button id="issueSaveButton" class="primary" onclick="saveIssue()">변경 내용 확인 후 저장</button><button class="secondary" onclick="checkIssueReceipt()">이 기기의 마지막 상태 저장 결과 확인</button>';
+ el.insertAdjacentHTML('beforeend',issueRequestHistoryHtml(issueId)+(readStore('hf-issue-drafts-v1',{})[issueId]?'<button class="secondary" onclick="restoreIssueDraft(\''+esc(issueId)+'\')">기기에 보관한 수정 초안 불러오기</button>':''));
  }catch(e){appFailure(el,e);}}
 function applyIssueReceiptLocal(d){const i=items.findIndex(x=>x.issueId===d.issueId);if(i>=0){const prev=items[i];items[i]={...prev,state:d.state,nextAction:d.nextAction,issueStatus:d.issueStatus,process:coreProcessFromState(d.state,d.nextAction,prev.process),priority:corePriorityFromState(d.state,d.nextAction,d.issueStatus,prev.priority),sourceLatestUpdate:new Date().toISOString()};}items=items.map(x=>({...x,id:itemIdentity(x)}));renderCoreScreen();}
-async function saveIssue(){if(!appIssue||$('issueSaveButton')?.disabled)return;if(readStore('hf-issue-pending',null))return toast('이전 상태 저장 결과부터 확인하세요. 자동 재전송하지 않습니다.');const body={action:'edit',issueId:appIssue.issueId,orderId:appIssue.orderId,expected:appIssue.revision,state:$('issueState').value.trim(),nextAction:$('issueNext').value.trim(),status:$('issueStatus').value,reason:$('issueReason').value.trim(),requestId:crypto.randomUUID()};const hint=$('issueSaveHint');if(!body.state||!body.reason||(!body.nextAction&&body.status!=='CLOSED')){hint.textContent='현재 상태, 다음 행동, 변경 사유를 확인하세요.';return;}try{persist('hf-issue-pending',body);}catch{hint.textContent='요청을 기기에 보관하지 못해 전송하지 않았습니다.';return;}$('issueSaveButton').disabled=true;hint.textContent='서버 저장 중…';try{const d=await appCall(body);if(d.status!=='APPLIED')throw Error('unconfirmed');applyIssueReceiptLocal(d);showIssueReceiptPending(d);setTimeout(()=>verifyIssueReceipt(d),0);}catch(e){if([400,401,403,409].includes(e.status))localStorage.removeItem('hf-issue-pending');if(hint.isConnected){hint.textContent=appError(e);$('issueSaveButton').hidden=true;}}}
+async function saveIssue(){
+ if(!appIssue||$('issueSaveButton')?.disabled)return;
+ const hint=$('issueSaveHint'),button=$('issueSaveButton');
+ const body={action:'edit',issueId:appIssue.issueId,orderId:appIssue.orderId,expected:appIssue.revision,state:$('issueState').value.trim(),nextAction:$('issueNext').value.trim(),status:$('issueStatus').value,reason:$('issueReason').value.trim(),requestId:crypto.randomUUID()};
+ if(!body.state||!body.reason||(!body.nextAction&&body.status!=='CLOSED')){hint.textContent='현재 상태, 다음 행동, 변경 사유를 확인하세요.';return;}
+ button.disabled=true;
+ try{
+  const drafts=readStore('hf-issue-drafts-v1',{});drafts[body.issueId]={...body};persist('hf-issue-drafts-v1',drafts);
+  // Copy the legacy cursor into durable request history before a new request.
+  const legacy=readStore('hf-issue-pending',null);if(legacy)rememberIssueRequest(legacy,'pending');
+  const pending=pendingIssueRequest(body.issueId);
+  if(pending){
+   hint.textContent='이 장비의 이전 요청을 서버에서 확인 중…';
+   const receipt=await appCall({action:'receipt',issueId:pending.issueId,requestId:pending.requestId});
+   if(!matchingIssueReceipt(pending,receipt)){hint.textContent='이 장비의 이전 요청은 아직 저장 여부가 미확인입니다. 입력은 그대로 두었습니다. 아래에서 해당 요청을 확인하세요.';return;}
+   confirmIssueRequest(receipt);
+  }
+  rememberIssueRequest(body,'pending');persist('hf-issue-pending',body);
+  hint.textContent='서버 저장 중…';
+  const d=await appCall(body);if(!matchingIssueReceipt(body,d))throw Error('receipt_mismatch');
+  confirmIssueRequest(d);showIssueReceiptPending(d);setTimeout(()=>verifyIssueReceipt(d),0);
+ }catch(e){
+  if([400,401,403,409].includes(e.status)){
+   rememberIssueRequest(body,'rejected');
+   if(readStore('hf-issue-pending',null)?.requestId===body.requestId)localStorage.removeItem('hf-issue-pending');
+  }
+  if(hint.isConnected)hint.textContent=appError(e)+' 입력 내용은 이 화면과 요청 이력에 보존됩니다.';
+ }finally{if(button.isConnected!==false){button.disabled=false;button.hidden=false;}}
+}
 function showIssueReceiptPending(d){open(heading('서버 저장 성공',d.state,d.orderId)+'<p>다음 행동 '+esc(d.nextAction||'없음')+'</p><p>'+esc(d.reason)+'</p><p class="alert">화면에 바로 반영했습니다. 서버 원본을 다시 확인하고 있습니다.</p><p class="note">'+esc(d.requestId)+'</p>');}
-function showIssueReceipt(d){if(d.status!=='APPLIED')throw Error('unconfirmed');try{localStorage.removeItem('hf-issue-pending');}catch{}open(heading('현재 상태 저장 완료',d.state,d.orderId)+'<p>다음 행동 '+esc(d.nextAction||'없음')+'</p><p>'+esc(d.reason)+'</p><p class="alert">앱의 현재 업무 화면에도 수정 내용을 반영했습니다.</p><p class="note">'+esc(d.actor)+'<br>'+esc(d.requestId)+'</p><button id="savedIssueHistory" class="secondary">변경이력 확인</button>');$('savedIssueHistory').onclick=()=>projectHistory(d.orderId);}
-async function checkIssueReceipt(){const b=readStore('hf-issue-pending',null);if(!b)return toast('확인할 상태 저장 요청이 없습니다.');try{const d=await appCall({action:'receipt',issueId:b.issueId,requestId:b.requestId});if(d.status==='APPLIED'){await verifyIssueReceipt(d);}else toast('저장 이력이 아직 확인되지 않습니다. 자동 재전송하지 않습니다.');}catch(e){toast(appError(e));}}
+function showIssueReceipt(d){if(d.status!=='APPLIED')throw Error('unconfirmed');try{if(readStore('hf-issue-pending',null)?.requestId===d.requestId)localStorage.removeItem('hf-issue-pending');}catch{}open(heading('현재 상태 저장 완료',d.state,d.orderId)+'<p>다음 행동 '+esc(d.nextAction||'없음')+'</p><p>'+esc(d.reason)+'</p><p class="alert">앱의 현재 업무 화면에도 수정 내용을 반영했습니다.</p><p class="note">'+esc(d.actor)+'<br>'+esc(d.requestId)+'</p><button id="savedIssueHistory" class="secondary">변경이력 확인</button>');$('savedIssueHistory').onclick=()=>projectHistory(d.orderId);}
+async function checkIssueReceipt(requestId=''){
+ const records=issueRequestHistory(),b=requestId?records.find(r=>r.requestId===requestId):records.find(r=>r.issueId===appIssue?.issueId&&r.phase==='pending')||records.find(r=>r.phase==='pending')||records[0];
+ if(!b)return toast('확인할 상태 저장 요청이 없습니다.');
+ try{const d=await appCall({action:'receipt',issueId:b.issueId,requestId:b.requestId});if(matchingIssueReceipt(b,d))await verifyIssueReceipt(d);else toast('이 요청의 저장 여부는 아직 미확인입니다. 요청 번호와 원문을 보존했고 재전송하지 않았습니다.');}catch(e){toast(appError(e));}
+}
 function receiptState(d){if(d.applied&&/REVIEW|EXCLUDED|FAILED/.test(d.status))return 'partial';if(/FAILED|PROCESSING/.test(d.status))return 'unknown';return /REVIEW/.test(d.status)?'review':d.applied?'saved_unverified':/EXCLUDED/.test(d.status)?'excluded':/DUPLICATE/.test(d.status)?'duplicate':'received';}
 const appReceiptBase=receiptDetail;
 function linkedIssueForNote(r){return items.find(x=>x.issueId&&(r.target.includes(x.orderId)||r.target.includes(x.customer)&&r.target.includes(x.model)));}
 receiptDetail=function(id){appReceiptBase(id);const r=notes().find(x=>x.id===id);if(!r)return;if(r.copiedFrom)$('sheetBody').insertAdjacentHTML('beforeend','<p class="note">원문 보관 번호 '+esc(r.copiedFrom)+'</p>');if(r.revisions?.length)$('sheetBody').insertAdjacentHTML('beforeend','<details><summary>기기에 보관한 수정 이력</summary>'+r.revisions.map(v=>'<p>'+esc(v.target)+'<br>'+esc(v.text)+'</p>').join('')+'</details>');if(r.status!=='draft'){$('sheetBody').insertAdjacentHTML('beforeend','<button id="serverReceiptButton" class="secondary">서버 저장 결과 다시 확인</button>');$('serverReceiptButton').onclick=()=>checkEventReceipt(id);}if(r.status!=='sending'){$('sheetBody').insertAdjacentHTML('beforeend','<button id="editLocalNote" class="secondary">'+(['draft','rejected'].includes(r.status)?'내용 수정하기':'내용 수정 후 새로 접수')+'</button>');$('editLocalNote').onclick=()=>editLocalNote(id);}};
-async function checkEventReceipt(id,silent=false){const r=notes().find(x=>x.id===id);if(!r)return false;try{const d=await appCall({action:'receipt',requestId:r.requestId||'',submissionId:r.submissionId||r.id,text:`${r.target} ${r.text}`,targetHint:r.target});if(d.status==='NOT_FOUND'){updateNote(id,{ack:'서버에서 일치하는 저장 기록을 아직 찾지 못했습니다. 기존 상태와 원문을 보존하며 자동 재전송하지 않습니다.',respondedAt:new Date().toISOString()});if(!silent)receiptDetail(id);return false;}updateNote(id,{status:receiptState(d),requestId:d.requestId||r.requestId,ack:d.ack||r.ack||'서버 저장 결과를 확인했습니다.',respondedAt:new Date().toISOString()});if(d.applied)await verifyEventNote(id,d);if(!silent)receiptDetail(id);return true;}catch(e){const current=notes().find(x=>x.id===id);const saved=!!current?.eventVerifiedAt||['saved_unverified','applied'].includes(current?.status);updateNote(id,{ack:saved?'서버 저장 응답 확인 · 원본 재조회가 지연 중입니다. 자동 재전송하지 않습니다.':appError(e)});if(!silent)receiptDetail(id);return false;}}
+async function checkEventReceipt(id,silent=false){const r=notes().find(x=>x.id===id);if(!r)return false;try{let d=await appCall({action:'receipt',requestId:r.requestId||'',submissionId:r.submissionId||r.id,text:`${r.target} ${r.text}`,targetHint:r.target});if(d.status==='NOT_FOUND'&&r.requestId)d=await recoverJournalFromHistory(r)||d;if(d.status==='NOT_FOUND'){updateNote(id,{ack:'서버에서 일치하는 저장 기록을 아직 찾지 못했습니다. 기존 상태와 원문을 보존하며 자동 재전송하지 않습니다.',respondedAt:new Date().toISOString()});if(!silent)receiptDetail(id);return false;}updateNote(id,{status:receiptState(d),requestId:d.requestId||r.requestId,ack:d.ack||r.ack||'서버 저장 결과를 확인했습니다.',respondedAt:new Date().toISOString()});if(eventJournalConfirmed(r,d))updateNote(id,{eventVerifiedAt:new Date().toISOString()});if(d.applied)await verifyEventNote(id,d);if(!silent)receiptDetail(id);return true;}catch(e){const current=notes().find(x=>x.id===id);const saved=!!current?.eventVerifiedAt||['saved_unverified','applied'].includes(current?.status);updateNote(id,{ack:saved?'서버 저장 응답 확인 · 원본 재조회가 지연 중입니다. 자동 재전송하지 않습니다.':appError(e)});if(!silent)receiptDetail(id);return false;}}
 const eventReceiptTimers=new Map();
 function scheduleEventReceiptCheck(id,delay=0,silent=false){clearTimeout(eventReceiptTimers.get(id));eventReceiptTimers.set(id,setTimeout(async()=>{eventReceiptTimers.delete(id);await checkEventReceipt(id,silent);},delay));}
 let eventReceiptSweep=null,eventReceiptCursor=0;
 function reconcileEventReceipts(){
  if(eventReceiptSweep)return eventReceiptSweep;
- const all=notes().filter(r=>['sending','unknown','received','saved_unverified','duplicate'].includes(r.status)||(r.status==='partial'&&r.eventVerifiedAt&&r.issueId&&!r.issueVerifiedAt));
+ const all=notes().filter(r=>['sending','unknown','received','saved_unverified','duplicate','partial','review'].includes(r.status));
  if(!all.length){eventReceiptCursor=0;return Promise.resolve();}
  const start=eventReceiptCursor%all.length,pending=Array.from({length:Math.min(5,all.length)},(_,i)=>all[(start+i)%all.length]);
  eventReceiptCursor=(start+pending.length)%all.length;
@@ -725,7 +758,8 @@ saveNote=function(){if(!editingNoteId)return appSaveNoteBase();const id=editingN
 function canSendNote(r,editing=false){
  const unresolved=['sending','unknown','received','duplicate','saved_unverified','partial','review'];
  const parent=r.copiedFrom&&notes().find(x=>x.id===r.copiedFrom);
- if((editing&&(unresolved.includes(r.status)||(r.status==='applied'&&!r.verifiedAt)))||(r.copiedFrom&&(!parent||unresolved.includes(parent.status)||(parent.status==='applied'&&!parent.verifiedAt)))){toast('이전 요청의 서버 결과부터 확인하세요. 중복 방지를 위해 수정본 전송을 보류합니다.');return false;}
+ const blocked=n=>!n||n.status==='sending'||(!n.eventVerifiedAt&&(unresolved.includes(n.status)||(n.status==='applied'&&!n.verifiedAt)));
+ if((editing&&blocked(r))||(r.copiedFrom&&blocked(parent))){toast('이전 요청의 서버 저장 여부를 먼저 확인합니다. 원문은 보존하며 중복 전송하지 않습니다.');if(typeof checkEventReceipt==='function'&&typeof scheduleEventReceiptCheck==='function')scheduleEventReceiptCheck(parent?.id||r.id,0);return false;}
  return true;
 }
 async function saveEditedAndSend(){if(!editingNoteId)return;const id=saveNote();if(id)await sendNote(id);}
@@ -763,6 +797,7 @@ async function verifyEventNote(id,receipt){
   }
   if(r.eventType&&r.orderId){
    if(d.applied!==true||d.status!=='WRITTEN'||!d.requestId||(Array.isArray(d.events)&&d.events.some(e=>e.status!=='WRITTEN'||e.orderId!==r.orderId)))throw Error('receipt_unconfirmed');
+   if(typeof eventJournalConfirmed==='function'&&eventJournalConfirmed(r,d))updateNote(id,{eventVerifiedAt:new Date().toISOString(),ack:'원문 업무이력 저장 확인 · 현재 화면 반영은 별도 확인 중'});
    const evidence=await readBackSubmittedProject(r,d.requestId,d);
    updateNote(id,{status:'applied',requestId:d.requestId,verifiedAt:new Date().toISOString(),eventVerifiedAt:new Date().toISOString(),ack:evidence.historical?'서버 이력 저장 확인 · 현재 카드는 후속 기록을 표시합니다.':'저장 완료 · 해당 장비 서버 반영 확인'});return true;
   }
@@ -827,15 +862,17 @@ async function verifyProgressIssue(id,d){
 }
 async function verifyIssueReceipt(d){
  if(d.status!=='APPLIED')throw Error('unconfirmed');
+ confirmIssueRequest(d);
  try{
   const current=await appCall({action:'issue',issueId:d.issueId});
   if(current.issueId!==d.issueId||current.orderId!==d.orderId||current.state!==d.state||current.nextAction!==d.nextAction||current.status!==d.issueStatus)throw Error('readback_mismatch');
   if(readPending)await readPending;
   if(!await refresh())throw Error('refresh_failed');
   const shown=items.find(x=>x.issueId===d.issueId);
-  if(d.issueStatus==='CLOSED'?!!shown:!shown||shown.orderId!==d.orderId||shown.state!==d.state||shown.nextAction!==d.nextAction||shown.issueStatus!==d.issueStatus)throw Error('readback_mismatch');
+  const project=shown||items.find(x=>x.orderId===d.orderId);
+  if(!project||project.orderId!==d.orderId||project.state!==d.state||project.nextAction!==d.nextAction||(project.issueStatus&&project.issueStatus!==d.issueStatus))throw Error('readback_mismatch');
   applyIssueReceiptLocal(d);showIssueReceipt(d);
- }catch{open(heading('현재 상태 저장 응답 확인','재조회 확인 필요',d.orderId)+'<p class="alert">서버 저장 응답은 받았지만 최신 조회값과의 일치를 확인하지 못했습니다. 자동 재전송하지 않습니다.</p><button class="secondary" onclick="checkIssueReceipt()">서버 저장 결과 다시 확인</button>');}
+ }catch{open(heading('서버 저장 이력 확인','화면 반영은 별도 확인 중',d.orderId)+'<p class="alert">요청 번호와 저장 내용이 일치합니다. 최신 화면이 다른 상태이거나 조회가 지연 중입니다. 같은 내용을 재전송하지 않았고 새 수정은 가능합니다.</p><p>'+esc(d.state)+' · '+esc(d.reason)+'</p><p class="note">'+esc(d.requestId)+'</p><button class="secondary" onclick="checkIssueReceipt(\''+esc(d.requestId)+'\')">이 요청 다시 확인</button><button class="primary" onclick="editIssue(\''+esc(d.issueId)+'\')">최신 상태를 열어 새로 수정</button>');}
 }
 
 function hybridProjectMatch(orderId){const id=String(orderId||''),exact=items.find(x=>x.orderId===id);if(exact)return exact;return items.find(x=>x.orderId?.includes('*')&&id.startsWith(x.orderId.replace(/\*.*$/,'')))||null;}
@@ -1188,8 +1225,8 @@ function saveTodayDraft(key,text){
  if(text)drafts[id]=String(text).slice(0,800);else delete drafts[id];
  persist('hf-today-issue-drafts-v1',drafts);
 }
-function unresolvedSameInput(orderId,text,general=false){
- return notes().find(r=>(general?r.eventType==='GENERAL':r.orderId===orderId)&&(r.originalText||r.text)===text&&['sending','unknown','received','saved_unverified','partial','review','duplicate'].includes(r.status));
+function unresolvedSameInput(orderId,text,general=false,selection=''){
+ return notes().find(r=>(general?r.eventType==='GENERAL':r.orderId===orderId)&&(r.originalText||r.text)===text&&['sending','unknown','received','saved_unverified','partial','review','duplicate'].includes(r.status)&&!(r.eventVerifiedAt&&selection&&selection!==(r.text.match(/\[공정 확인\]\s*([^\n]+)$/)?.[1]||r.displayState)));
 }
 function previewUnifiedEvent(key,scope=document){
  const field=scope.querySelector('[data-unified-text="'+key+'"]'),status=scope.querySelector('[data-unified-preview="'+key+'"]');
@@ -1220,11 +1257,11 @@ async function submitUnifiedEvent(key,text,statusEl){
  let bodyText=String(text||'').trim();
  const originalText=bodyText;
  if(!bodyText)return {ok:false,error:'empty'};
- const pending=unresolvedSameInput(x.orderId,bodyText);
+ const choice=typeof issueDecision==='function'?issueDecision(key,bodyText):'';
+ const pending=unresolvedSameInput(x.orderId,bodyText,false,choice);
  if(pending)return {ok:false,partial:true,eventSaved:!!pending.eventVerifiedAt||['saved_unverified','applied'].includes(pending.status),pendingId:pending.id};
  if(navigator.onLine===false)return {ok:false,error:'offline'};
  const context=classifyUnifiedEvent(bodyText,x);
- const choice=typeof issueDecision==='function'?issueDecision(key,bodyText):'';
  if(context.needsDecision&&!choice||typeof issueDecisionIncomplete==='function'&&issueDecisionIncomplete(key,bodyText)){if(statusEl)statusEl.textContent='실제 공정과 진행상태를 먼저 선택하세요. 원문은 보존됩니다.';return {ok:false,error:'decision_required'};}
  if(choice)bodyText+='\n[공정 확인] '+choice;
  const classification=classifyUnifiedEvent(bodyText,x),impact=classification.explicitDecision?{...classification,effectiveState:classification.state||x.state,effectiveNext:x.nextAction,label:classification.label}:resolveUnifiedImpact(x,classification,bodyText);
@@ -1370,6 +1407,7 @@ async function saveTodayIssue(key){
    return;
  }else if(result.partial){
    if(statusEl)statusEl.textContent=result.eventSaved?'Event는 저장됐지만 상태 자동반영은 확인하지 못했습니다. 중복 입력하지 말고 이력을 확인하세요.':'이전 접수 결과 확인 중입니다. 이 기기 입력 이력에서 서버 저장 결과를 확인하세요. 중복 전송하지 않습니다.';
+   if(result.pendingId&&statusEl){statusEl.insertAdjacentHTML('beforeend','<button class="secondary" onclick="checkEventReceipt(\''+esc(result.pendingId)+'\')">이전 요청 저장 결과 바로 확인</button>');scheduleEventReceiptCheck(result.pendingId,0,true);}
  }else{
    const messages={grouped_target:'이 장비는 발주번호가 묶여 있습니다. 01/02 개별 장비 선택 기능을 먼저 연결해야 합니다.',offline:'오프라인입니다. 네트워크 연결 후 기록하세요.',local_store:'기기 기록 보관에 실패해 전송하지 않았습니다.',rejected:'요청이 거절됐습니다. 연결과 권한을 확인하세요.',unknown:'응답을 확정하지 못했습니다. 자동 재전송하지 않습니다.',decision_required:'반영할 공정을 먼저 선택하세요. 내용만 기록하려면 공정 유지로 선택하세요.',missing_issue:'입력 장비를 현재 목록에서 찾지 못했습니다. 초안은 보관했습니다.',text_too_long:'장비 정보와 줄별 내용을 합쳐 전송 길이를 초과했습니다. 내용을 나누어 기록하세요.',empty:'진행 또는 이슈 내용을 입력하세요.',client_error:'입력 처리 중 오류가 발생했습니다. 초안을 보관했으며 자동 재전송하지 않습니다.'};
    if(result.error==='decision_required')previewUnifiedEvent(key,main);

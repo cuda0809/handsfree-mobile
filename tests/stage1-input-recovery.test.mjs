@@ -41,7 +41,7 @@ test('state edit readback can complete with matching current data and fails clos
  const d={status:'APPLIED',issueId:'ISS',orderId:'JOB',state:'전장 완료',nextAction:'프로그램',issueStatus:'OPEN'};
  let shown=0,pending=0;
  const c=vm.createContext({items:[{...d}],readPending:null,appCall:async()=>({...d,status:'OPEN'}),refresh:async()=>true,
- applyIssueReceiptLocal(){},showIssueReceipt(){shown++;},open(){pending++;},heading:()=>'',esc:String});
+ confirmIssueRequest(){},applyIssueReceiptLocal(){},showIssueReceipt(){shown++;},open(){pending++;},heading:()=>'',esc:String});
  vm.runInContext(src.slice(src.indexOf('async function verifyIssueReceipt('),src.indexOf('function hybridProjectMatch(')),c);
  await c.verifyIssueReceipt(d);assert.equal(shown,1);assert.equal(pending,0);
  c.items=[];await c.verifyIssueReceipt(d);assert.equal(shown,1);assert.equal(pending,1);
