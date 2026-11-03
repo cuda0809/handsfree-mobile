@@ -127,15 +127,70 @@ function processField_(ss,p,id){
 function splitEvents_(raw){const a=String(raw).split(/\r?\n|;/).map(x=>x.trim()).filter(Boolean);return a.length?a:[String(raw).trim()];}
 
 function normalEvent_(ss,line,index,p){
-  const now=new Date(),project=resolveProject_(ss,line),type=workType_(line),people=extractPeople_(line),date=parseDate_(line,now),excludedDate=safety_(ss,'Excluded Actual Date')||'2026-09-14',dateKey=Utilities.formatDate(date,HF_SW.TZ,'yyyy-MM-dd');
+  if(String(p.channel||'').split('|').includes('GENERAL_EVENT')&&p.targetHint==='GENERAL_ISSUE')return generalEvent_(ss,line,index,p);
+  const now=new Date(),project=resolveUnifiedProject_(ss,line,p),classified=workType_(line),type=classified==='재입고완료'&&String(p.channel||'').split('|').includes('UNIFIED_EVENT')?'일일작업':classified,people=extractPeople_(line),date=parseDate_(line,now),excludedDate=safety_(ss,'Excluded Actual Date')||'2026-09-14',dateKey=Utilities.formatDate(date,HF_SW.TZ,'yyyy-MM-dd');
   const excluded=dateKey===excludedDate,conf=confidence_(type,project,people,line),safe=!excluded&&highConfidence_(type,project,people,conf),reason=excluded?`EXCLUDED_DATE:${excludedDate}`:safe?'':'LOW_CONFIDENCE_OR_AMBIGUOUS_TARGET';
   return {receivedAt:now,source:'FIELD_INPUT',raw:line,eventIndex:index,target:type==='재입고완료'?'반출일지':'업무이력',date,type,customer:project.customer||'',model:project.model||'',orderId:project.orderId||'',actor:String(p.requester||'UNKNOWN'),work:workContent_(line,project,people),people:people.join(', '),link:project.orderId||'',confidence:conf,safe,excluded,reason,inputSheet:p.inputSheet,inputRow:p.inputRow};
+}
+
+function resolveUnifiedProject_(ss,line,p){
+ if(!String(p.channel||'').split('|').includes('UNIFIED_EVENT'))return resolveProject_(ss,line);
+ const jobs=String(p.targetHint||'').match(/(?:[A-Z]{2,4}-)?\d{6}[A-Z]-\d{3}(?:-\d+)?/g)||[];
+ const ids=Array.from(new Set(jobs));
+ const invalid={orderId:'',customer:'',model:'',ambiguous:true,score:0};
+ if(ids.length!==1)return invalid;
+ const explicit=String(line).match(/(?:[A-Z]{2,4}-)?\d{6}[A-Z]-\d{3}(?:-\d+)?/g)||[];
+ if(explicit.some(id=>id!==ids[0]))return invalid;
+ const target=resolveUnifiedCoreProject_(ss,ids[0]);
+ return target.orderId===ids[0]&&!target.ambiguous?target:invalid;
+}
+
+// The unified app lists Core equipment, not the smaller legacy product master.
+// Resolve exact A/B jobs only; missing schema, duplicate jobs and other teams fail closed.
+function resolveUnifiedCoreProject_(ss,orderId){
+ const invalid={orderId:'',customer:'',model:'',ambiguous:true,score:0};
+ const sh=ss.getSheetByName('HF_CORE_통합운영');
+ if(!sh||sh.getSheetId()!==1301394609)return invalid;
+ const values=sh.getRange(1,1,Math.max(sh.getLastRow(),1),5).getDisplayValues();
+ const headers=['Project_ID','JOB_NO','생산팀','고객사','모델'];
+ if(!values.length||headers.some((v,i)=>values[0][i]!==v))return invalid;
+ const matches=values.slice(1).filter(r=>String(r[1]||'').trim()===orderId);
+ if(matches.length!==1)return invalid;
+ const r=matches[0],team=String(r[2]||'').trim();
+ if(!String(r[0]||'').trim()||!['A','B'].includes(team)||!String(r[3]||'').trim()||!String(r[4]||'').trim())return invalid;
+ return {orderId,customer:String(r[3]).trim(),model:String(r[4]).trim(),ambiguous:false,score:8};
+}
+
+// Read-only deployment check: classification only, never enqueue/process/write.
+function verifyUnifiedCoreTargetsReadOnly(){
+ const ss=SpreadsheetApp.openById(HF_SW.SSID);
+ if(ss.getId()!==HF_SW.SSID)throw Error('CLASSIFIER_DB_MISMATCH');
+ const jobs=['260626A-045','260727A-060-02'];
+ const checks=jobs.map(job=>{
+  const p={channel:'MOBILE|UNIFIED_EVENT',targetHint:job};
+  const e=normalEvent_(ss,job+' 테스트',1,p);
+  const conflict=resolveUnifiedProject_(ss,jobs.find(id=>id!==job)+' 작업',p);
+  return {job,matched:e.orderId===job,safe:e.safe,conflictRejected:conflict.ambiguous};
+ });
+ const unknownRejected=resolveUnifiedProject_(ss,'테스트',{channel:'MOBILE|UNIFIED_EVENT',targetHint:'269999A-999'}).ambiguous;
+ if(checks.some(x=>!x.matched||!x.safe||!x.conflictRejected)||!unknownRejected)throw Error('CLASSIFIER_VERIFICATION_FAILED');
+ const result={ok:true,readOnly:true,checks,unknownRejected};
+ console.log(JSON.stringify(result));return result;
 }
 
 function workType_(raw){const t=norm_(HF_SW.PEOPLE.reduce((s,n)=>s.split(n).join(' '),String(raw)));if(/재입고완료|수정품.*입고완료|반출품.*입고완료/.test(t))return'재입고완료';if(/출고완료|납품완료/.test(t))return'출고완료';if(/불량|문제|이상|소음|끼임|동심|재가공|고장|파손/.test(t))return'불량발생';if(/일정.*변경|연기|미뤄|당겨|재조정/.test(t))return'일정변경';if(/지연|대기|미입고|발주누락|누락/.test(t))return'지연사유';if(/외주입고/.test(t))return'외주입고';if(/(^|[^a-z])pt([^a-z]|$)|pt지원/.test(t))return'PT';if(/a\/s|as지원|a\/s지원/.test(t))return'A/S';if(/출장/.test(t))return'출장';if(/반차/.test(t))return'반차';if(/연차/.test(t))return'연차';if(/타팀지원|지원/.test(t))return'타팀지원';if(/검수/.test(t))return'검수';return'일일작업';}
 
 function resolveProject_(ss,raw){
   return resolveEventProject_(getSheet_(ss,HF_SW.SHEET.PRODUCT,null),raw);
+}
+
+// Explicit non-equipment input still passes Queue, normalization and the existing safety gate.
+// Never resolve customer/model text in this lane to an equipment record.
+function generalEvent_(ss,line,index,p){
+ const now=new Date(),date=parseDate_(line,now),dateKey=Utilities.formatDate(date,HF_SW.TZ,'yyyy-MM-dd');
+ const excluded=dateKey===(safety_(ss,'Excluded Actual Date')||'2026-09-14');
+ const valid=String(line||'').trim().length>=2&&String(p.requester||'').trim()!=='';
+ return {receivedAt:now,source:'FIELD_INPUT',raw:line,eventIndex:index,target:'업무이력',date,type:/지원/.test(line)?'타팀지원':'기타',general:true,customer:'',model:'',orderId:'',actor:String(p.requester||'UNKNOWN'),work:String(line).trim(),people:extractPeople_(line).join(', '),link:'',confidence:valid?1:0,safe:valid&&!excluded,excluded,reason:excluded?'EXCLUDED_DATE:'+dateKey:valid?'':'GENERAL_INPUT_INVALID',inputSheet:p.inputSheet,inputRow:p.inputRow};
 }
 function resolveEventProject_(sh,raw){
   const rows=sh.getRange(5,1,Math.max(sh.getLastRow()-4,1),3).getDisplayValues().filter(r=>String(r[0]||'').trim());
@@ -159,7 +214,14 @@ function highConfidence_(type,p,people,c){if(['연차','반차'].includes(type))
 function workContent_(raw,p,people){let t=String(raw).trim();[p.orderId,p.customer,p.model].concat(people).forEach(v=>{if(v)t=t.replace(v,' ');});t=t.replace(/\s+/g,' ').trim();return t||String(raw).trim();}
 
 function appendNorm_(ss,e,id){
-  const sh=getSheet_(ss,HF_SW.SHEET.NORM,HF_SW.ID.NORM),row=blankRow_(sh,2,1);ensureRows_(sh,row);const eid=id+'-E'+String(e.eventIndex).padStart(2,'0'),dedupe=sha256_([e.source,Utilities.formatDate(e.date,HF_SW.TZ,'yyyy-MM-dd'),norm_(e.raw)].join('|'));
+  const sh=getSheet_(ss,HF_SW.SHEET.NORM,HF_SW.ID.NORM),eid=id+'-E'+String(e.eventIndex).padStart(2,'0'),dedupe=sha256_([e.source,Utilities.formatDate(e.date,HF_SW.TZ,'yyyy-MM-dd'),norm_(e.raw)].join('|'));
+  let row=blankRow_(sh,2,1);
+  if(e.general&&sh.getLastRow()>1){
+    const found=sh.getRange(2,1,sh.getLastRow()-1,23).getDisplayValues().map((r,i)=>({r,row:i+2})).filter(x=>x.r[0]===eid);
+    if(found.length>1)throw Error('GENERAL_EVENT_ID_CONFLICT');
+    if(found.length){const prior=found[0];if(prior.r[3]!==e.raw||prior.r[17]||prior.r.slice(7).some(v=>String(v||'').trim()))throw Error('GENERAL_EVENT_RETRY_REVIEW_REQUIRED');row=prior.row;}
+  }
+  ensureRows_(sh,row);
   const headers=['Project_ID','Actor_Email','Request_ID'];
   if(sh.getMaxColumns()<23)sh.insertColumnsAfter(sh.getMaxColumns(),23-sh.getMaxColumns());
   const existing=sh.getRange(1,21,1,3).getDisplayValues()[0];

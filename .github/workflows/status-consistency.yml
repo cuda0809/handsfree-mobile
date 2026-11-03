@@ -1,0 +1,17 @@
+name: Current status consistency
+on:
+  push:
+    paths: ['kmt-sa2/**', 'api/sa2-*.js', 'apps-script/**', 'tests/**', '.github/workflows/status-consistency.yml']
+  pull_request:
+    paths: ['kmt-sa2/**', 'api/sa2-*.js', 'apps-script/**', 'tests/**', '.github/workflows/status-consistency.yml']
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - run: node --check kmt-sa2/app-flow.js && node --check kmt-sa2/mobile.js && node --check api/sa2-write.js
+      - run: node --test tests/status-consistency.test.mjs tests/current-state-next-action.test.mjs tests/current-issues-general.test.mjs tests/core-refresh-truth.test.mjs tests/process-seven-stages.test.mjs tests/actual-delivery-evidence.test.mjs

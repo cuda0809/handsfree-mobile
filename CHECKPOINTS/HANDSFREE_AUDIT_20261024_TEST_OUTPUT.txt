@@ -1,0 +1,27 @@
+Baseline f4655ab plus separately prepared, undeployed PIN override. Local tests; not live E2E.
+✖ tests/android-wrapper.test.mjs (96.514165ms)
+✖ tests/app-api.test.mjs (4898.425956ms)
+✖ local input history hides other-team equipment without deleting original notes or general work (2.682901ms)
+✖ plan current count excludes shipping wait, needs-check and actual shipment; ID-less equipment stays visible (17.106217ms)
+✖ delivery view includes completed history and confirmed actual day without mixing it into current work (2.124974ms)
+✖ failed plan read retains prior cards but never reports a confirmed zero or current count (0.670575ms)
+✖ signed read routes fail closed and never substitute catalog for unsupported Core (3719.543891ms)
+✖ unavailable or stale Core never presents zero issues as a confirmed result (15.002615ms)
+✖ verified empty Core can accurately show zero issues (0.88945ms)
+✖ verified nonempty previous snapshot displays real cards immediately but remains explicitly stale (0.639459ms)
+✖ project detail keeps current issue, recent event and next action distinct (1.591041ms)
+✖ Core and catalog start together instead of stacking upstream waits (1.883806ms)
+✖ confirmed B-team snapshot populates metadata without another Core request or projects-array exception (4.778442ms)
+✖ today issue photo entry points remain separate from text issues and use actual plan processes (2.559699ms)
+✖ actual project renderer shows seven plans with electrical and program dates separate (1.661976ms)
+✖ tests/receipt-flow.test.mjs (77.621336ms)
+✖ tests/sa2-flow.test.mjs (67.547105ms)
+✖ tests/sa283-core-status.test.mjs (68.029817ms)
+✖ tests/sa283-hybrid05-ui.test.mjs (76.244278ms)
+✖ tests/schedule-ui.test.mjs (79.293483ms)
+✖ targeted readback accepts only the exact saved request and immutable project (2.577065ms)
+ℹ tests 210
+ℹ pass 189
+ℹ fail 21
+ℹ duration_ms 4953.011346
+✖ failing tests:

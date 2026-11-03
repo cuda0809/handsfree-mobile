@@ -27,15 +27,20 @@ async function saveSchedule(){
  const hint=$('scheduleHint'),button=$('scheduleSave');button.disabled=true;
  try{localStorage.setItem('hf-schedule-pending',JSON.stringify(b));}catch{hint.textContent='기기에 요청을 보관하지 못해 전송하지 않았습니다.';button.disabled=false;return;}
  hint.textContent='저장 결과를 확인하는 중…';
- try{const d=await api('/api/lifecycle',b,55000);showScheduleReceipt(d);}
+ try{const d=await api('/api/lifecycle',b,55000);await showScheduleReceipt(d);}
  catch(e){if(hint.isConnected){hint.textContent=scheduleMessage(e.data?.error);button.outerHTML='<button class="secondary" onclick="checkScheduleReceipt()">저장 결과 확인</button>';}}
 }
-function showScheduleReceipt(d){
+async function showScheduleReceipt(d){
  if(d.status!=='APPLIED')throw Error('unconfirmed');
+ const pending=readStore('hf-schedule-pending',null);
+ if(!pending||d.requestId!==pending.requestId||d.orderId!==pending.orderId||d.key!==pending.key||d.date!==pending.date)throw Error('receipt_mismatch');
+ const latest=await api('/api/lifecycle',{action:'plans',orderId:pending.orderId});
+ const matches=latest.records?.filter(r=>r.key===pending.key);
+ if(latest.orderId!==pending.orderId||matches?.length!==1||matches[0].date!==pending.date)throw Error('readback_mismatch');
  try{localStorage.removeItem('hf-schedule-pending');}catch{}
  open(heading('일정 저장 완료',d.beforeDate+' → '+d.date,d.orderId)+'<p>월간계획과 원장에 저장하고 변경이력을 남겼습니다.</p><p>'+esc(d.reason)+'</p><p class="note">작성자 '+esc(d.actor)+'<br>요청 번호 '+esc(d.requestId)+'</p>');scheduleEdit=null;
 }
 async function checkScheduleReceipt(){
  let b;try{b=JSON.parse(localStorage.getItem('hf-schedule-pending'));}catch{}if(!b)return toast('확인할 일정 요청이 없습니다.');
- try{const d=await api('/api/lifecycle',{action:'receipt',orderId:b.orderId,requestId:b.requestId});if(d.status==='APPLIED')showScheduleReceipt(d);else toast('아직 저장 이력이 확인되지 않습니다. 자동 재전송하지 않습니다.');}catch{toast('저장 결과를 확인하지 못했습니다. 요청은 기기에 보관되어 있습니다.');}
+ try{const d=await api('/api/lifecycle',{action:'receipt',orderId:b.orderId,requestId:b.requestId});if(d.status==='APPLIED')await showScheduleReceipt(d);else toast('아직 저장 이력이 확인되지 않습니다. 자동 재전송하지 않습니다.');}catch{toast('서버 저장 결과와 최신 일정의 일치를 확인하지 못했습니다. 요청은 기기에 보관하며 자동 재전송하지 않습니다.');}
 }

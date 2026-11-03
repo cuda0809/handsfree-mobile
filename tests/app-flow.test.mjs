@@ -13,6 +13,11 @@ const fresh={...b,requestId:'issue-test-00000002',expected:c.hfLsHash_(s.rows[1]
 s.formulas[1][16]='=A1';assert.throws(()=>c.hfAppIssueBuild_(s,fresh,'2026-09-28T08:00:00Z'),/formula_cell/);s.formulas[1][16]='';
 assert.throws(()=>c.hfAppIssueBuild_(s,{...fresh,orderId:'OTHER'},'now'),/project_mismatch/);assert.throws(()=>c.hfAppIssueBuild_(s,{...fresh,reason:''},'now'),/invalid_reason/);
 console.log('PASS issue atomic batch, identity and source preservation, close boolean, stale/formula/conflict guards and owner receipt');
+const blankRow=row.slice();blankRow[18]='';
+const blankSnapshot={...s,rows:[[],blankRow],audit:[],formulas:[[],[]]};
+const blankRequest={...b,expected:c.hfLsHash_(blankRow),nextAction:''};
+assert.equal(c.hfAppIssueBuild_(blankSnapshot,blankRequest,'2026-10-07T00:00:00Z').after[18],'');
+assert.throws(()=>c.hfAppIssueBuild_({...blankSnapshot,rows:[[],row]},{...blankRequest,expected:c.hfLsHash_(row)},'2026-10-07T00:00:00Z'),/invalid_next_action/);
 const queue=[['Request','At','Kind','Actor','Payload'],['HF-1','','','owner@test',JSON.stringify({submissionId:'submission-test-0001',raw:'verified input',targetHint:'PROJECT-01'}),'DONE']],normalized=[[],['HF-1-E01','','','verified input','','','','진행','','','','','','','','PROJECT-01','','WRITTEN','','','PROJECT-01','owner@test','HF-1']];
 c.hfAppRows_=(ss,name)=>name==='HF_DATA_입력대기열'?queue:name==='HF_DATA_입력정규화'?normalized:[];
 assert.equal(c.hfAppReceipt_({}, {submissionId:'submission-test-0001',actor:{email:'owner@test'}}).status,'WRITTEN');assert.equal(c.hfAppReceipt_({}, {requestId:'HF-1',actor:{email:'other@test'}}).status,'NOT_FOUND');

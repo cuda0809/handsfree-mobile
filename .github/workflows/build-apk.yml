@@ -27,14 +27,23 @@ jobs:
 
       - name: Build debug APK
         working-directory: android
-        run: gradle assembleDebug --no-daemon
+        run: >-
+          gradle assembleDebug assembleCamera --no-daemon
+          -PHF_APP_URL="https://handsfree-mobile-alpha-02-git-codex-real-l-fbac1c-cuda0809-8210.vercel.app/kmt-sa2/?app=sa283preview"
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk HandsFree-Mobile-Alpha3.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk HandsFree-REAL-MOBILE21-Camera.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: HandsFree-Mobile-Alpha3-APK
-          path: HandsFree-Mobile-Alpha3.apk
+          name: HandsFree-REAL-MOBILE21-Camera-APK
+          path: HandsFree-REAL-MOBILE21-Camera.apk
+          if-no-files-found: error
+
+      - name: Upload parallel camera installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: HandsFree-REAL-Camera-Parallel-APK
+          path: android/app/build/outputs/apk/camera/app-camera.apk
           if-no-files-found: error

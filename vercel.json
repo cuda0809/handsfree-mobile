@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [{"source":"/kmt-sa2/login.html","destination":"/kmt-sa2/account.html?manage=1","permanent":false}],
+  "headers": [{"source":"/kmt-sa2/:file(account|login|members).:ext(html|js)","headers":[{"key":"Cache-Control","value":"no-store, max-age=0, must-revalidate"}]}],
+  "functions": {
+    "api/sa2-app.js": {
+      "regions": ["iad1"]
+    }
+  }
+}
